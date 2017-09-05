@@ -1,0 +1,19 @@
+[root]
+name = "test_bin"
+version = "0.1.0"
+dependencies = [
+ "errors 0.1.0",
+ "syntax 0.1.0",
+]
+
+[[package]]
+name = "errors"
+version = "0.1.0"
+
+[[package]]
+name = "syntax"
+version = "0.1.0"
+dependencies = [
+ "errors 0.1.0",
+]
+

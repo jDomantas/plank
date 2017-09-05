@@ -1,0 +1,114 @@
+use std::cell::RefCell;
+use std::marker::PhantomData;
+use std::rc::Rc;
+use position::Span;
+use typenum::{Nat, Z, S};
+
+
+#[derive(Default, Debug, Clone)]
+pub struct Reporter {
+    diagnostics: Rc<RefCell<Vec<Diagnostic>>>,
+}
+
+impl Reporter {
+    pub fn new() -> Reporter {
+        Default::default()
+    }
+
+    pub fn have_errors(&self) -> bool {
+        self.diagnostics.borrow().iter().any(|d| {
+            d.severity == Severity::Error
+        })
+    }
+
+    pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
+        self.diagnostics.borrow().clone()
+    }
+
+    pub fn error<T>(&mut self, msg: T) -> Builder<S<S<Z>>>
+        where T: Into<String>
+    {
+        self.diagnostic(Severity::Error, msg)
+    }
+
+    pub fn warning<T>(&mut self, msg: T) -> Builder<S<S<Z>>>
+        where T: Into<String>
+    {
+        self.diagnostic(Severity::Warning, msg)
+    }
+
+    pub fn diagnostic<T>(&mut self, severity: Severity, msg: T) -> Builder<S<S<Z>>>
+        where T: Into<String>
+    {
+        Builder::new(self, severity, msg.into())
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
+pub enum Severity {
+    Error,
+    Warning,
+}
+
+#[derive(Debug, Clone)]
+pub struct Diagnostic {
+    pub message: String,
+    pub severity: Severity,
+    pub notes: Vec<Note>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Note {
+    pub span: Span,
+    pub message: Option<String>,
+}
+
+#[must_use]
+pub struct Builder<N> {
+    phantom: PhantomData<N>,
+    reporter: Reporter,
+    diagnostic: Diagnostic,
+}
+
+impl<N: Nat> Builder<N> {
+    fn new(reporter: &Reporter, severity: Severity, msg: String) -> Self {
+        Builder {
+            phantom: PhantomData,
+            reporter: reporter.clone(),
+            diagnostic: Diagnostic {
+                message: msg,
+                severity,
+                notes: Vec::new(),
+            },
+        }
+    }
+
+    pub fn build(self) {
+        assert!(self.diagnostic.notes.len() > 0, "built a diagnostic without any notes");
+        self.reporter.diagnostics.borrow_mut().push(self.diagnostic);
+    }
+}
+
+impl<N: Nat> Builder<S<N>> {
+    pub fn span(self, span: Span) -> Builder<N> {
+        self.note(span, None)
+    }
+
+    pub fn span_note<T>(self, span: Span, msg: T) -> Builder<N>
+        where T: Into<String>
+    {
+        self.note(span, Some(msg.into()))
+    }
+
+    fn note(mut self, span: Span, msg: Option<String>) -> Builder<N> {
+        self.diagnostic.notes.push(Note {
+            span,
+            message: msg,
+        });
+        Builder {
+            phantom: PhantomData,
+            reporter: self.reporter,
+            diagnostic: self.diagnostic,
+        }
+    }
+}
