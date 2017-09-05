@@ -28,6 +28,7 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     parser.prefix(TokenKind::Token(Token::Plus), &UnaryOpParser(UnaryOp::Plus));
     parser.prefix(TokenKind::Token(Token::Minus), &UnaryOpParser(UnaryOp::Minus));
     parser.prefix(TokenKind::Token(Token::Star), &UnaryOpParser(UnaryOp::Deref));
+    parser.prefix(TokenKind::Token(Token::Not), &UnaryOpParser(UnaryOp::Not));
     parser.prefix(TokenKind::Token(Token::LeftParen), &ParenthesisedParser);
 
     parser.infix(TokenKind::Token(Token::LeftParen), &CallParser);

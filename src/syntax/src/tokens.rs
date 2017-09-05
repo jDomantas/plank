@@ -32,6 +32,7 @@ pub enum Token {
     Colon,
     DoubleColon,
     Semicolon,
+    Not,
     Assign,
     Error,
 }
@@ -80,6 +81,7 @@ impl fmt::Display for Token {
             Token::DoubleColon => write!(f, "::"),
             Token::Semicolon => write!(f, ";"),
             Token::Assign => write!(f, "="),
+            Token::Not => write!(f, "!"),
             Token::Error => write!(f, "?"),
         }
     }
@@ -154,7 +156,8 @@ impl TokenKind {
             TokenKind::Token(Token::Minus) |
             TokenKind::Token(Token::Star) |
             TokenKind::Token(Token::Ampersand) |
-            TokenKind::Token(Token::LeftParen) => true,
+            TokenKind::Token(Token::LeftParen) |
+            TokenKind::Token(Token::Not) => true,
             _ => false,
         }
     }
