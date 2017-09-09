@@ -430,7 +430,6 @@ impl<'a> Parser<'a> {
             } else {
                 Vec::new()
             };
-            // TODO: make this nicer?
             let span = Spanned::span(&name).merge(self.previous_span());
             let typ = Type::Concrete(name, params);
             Ok(Spanned::new(typ, span))
