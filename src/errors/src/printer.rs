@@ -194,7 +194,25 @@ impl<'a> Printer<'a> {
 
     fn print_annotations(&mut self) {
         let line_markers = ::std::mem::replace(&mut self.line_markers, BTreeMap::new());
+        let mut last_printed = None;
         for (line, markers) in line_markers {
+            // println!("now: {}, prev: {:?}", line, last_printed);
+            if let Some(prev) = last_printed {
+                if self.full_connection_cols.len() > 0 {
+                    if line - prev > 2 {
+                        self.print_line(prev + 1);
+                        self.print_gap_line();
+                        self.print_line(line - 1);
+                    } else {
+                        for line in (prev + 1)..line {
+                            self.print_line(line);
+                        }
+                    }
+                } else if line - prev > 1 {
+                    self.print_gap_line();
+                }
+            }
+            last_printed = Some(line);
             self.print_line_and_markers(line, markers);
         }
     }
@@ -224,12 +242,14 @@ impl<'a> Printer<'a> {
         //          ~~~  ~ first note
         //            |
         //            second note
-        match markers.iter().next_back().cloned().unwrap() {
-            LineMarker::FromTo { end_col, .. } => {
+        match markers.iter().next_back().cloned() {
+            Some(LineMarker::FromTo { end_col, .. }) => {
                 self.print_markers(&markers, end_col);
                 println!();
             }
-            LineMarker::FromStart { arrow_col, message, .. } if message.is_some() => {
+            Some(LineMarker::FromStart { arrow_col, message, .. })
+                if message.is_some() =>
+            {
                 self.print_markers(&markers, arrow_col + 1);
                 println!();
             }
@@ -286,6 +306,18 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+    }
+
+    fn print_gap_line(&mut self) {
+        print!("{: <width$}", "...", width = self.number_space + 4);
+        for col in 0..self.next_connect_col {
+            if self.full_connection_cols.contains(&col) {
+                print!("|");
+            } else {
+                print!(" ");
+            }
+        }
+        println!();
     }
 
     fn print_immediate_markers(&mut self, markers: &[LineMarker]) {
