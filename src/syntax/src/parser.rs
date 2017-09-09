@@ -289,6 +289,29 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn synchronize_item(&mut self) {
+        loop {
+            match self.peek() {
+                Some(&Token::Keyword(Keyword::Struct)) |
+                Some(&Token::Keyword(Keyword::Extern)) |
+                None => {
+                    return;
+                }
+                // don't stop on fn type - also check that after fn goes an ident
+                Some(&Token::Keyword(Keyword::Fn)) => {
+                    match self.peek2() {
+                        Some(&Token::Ident(_)) => {
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            self.consume().expect("token disappeared");
+        }
+    }
+
     fn parse_program(&mut self) -> Program {
         let mut program = Program {
             structs: Vec::new(),
@@ -301,26 +324,26 @@ impl<'a> Parser<'a> {
                 if let Ok(s) = self.parse_struct() {
                     program.structs.push(s);
                 } else {
-                    return program;
+                    self.synchronize_item();
                 }
             } else if self.check(Token::Keyword(Keyword::Fn)) {
                 if let Ok(f) = self.parse_function(FunctionType::Normal) {
                     program.functions.push(f);
                 } else {
-                    return program;
+                    self.synchronize_item();
                 }
             } else if self.check(Token::Keyword(Keyword::Extern)) {
                 if self.expect(Token::Keyword(Keyword::Fn)).is_err() {
-                    return program;
+                    self.synchronize_item();
                 }
                 if let Ok(f) = self.parse_function(FunctionType::Normal) {
                     program.functions.push(f);
                 } else {
-                    return program;
+                    self.synchronize_item();
                 }
             } else {
                 self.emit_error(None);
-                return program;
+                self.synchronize_item();
             }
         }
     }
