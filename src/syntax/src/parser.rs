@@ -645,6 +645,8 @@ impl InfixParser for CallParser {
                     let value = parser.parse_expr()?;
                     params.push(CallParam::Named(name, value));
                 } else {
+                    // TODO: if next token is ident, and after that we get an
+                    // error, `:` won't be in the list of expected tokens.
                     params.push(CallParam::Unnamed(parser.parse_expr()?));
                 }
                 if parser.check(Token::RightParen) {
