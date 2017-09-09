@@ -186,7 +186,7 @@ impl<'a> Lexer<'a> {
         let start = self.current_pos;
         loop {
             match self.peek() {
-                Some(ch) if ch.is_alphanumeric() => {
+                Some(ch) if is_ident_char(ch) => {
                     string.push(ch);
                     self.advance();
                 }
@@ -205,12 +205,12 @@ impl<'a> Lexer<'a> {
     fn next_raw_token(&mut self) -> Option<Spanned<Token>> {
         loop {
             return Some(match self.peek() {
-                Some(ch) if ch.is_whitespace() => {
+                Some(' ') | Some('\t') | Some('\r') | Some('\n') => {
                     self.advance();
                     continue;
                 }
                 Some(ch) if ch.is_digit(10) => self.lex_number(),
-                Some(ch) if ch.is_alphabetic() => self.lex_name(),
+                Some(ch) if is_ident_char(ch) => self.lex_name(),
                 Some('.') => self.single_char(Token::Dot),
                 Some(',') => self.single_char(Token::Comma),
                 Some(';') => self.single_char(Token::Semicolon),
@@ -221,7 +221,6 @@ impl<'a> Lexer<'a> {
                 Some(')') => self.single_char(Token::RightParen),
                 Some('{') => self.single_char(Token::LeftBrace),
                 Some('}') => self.single_char(Token::RightBrace),
-                Some('_') => self.single_char(Token::Underscore),
                 Some('|') => self.two_char('|', Token::Or),
                 Some('!') => self.test_second('=', Token::Not, Token::NotEqual),
                 Some('&') => self.test_second('&', Token::Ampersand, Token::And),
@@ -276,8 +275,15 @@ impl<'a> Lexer<'a> {
     }
 }
 
+fn is_ident_char(ch: char) -> bool {
+    // TODO: grammar allows only /[a-zA-Z0-9_]/,
+    // but here we allow funky unicode stuff
+    ch.is_alphanumeric() || ch == '_'
+}
+
 fn keyword(s: &str) -> Option<Token> {
     match s {
+        "extern" => Some(Token::Keyword(Keyword::Extern)),
         "fn" => Some(Token::Keyword(Keyword::Fn)),
         "struct" => Some(Token::Keyword(Keyword::Struct)),
         "if" => Some(Token::Keyword(Keyword::If)),
@@ -290,6 +296,7 @@ fn keyword(s: &str) -> Option<Token> {
         "return" => Some(Token::Keyword(Keyword::Return)),
         "true" => Some(Token::Bool(true)),
         "false" => Some(Token::Bool(false)),
+        "_" => Some(Token::Underscore),
         _ => None,
     }
 }

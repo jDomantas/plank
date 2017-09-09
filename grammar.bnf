@@ -1,0 +1,90 @@
+<w>                 ::= "" | <mandatory-w>
+<mandatory-w>       ::= <w-char> <w>
+<w-char>            ::= " " | "\n" | "\t" | "\r"
+
+<program>           ::= <w> <item> <program> | <w>
+<item>              ::= <function> | <struct>
+<item-name>         ::= <ident> | <ident> <w> "<" <w> <ident-list> <w> ">"
+<ident-list>        ::= <ident> | <ident> <w> "," <w> <ident-list>
+
+<struct>            ::= "struct" <mandatory-w> <item-name> <w> "{" <field-list> "}"
+<field-list>        ::= <w> | <w> <field> <w> | <w> <field> <w> "," <field-list>
+<field>             ::= <ident> <w> ":" <w> <type>
+
+<function-type>     ::= "extern" <mandatory-w> | ""
+<function>          ::= <function-type> <function-header> <w> <function-body>
+<function-body>     ::= <block> | ";"
+<function-header>   ::= "fn" <mandatory-w> <item-name> <w> "(" <param-list> ")" <w> "->" <w> <type>
+<param-list>        ::= <w> | <w> <param> <w> | <w> <param> <w> "," <param-list>
+<param>             ::= <ident> <w> ":" <w> <type>
+
+<type>              ::= "_" | "*" <w> <type> | <fn-type> | <type-name>
+<fn-type>           ::= "fn" <w> "(" <type-list> ")" <w> "->" <w> <type>
+<type-list>         ::= <w> | <w> <type> <w> | <w> <type> <w> "," <type-list>
+<type-name>         ::= <ident> | <ident> <w> "<" <w> <type-param-list> <w> ">"
+<type-param-list>   ::= <type> | <type> <w> "," <w> <type-param-list>
+
+<block>             ::= "{" <statement-list> "}"
+<statement-list>    ::= <w> | <w> <statement> <statement-list>
+<statement>         ::= <if> | <loop> | <while> | <break> | <cont> | <return> | <let> | <block> | <expr-statement>
+<if>                ::= "if" <w> <expr-w> <w> <block> <opt-else>
+<opt-else>          ::= "" | <w> "else" <w> <block>
+<loop>              ::= "loop" <w> <block>
+<while>             ::= "while" <w> <expr-w> <w> <block>
+<break>             ::= "break" <w> ";"
+<cont>              ::= "continue" <w> ";"
+<return>            ::= "return" <w> <expr-w> <w> ";"
+<expr-statement>    ::= <expr> <w> ";"
+
+<let>               ::= "let" <mandatory-w> <ident> <opt-type> <w> "=" <w> <expr> <w> ";"
+<opt-type>          ::= "" | <w> ":" <type>
+
+<expr>              ::= <assign>
+<assign>            ::= <or> | <or> <w> "=" <w> <assign>
+<or>                ::= <and> | <or> <w> "||" <w> <and>
+<and>               ::= <equation> | <and> <w> "&&" <w> <equation>
+<equation>          ::= <comparision> | <equation> <equation-op> <comparision>
+<comparision>       ::= <sum> | <comparision> <compare-op> <sum>
+<sum>               ::= <product> | <sum> <add-op> <product>
+<product>           ::= <unary> | <product> <mul-op> <unary>
+<unary>             ::= <call> | <unary-op> <w> <unary>
+<call>              ::= <term> | <term> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
+<term>              ::= <literal> | <name> | "(" <w> <expr> <w> ")"
+<literal>           ::= <bool> | <int>
+
+<expr-w>            ::= <assign-w>
+<assign-w>          ::= <or-w> | <or-w> <w> "=" <w> <assign>
+<or-w>              ::= <and-w> | <or-w> <w> "||" <w> <and>
+<and-w>             ::= <equation-w> | <and-w> <w> "&&" <w> <equation>
+<equation-w>        ::= <comparision-w> | <equation-w> <equation-op> <comparision>
+<comparision-w>     ::= <sum-w> | <comparision-w> <compare-op> <sum>
+<sum-w>             ::= <product-w> | <sum-w> <add-op> <product>
+<product-w>         ::= <unary-w> | <product-w> <mul-op> <unary>
+<unary-w>           ::= <call-w> | <unary-op> <w> <unary>
+<call-w>            ::= <term-w> | <term-w> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
+<term-w>            ::= <literal-w> | <w-char> <name> | "(" <w> <expr> <w> ")"
+<literal-w>         ::= <w-char> <bool> | <w-char> <int>
+
+<call-param-list>   ::= <w> | <w> <call-param> <w> | <w> <call-param> <w> "," <call-param-list>
+<call-param>        ::= <expr> | <ident> <w> ":" <w> <expr>
+
+<bool>              ::= "true" | "false"
+<int>               ::= <digit> | <non-zero-digit> <int>
+
+<equation-op>       ::= "==" | "!="
+<compare-op>        ::= "<" | "<=" | ">" | ">="
+<add-op>            ::= "+" | "-"
+<mul-op>            ::= "*" | "/" | "%"
+<unary-op>          ::= "+" | "-" | "*" | "&" | "!"
+
+<name>              ::= <ident> | <ident> <w> "::" <w> "<" <w> <type-param-list> <w> ">"
+
+<ident>             ::= <letter> <ident-suffix> | "_" <ident-char> <ident-suffix>
+<ident-suffix>      ::= "" | <ident-char> <ident-suffix>
+<ident-char>        ::= "_" | <letter> | <digit>
+
+<letter>            ::= <uppercase> | <lowercase>
+<uppercase>         ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+<lowercase>         ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+<non-zero-digit>    ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<digit>             ::= "0" | <non-zero-digit>

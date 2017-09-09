@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use errors::Reporter;
 use ast::{
     BinaryOp, Expr, Function, Ident, ItemName, Literal, Program, Statement,
-    Struct, UnaryOp, Type, Var,
+    Struct, UnaryOp, Type, Var, FunctionType, CallParam,
 };
 use position::{Position, Span, Spanned};
 use tokens::{Keyword, Token, TokenKind};
@@ -79,6 +79,7 @@ struct Parser<'a> {
     prev_span: Option<Span>,
     prefix_parsers: HashMap<TokenKind, &'a PrefixParser>,
     infix_parsers: HashMap<TokenKind, &'a InfixParser>,
+    // inside_statement: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -95,6 +96,7 @@ impl<'a> Parser<'a> {
             prefix_parsers: HashMap::new(),
             infix_parsers: HashMap::new(),
             expected: HashSet::new(),
+            // inside_statement: false,
         }
     }
 
@@ -106,7 +108,7 @@ impl<'a> Parser<'a> {
         self.prefix_parsers.insert(tok, parser);
     }
 
-    fn emit_error(&mut self) {
+    fn emit_error(&mut self, helper: Option<(Span, String)>) {
         if self.peek() == Some(&Token::Error) {
             // lexer should have already reported this
             return;
@@ -149,10 +151,49 @@ impl<'a> Parser<'a> {
                 msg
             }
         };
-        self.reporter
+        let builder = self.reporter
             .error(msg)
-            .span(self.peek_span())
-            .build();
+            .span_note(self.peek_span(), format!("unexpected {}", got));
+        if let Some((span, msg)) = helper {
+            builder.span_note(span, msg).build()
+        } else {
+            builder.build()
+        }
+    }
+
+    fn expect_semicolon(&mut self) -> ParseResult<()> {
+        if self.check(Token::Semicolon) {
+            return Ok(());
+        }
+        let (helper, res) = match (self.prev_span, &self.next_token) {
+            (Some(span), &Some(ref tok)) => {
+                let prev_line = span.end.line;
+                let next_line = Spanned::span(tok).start.line;      
+                assert!(prev_line <= next_line);
+                if next_line > prev_line {
+                    // make specialized error about expected
+                    // semicolon, and pretend that it exists
+                    let help_span = Span::new(span.end, span.end.forward(1));
+                    (Some((help_span, "maybe you missed a `;`?".into())), Ok(()))
+                } else {
+                    // regular error
+                    (None, Err(()))
+                }
+            }
+            _ => (None, Err(())),
+        };
+        self.emit_error(helper);
+        res
+    }
+
+    fn expect_closing(&mut self, tok: Token, opener: Span) -> ParseResult<()> {
+        if self.check(tok) {
+            Ok(())
+        } else {
+            let helper = (opener, "unclosed delimiter".into());
+            self.emit_error(Some(helper));
+            Err(())
+        }
     }
 
     fn previous_span(&self) -> Span {
@@ -177,6 +218,10 @@ impl<'a> Parser<'a> {
 
     fn peek(&self) -> Option<&Token> {
         self.next_token.as_ref().map(Spanned::value)
+    }
+
+    fn peek2(&self) -> Option<&Token> {
+        self.tokens.front().map(Spanned::value)
     }
 
     fn check(&mut self, tok: Token) -> bool {
@@ -207,7 +252,7 @@ impl<'a> Parser<'a> {
         if self.check(tok) {
             Ok(())
         } else {
-            self.emit_error();
+            self.emit_error(None);
             Err(())
         }
     }
@@ -240,7 +285,9 @@ impl<'a> Parser<'a> {
         if let Some(name) = self.check_ident() {
             Ok(name)
         } else {
-            self.emit_error();
+            // TODO: if next token is keyword,
+            // give message that it is a keyword and cannot be used as ident?
+            self.emit_error(None);
             Err(())
         }
     }
@@ -260,13 +307,22 @@ impl<'a> Parser<'a> {
                     return program;
                 }
             } else if self.check(Token::Keyword(Keyword::Fn)) {
-                if let Ok(f) = self.parse_function() {
+                if let Ok(f) = self.parse_function(FunctionType::Normal) {
+                    program.functions.push(f);
+                } else {
+                    return program;
+                }
+            } else if self.check(Token::Keyword(Keyword::Extern)) {
+                if self.expect(Token::Keyword(Keyword::Fn)).is_err() {
+                    return program;
+                }
+                if let Ok(f) = self.parse_function(FunctionType::Normal) {
                     program.functions.push(f);
                 } else {
                     return program;
                 }
             } else {
-                self.emit_error();
+                self.emit_error(None);
                 return program;
             }
         }
@@ -280,47 +336,44 @@ impl<'a> Parser<'a> {
             let name = self.consume_ident()?;
             self.expect(Token::Colon)?;
             let typ = self.parse_type()?;
-            self.expect(Token::Comma)?;
             fields.push(Var { name, typ });
+            if self.check(Token::RightBrace) {
+                break;
+            }
+            self.expect(Token::Comma)?;
         }
         Ok(Struct { name, fields })
     }
 
-    fn parse_function(&mut self) -> ParseResult<Function> {
+    fn parse_function(&mut self, fn_type: FunctionType) -> ParseResult<Function> {
         let name = self.parse_item_name()?;
         self.expect(Token::LeftParen)?;
-        let params = if self.check(Token::RightParen) {
-            Vec::new()
-        } else {
-            let params = self.parse_function_params()?;
-            self.expect(Token::RightParen)?;
-            params
-        };
+        let mut params = Vec::new();
+        while !self.check(Token::RightParen) {
+            let name = self.consume_ident()?;
+            self.expect(Token::Colon)?;
+            let typ = self.parse_type()?;
+            params.push(Var { name, typ });
+            if self.check(Token::RightParen) {
+                break;
+            }
+            self.expect(Token::Comma)?;
+        }
         self.expect(Token::Arrow)?;
         let return_type = self.parse_type()?;
-        self.expect(Token::LeftBrace)?;
-        let body = self.parse_block()?;
+        let body = if self.check(Token::Semicolon) {
+            None
+        } else {
+            self.expect(Token::LeftBrace)?;
+            Some(self.parse_block()?)
+        };
         Ok(Function {
+            fn_type,
             name,
             params,
             return_type,
             body,
         })
-    }
-
-    fn parse_function_params(&mut self) -> ParseResult<Vec<Var>> {
-        let mut params = Vec::new();
-        let name = self.consume_ident()?;
-        self.expect(Token::Colon)?;
-        let typ = self.parse_type()?;
-        params.push(Var { name, typ });
-        while self.check(Token::Comma) {
-            let name = self.consume_ident()?;
-            self.expect(Token::Colon)?;
-            let typ = self.parse_type()?;
-            params.push(Var { name, typ });
-        }
-        Ok(params)
     }
 
     fn parse_item_name(&mut self) -> ParseResult<ItemName> {
@@ -352,13 +405,14 @@ impl<'a> Parser<'a> {
         } else if self.check(Token::Keyword(Keyword::Fn)) {
             let start = self.previous_span();
             self.expect(Token::LeftParen)?;
-            let param_types = if self.check(Token::RightParen) {
-                Vec::new()
-            } else {
-                let types = self.parse_type_list()?;
-                self.expect(Token::RightParen)?;
-                types
-            };
+            let mut param_types = Vec::new();
+            while !self.check(Token::RightParen) {
+                param_types.push(self.parse_type()?);
+                if self.check(Token::RightParen) {
+                    break;
+                }
+                self.expect(Token::Comma)?;
+            }
             self.expect(Token::Arrow)?;
             let return_type = self.parse_type()?;
             let span = start.merge(Spanned::span(&return_type));
@@ -370,7 +424,9 @@ impl<'a> Parser<'a> {
         } else {
             let name = self.consume_ident()?;
             let params = if self.check(Token::Less) {
-                self.parse_type_list()?
+                let types = self.parse_type_params()?;
+                self.expect(Token::Greater)?;
+                types
             } else {
                 Vec::new()
             };
@@ -381,7 +437,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_type_list(&mut self) -> ParseResult<Vec<Spanned<Type>>> {
+    fn parse_type_params(&mut self) -> ParseResult<Vec<Spanned<Type>>> {
         let mut types = Vec::new();
         types.push(self.parse_type()?);
         while self.check(Token::Comma) {
@@ -422,16 +478,16 @@ impl<'a> Parser<'a> {
             Ok(Spanned::new(stmt, span))
         } else if self.check(Token::Keyword(Keyword::Break)) {
             let span = self.previous_span();
-            self.expect(Token::Semicolon)?;
+            self.expect_semicolon()?;
             Ok(Spanned::new(Statement::Break, span))
         } else if self.check(Token::Keyword(Keyword::Continue)) {
             let span = self.previous_span();
-            self.expect(Token::Semicolon)?;
+            self.expect_semicolon()?;
             Ok(Spanned::new(Statement::Continue, span))
         } else if self.check(Token::Keyword(Keyword::Return)) {
             let start = self.previous_span();
             let value = self.parse_expr()?;
-            self.expect(Token::Semicolon)?;
+            self.expect_semicolon()?;
             let span = start.merge(self.previous_span());
             Ok(Spanned::new(Statement::Return(value), span))
         } else if self.check(Token::Keyword(Keyword::Let)) {
@@ -444,13 +500,13 @@ impl<'a> Parser<'a> {
             };
             self.expect(Token::Assign)?;
             let value = self.parse_expr()?;
-            self.expect(Token::Semicolon)?;
+            self.expect_semicolon()?;
             let span = start.merge(self.previous_span());
             let stmt = Statement::Let(name, typ, value);
             Ok(Spanned::new(stmt, span))
         } else {
             let expr = self.parse_expr()?;
-            self.expect(Token::Semicolon)?;
+            self.expect_semicolon()?;
             let span = Spanned::span(&expr);
             let stmt = Statement::Expr(expr);
             Ok(Spanned::new(stmt, span))
@@ -476,7 +532,7 @@ impl<'a> Parser<'a> {
         let mut expr = self.peek()
             .map(|tok| tok.kind())
             .and_then(|tok| self.prefix_parsers.get(&tok).cloned())
-            .ok_or_else(|| self.emit_error())?
+            .ok_or_else(|| self.emit_error(None))?
             .parse(self)?;
         loop {
             self.expected.insert(Expectation::Operator);
@@ -579,17 +635,25 @@ impl InfixParser for CallParser {
 
     fn parse(&self, parser: &mut Parser, callee: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
         if parser.check(Token::LeftParen) {
-            parser.consume().expect("token disappeared");
-            let mut args = Vec::new();
-            if !parser.check(Token::RightParen) {
-                args.push(parser.parse_expr()?);
-                while parser.check(Token::Comma) {
-                    args.push(parser.parse_expr()?);
+            let mut params = Vec::new();
+            while !parser.check(Token::RightParen) {
+                if parser.peek().map(Token::kind) == Some(TokenKind::Ident)
+                    && parser.peek2() == Some(&Token::Colon)
+                {
+                    let name = parser.consume_ident().expect("expected ident");
+                    parser.expect(Token::Colon).expect("expected ':'");
+                    let value = parser.parse_expr()?;
+                    params.push(CallParam::Named(name, value));
+                } else {
+                    params.push(CallParam::Unnamed(parser.parse_expr()?));
                 }
-                parser.expect(Token::RightParen)?;
+                if parser.check(Token::RightParen) {
+                    break;
+                }
+                parser.expect(Token::Comma)?;
             }
             let span = Spanned::span(&callee).merge(parser.previous_span());
-            let expr = Expr::Call(Box::new(callee), args);
+            let expr = Expr::Call(Box::new(callee), params);
             Ok(Spanned::new(expr, span))
         } else if parser.check(Token::Dot) {
             let field = parser.consume_ident()?;
@@ -609,7 +673,7 @@ impl PrefixParser for NameParser {
         let ident = parser.consume_ident().expect("identifier disappeared");
         let type_params = if parser.check(Token::DoubleColon) {
             parser.expect(Token::Less)?;
-            let types = parser.parse_type_list()?;
+            let types = parser.parse_type_params()?;
             parser.expect(Token::Greater)?;
             types
         } else {
@@ -655,9 +719,10 @@ struct ParenthesisedParser;
 
 impl PrefixParser for ParenthesisedParser {
     fn parse(&self, parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
-        parser.consume().expect("token disappeared");
+        let tok = parser.consume().expect("token disappeared");
+        let open_span = Spanned::span(&tok);
         let expr = parser.parse_expr()?;
-        parser.expect(Token::RightParen)?;
+        parser.expect_closing(Token::RightParen, open_span)?;
         Ok(expr)
     }
 }

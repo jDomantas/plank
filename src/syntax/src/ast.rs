@@ -14,10 +14,16 @@ pub enum Literal {
 pub enum Expr {
     Binary(Box<Spanned<Expr>>, Spanned<BinaryOp>, Box<Spanned<Expr>>),
     Unary(Spanned<UnaryOp>, Box<Spanned<Expr>>),
-    Call(Box<Spanned<Expr>>, Vec<Spanned<Expr>>),
+    Call(Box<Spanned<Expr>>, Vec<CallParam>),
     Field(Box<Spanned<Expr>>, Spanned<Ident>),
     Name(Spanned<Ident>, Vec<Spanned<Type>>),
     Literal(Literal),
+}
+
+#[derive(Debug, Clone)]
+pub enum CallParam {
+    Named(Spanned<Ident>, Spanned<Expr>),
+    Unnamed(Spanned<Expr>),
 }
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
@@ -74,12 +80,19 @@ pub struct ItemName {
     pub type_params: Vec<Spanned<Ident>>,
 }
 
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
+pub enum FunctionType {
+    Normal,
+    Extern,
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub fn_type: FunctionType,
     pub name: ItemName,
     pub params: Vec<Var>,
     pub return_type: Spanned<Type>,
-    pub body: Spanned<Statement>,
+    pub body: Option<Spanned<Statement>>,
 }
 
 #[derive(Debug, Clone)]

@@ -89,6 +89,7 @@ impl fmt::Display for Token {
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub enum Keyword {
+    Extern,
     Fn,
     Struct,
     If,
@@ -104,6 +105,7 @@ pub enum Keyword {
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Keyword::Extern => write!(f, "extern"),
             Keyword::Fn => write!(f, "fn"),
             Keyword::Struct => write!(f, "struct"),
             Keyword::If => write!(f, "if"),
