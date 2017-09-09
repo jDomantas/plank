@@ -21,8 +21,7 @@ macro_rules! parse_infix {
 pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     let mut parser = Parser::new(tokens, reporter);
 
-    parser.prefix(TokenKind::Bool, &LiteralParser);
-    parser.prefix(TokenKind::Number, &LiteralParser);
+    parser.prefix(TokenKind::Literal, &LiteralParser);
     parser.prefix(TokenKind::Ident, &NameParser);
     parser.prefix(TokenKind::Token(Token::Ampersand), &UnaryOpParser(UnaryOp::AddressOf));
     parser.prefix(TokenKind::Token(Token::Plus), &UnaryOpParser(UnaryOp::Plus));
@@ -133,10 +132,10 @@ impl<'a> Parser<'a> {
         let got = self
             .peek()
             .cloned()
-            .map(|t| TokenKind::Token(t).to_string())
+            .map(|t| t.kind().to_string())
             .unwrap_or_else(|| "end of input".into());
         let msg = match expected.len() {
-            0 => format!("expected nothing"),// panic!("no tokens expected"),
+            0 => panic!("no tokens expected"),
             1 => format!("expected {}, got {}.", expected[0], got),
             2 => format!("expected {} or {}, got {}.", expected[0], expected[1], got),
             _ => {
@@ -709,6 +708,8 @@ impl PrefixParser for LiteralParser {
         let literal = match Spanned::into_value(tok) {
             Token::Number(n) => Literal::Number(n),
             Token::Bool(b) => Literal::Bool(b),
+            Token::Char(c) => Literal::Char(c),
+            Token::Str(s) => Literal::Str(s),
             _ => panic!("expected a literal"),
         };
         let expr = Expr::Literal(literal);

@@ -94,7 +94,7 @@ impl<'a> LineMarker<'a> {
 
     fn end_col(&self) -> u32 {
         match *self {
-            LineMarker::FromStart { arrow_col, .. } => arrow_col,
+            LineMarker::FromStart { arrow_col, .. } => arrow_col + 1,
             LineMarker::FromTo { end_col, .. } => end_col,
         }
     }
@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
             // println!("now: {}, prev: {:?}", line, last_printed);
             if let Some(prev) = last_printed {
                 if self.full_connection_cols.len() > 0 {
-                    if line - prev > 2 {
+                    if line - prev > 3 {
                         self.print_line(prev + 1);
                         self.print_gap_line();
                         self.print_line(line - 1);

@@ -31,6 +31,13 @@ impl<T> Spanned<T> {
     pub fn span(this: &Self) -> Span {
         this.span
     }
+
+    pub fn map<U, F: FnOnce(T) -> U>(this: Self, f: F) -> Spanned<U> {
+        Spanned {
+            value: f(this.value),
+            span: this.span,
+        }
+    }
 }
 
 impl<T> ops::Deref for Spanned<T> {

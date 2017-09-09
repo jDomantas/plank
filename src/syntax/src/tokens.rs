@@ -6,6 +6,8 @@ pub enum Token {
     Ident(String),
     Number(u64),
     Bool(bool),
+    Char(u8),
+    Str(Vec<u8>),
     Keyword(Keyword),
     Less,
     LessEqual,
@@ -39,11 +41,13 @@ pub enum Token {
 
 impl Token {
     pub fn kind(&self) -> TokenKind {
-        match self {
-            &Token::Ident(_) => TokenKind::Ident,
-            &Token::Number(_) => TokenKind::Number,
-            &Token::Bool(_) => TokenKind::Bool,
-            tok => TokenKind::Token(tok.clone()),
+        match *self {
+            Token::Ident(_) => TokenKind::Ident,
+            Token::Number(_) |
+            Token::Bool(_) |
+            Token::Char(_) |
+            Token::Str(_) => TokenKind::Literal,
+            ref tok => TokenKind::Token(tok.clone()),
         }
     }
 }
@@ -54,6 +58,8 @@ impl fmt::Display for Token {
             Token::Ident(ref s) => write!(f, "{}", s),
             Token::Number(n) => write!(f, "{}", n),
             Token::Bool(b) => write!(f, "{}", b),
+            Token::Char(_) => write!(f, "char literal"),
+            Token::Str(_) => write!(f, "string literal"),
             Token::Keyword(k) => write!(f, "{}", k),
             Token::Less => write!(f, "<"),
             Token::LessEqual => write!(f, "<="),
@@ -124,8 +130,7 @@ impl fmt::Display for Keyword {
 pub enum TokenKind {
     Token(Token),
     Ident,
-    Number,
-    Bool,
+    Literal,
 }
 
 impl TokenKind {
@@ -152,8 +157,7 @@ impl TokenKind {
     pub fn can_start_expression(&self) -> bool {
         match *self {
             TokenKind::Ident |
-            TokenKind::Number |
-            TokenKind::Bool |
+            TokenKind::Literal |
             TokenKind::Token(Token::Plus) |
             TokenKind::Token(Token::Minus) |
             TokenKind::Token(Token::Star) |
@@ -169,8 +173,7 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             TokenKind::Ident => write!(f, "identifier"),
-            TokenKind::Bool => write!(f, "bool"),
-            TokenKind::Number => write!(f, "int"),
+            TokenKind::Literal => write!(f, "literal"),
             TokenKind::Token(ref tok) => write!(f, "`{}`", tok),
         }
     }

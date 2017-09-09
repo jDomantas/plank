@@ -4,10 +4,12 @@ use position::Spanned;
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
 pub struct Ident(pub String);
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
 pub enum Literal {
     Number(u64),
     Bool(bool),
+    Char(u8),
+    Str(Vec<u8>)
 }
 
 #[derive(Debug, Clone)]

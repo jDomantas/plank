@@ -202,6 +202,85 @@ impl<'a> Lexer<'a> {
         Spanned::new(tok, span)
     }
 
+    fn lex_string_raw(&mut self, closing: char) -> Spanned<Option<Vec<u8>>> {
+        let mut string = Vec::new();
+        let start_pos = self.current_pos;
+        self.advance();
+        loop {
+            match self.peek() {
+                Some(ch) if ch == closing => {
+                    self.advance();
+                    let span = start_pos.span_to(self.current_pos);
+                    return Spanned::new(Some(string), span);
+                }
+                Some('\\') => {
+                    let escape_start = self.current_pos;
+                    self.advance();
+                    // TODO: add more escape sequences
+                    match self.consume() {
+                        Some('\\') => string.push(b'\\'),
+                        Some('\'') => string.push(b'\''),
+                        Some('"') => string.push(b'"'),
+                        _ => {
+                            let span = escape_start.span_to(self.current_pos);
+                            self.reporter
+                                .error("bad escape sequence")
+                                .span(span)
+                                .build();
+                        }
+                    }
+                }
+                Some('\n') | Some('\r') | None => {
+                    let span = start_pos.span_to(self.current_pos);
+                    self.reporter
+                        .error("unterminated string")
+                        .span(span)
+                        .build();
+                    return Spanned::new(None, span);
+                }
+                Some(ch) => {
+                    let ch = ch as u32;
+                    if 32 <= ch && ch < 127 {
+                        string.push(ch as u8);
+                        self.advance();
+                    } else {
+                        let start = self.current_pos;
+                        self.advance();
+                        let span = start.span_to(self.current_pos);
+                        self.reporter
+                            .error(format!("unknown char in string (codepoint: {})", ch))
+                            .span(span)
+                            .build();
+                    }
+                }
+            }
+        }
+    }
+
+    fn lex_string(&mut self) -> Spanned<Token> {
+        Spanned::map(self.lex_string_raw('"'), |t| {
+            t.map(Token::Str).unwrap_or(Token::Error)
+        })
+    }
+
+    fn lex_char(&mut self) -> Spanned<Token> {
+        let tok = self.lex_string_raw('\'');
+        let span = Spanned::span(&tok);
+        if let Some(value) = Spanned::into_value(tok) {
+            if value.len() != 1 {
+                self.reporter
+                    .error(format!("char literal must have 1 char, but it has {}", value.len()))
+                    .span(span)
+                    .build();
+                Spanned::new(Token::Error, span)
+            } else {
+                Spanned::new(Token::Char(value[0]), span)
+            }
+        } else {
+            Spanned::new(Token::Error, span)
+        }
+    }
+
     fn next_raw_token(&mut self) -> Option<Spanned<Token>> {
         loop {
             return Some(match self.peek() {
@@ -236,8 +315,8 @@ impl<'a> Lexer<'a> {
                         continue;
                     }
                 }
-                Some('"') => unimplemented!("no string literals yet"),
-                Some('\'') => unimplemented!("no char literals yet"),
+                Some('"') => self.lex_string(),
+                Some('\'') => self.lex_char(),
                 Some(ch) => {
                     let tok = self.single_char(Token::Error);
                     if !self.previous_error {
