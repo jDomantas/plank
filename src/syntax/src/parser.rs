@@ -78,6 +78,7 @@ struct Parser<'a> {
     prev_span: Option<Span>,
     prefix_parsers: HashMap<TokenKind, &'a PrefixParser>,
     infix_parsers: HashMap<TokenKind, &'a InfixParser>,
+    last_line_completed: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -94,6 +95,7 @@ impl<'a> Parser<'a> {
             prefix_parsers: HashMap::new(),
             infix_parsers: HashMap::new(),
             expected: HashSet::new(),
+            last_line_completed: false,
         }
     }
 
@@ -132,29 +134,35 @@ impl<'a> Parser<'a> {
             .cloned()
             .map(|t| TokenKind::Token(t).to_string())
             .unwrap_or_else(|| "end of input".into());
-        let msg = match expected.len() {
+        let expected = match expected.len() {
             0 => panic!("no tokens expected"),
-            1 => format!("expected {}, got {}.", expected[0], got),
-            2 => format!("expected {} or {}, got {}.", expected[0], expected[1], got),
+            1 => format!("expected {}", expected[0]),
+            2 => format!("expected {} or {}", expected[0], expected[1]),
             _ => {
                 let mut msg = "expected one of ".to_string();
-                for exp in &expected {
+                for (index, exp) in expected.iter().enumerate() {
+                    if index > 0 {
+                        msg.push_str(", ");
+                    }
                     msg.push_str(exp);
-                    msg.push_str(", ");
                 }
-                msg.push_str("got ");
-                msg.push_str(&got);
-                msg.push('.');
                 msg
             }
         };
         let builder = self.reporter
-            .error(msg)
+            .error(format!("{}, got {}.", expected, got))
             .span_note(self.peek_span(), format!("unexpected {}", got));
         if let Some((span, msg)) = helper {
-            builder.span_note(span, msg).build()
+            builder.span_note(span, msg).build();
+        } else if !self.last_line_completed
+            && self.prev_span.is_some()
+            && self.prev_span.unwrap().end.line < self.peek_span().start.line
+        {
+            let last_pos = self.prev_span.unwrap().end;
+            let help_span = last_pos.forward(1).span_to(last_pos.forward(2));
+            builder.span_note(help_span, expected).build();
         } else {
-            builder.build()
+            builder.build();
         }
     }
 
@@ -232,6 +240,7 @@ impl<'a> Parser<'a> {
     }
 
     fn consume(&mut self) -> ParseResult<Spanned<Token>> {
+        self.last_line_completed = false;
         match self.next_token.take() {
             Some(tok) => {
                 self.expected.clear();
@@ -312,12 +321,48 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn synchronize_statement(&mut self) -> ParseResult<()> {
+        loop {
+            match self.peek() {
+                Some(&Token::Keyword(Keyword::If)) |
+                Some(&Token::Keyword(Keyword::Loop)) |
+                Some(&Token::Keyword(Keyword::While)) |
+                Some(&Token::Keyword(Keyword::Break)) |
+                Some(&Token::Keyword(Keyword::Continue)) |
+                Some(&Token::Keyword(Keyword::Let)) |
+                Some(&Token::Keyword(Keyword::Return)) |
+                Some(&Token::LeftBrace) |
+                Some(&Token::RightBrace) => {
+                    return Ok(());
+                }
+                Some(&Token::Keyword(Keyword::Fn)) => {
+                    match self.peek2() {
+                        Some(&Token::Ident(_)) => {
+                            return Err(());
+                        }
+                        _ => {}
+                    }
+                }
+                Some(&Token::Keyword(Keyword::Struct)) |
+                None => {
+                    return Err(());
+                }
+                _ => {}
+            }
+            if self.check(Token::Semicolon) {
+                return Ok(());
+            }
+            self.consume().expect("token disappeared");
+        }
+    }
+
     fn parse_program(&mut self) -> Program {
         let mut program = Program {
             structs: Vec::new(),
             functions: Vec::new(),
         };
         loop {
+            self.last_line_completed = true;
             if self.is_at_end() {
                 return program;
             } else if self.check(Token::Keyword(Keyword::Struct)) {
@@ -353,6 +398,7 @@ impl<'a> Parser<'a> {
         self.expect(Token::LeftBrace)?;
         let mut fields = Vec::new();
         while !self.check(Token::RightBrace) {
+            self.last_line_completed = true;
             let name = self.consume_ident()?;
             self.expect(Token::Colon)?;
             let typ = self.parse_type()?;
@@ -466,6 +512,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> ParseResult<Spanned<Statement>> {
+        self.last_line_completed = true;
         if self.check(Token::Keyword(Keyword::If)) {
             let start = self.previous_span();
             let cond = self.parse_expr()?;
@@ -538,7 +585,10 @@ impl<'a> Parser<'a> {
         let start = self.previous_span();
         let mut statements = Vec::new();
         while !self.check(Token::RightBrace) {
-            statements.push(self.parse_statement()?);
+            match self.parse_statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(()) => self.synchronize_statement()?,
+            }
         }
         let span = start.merge(self.previous_span());
         Ok(Spanned::new(Statement::Block(statements), span))
