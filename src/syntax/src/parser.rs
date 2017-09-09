@@ -73,6 +73,7 @@ impl ::std::fmt::Display for Expectation {
 struct Parser<'a> {
     reporter: Reporter,
     expected: HashSet<Expectation>,
+    expected2: HashSet<Expectation>,
     tokens: VecDeque<Spanned<Token>>,
     next_token: Option<Spanned<Token>>,
     prev_span: Option<Span>,
@@ -95,6 +96,7 @@ impl<'a> Parser<'a> {
             prefix_parsers: HashMap::new(),
             infix_parsers: HashMap::new(),
             expected: HashSet::new(),
+            expected2: HashSet::new(),
             last_line_completed: false,
         }
     }
@@ -243,7 +245,7 @@ impl<'a> Parser<'a> {
         self.last_line_completed = false;
         match self.next_token.take() {
             Some(tok) => {
-                self.expected.clear();
+                self.expected = ::std::mem::replace(&mut self.expected2, HashSet::new());
                 self.next_token = self.tokens.pop_front();
                 self.prev_span = Some(Spanned::span(&tok));
                 Ok(tok)
@@ -291,8 +293,6 @@ impl<'a> Parser<'a> {
         if let Some(name) = self.check_ident() {
             Ok(name)
         } else {
-            // TODO: if next token is keyword,
-            // give message that it is a keyword and cannot be used as ident?
             self.emit_error(None);
             Err(())
         }
@@ -708,16 +708,19 @@ impl InfixParser for CallParser {
         if parser.check(Token::LeftParen) {
             let mut params = Vec::new();
             while !parser.check(Token::RightParen) {
-                if parser.peek().map(Token::kind) == Some(TokenKind::Ident)
-                    && parser.peek2() == Some(&Token::Colon)
+                let ident_next = parser.peek().map(Token::kind) == Some(TokenKind::Ident);
+                if ident_next {
+                    parser.expected2.insert(Expectation::Token(
+                        TokenKind::Token(Token::Colon)
+                    ));
+                }
+                if ident_next && parser.peek2() == Some(&Token::Colon)
                 {
                     let name = parser.consume_ident().expect("expected ident");
                     parser.expect(Token::Colon).expect("expected ':'");
                     let value = parser.parse_expr()?;
                     params.push(CallParam::Named(name, value));
                 } else {
-                    // TODO: if next token is ident, and after that we get an
-                    // error, `:` won't be in the list of expected tokens.
                     params.push(CallParam::Unnamed(parser.parse_expr()?));
                 }
                 if parser.check(Token::RightParen) {
