@@ -50,7 +50,7 @@
 <unary>             ::= <call> | <unary-op> <w> <unary>
 <call>              ::= <term> | <term> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
 <term>              ::= <literal> | <name> | "(" <w> <expr> <w> ")"
-<literal>           ::= <bool> | <int>
+<literal>           ::= <bool> | <int> | <char> | <string>
 
 <expr-w>            ::= <assign-w>
 <assign-w>          ::= <or-w> | <or-w> <w> "=" <w> <assign>
@@ -63,7 +63,7 @@
 <unary-w>           ::= <call-w> | <unary-op> <w> <unary>
 <call-w>            ::= <term-w> | <term-w> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
 <term-w>            ::= <literal-w> | <w-char> <name> | "(" <w> <expr> <w> ")"
-<literal-w>         ::= <w-char> <bool> | <w-char> <int>
+<literal-w>         ::= <w-char> <bool> | <w-char> <int> | <char> | <string>
 
 <call-param-list>   ::= <w> | <w> <call-param> <w> | <w> <call-param> <w> "," <call-param-list>
 <call-param>        ::= <expr> | <ident> <w> ":" <w> <expr>
@@ -88,3 +88,12 @@
 <lowercase>         ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
 <non-zero-digit>    ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 <digit>             ::= "0" | <non-zero-digit>
+
+<char>              ::= "'" <string-char> "'"
+<string>            ::= "\"" <string-suffix>
+<string-suffix>     ::= "\"" | <string-char> <string-suffix>
+
+
+--                                      \n      \"       \'      \\
+<string-char>       ::= <printable> | "\\n" | "\\\"" | "\\'" | "\\\\"
+<printable>         ::= ? any char with codepoint in range [32; 127] ?
