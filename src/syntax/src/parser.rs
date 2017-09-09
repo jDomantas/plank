@@ -78,7 +78,6 @@ struct Parser<'a> {
     prev_span: Option<Span>,
     prefix_parsers: HashMap<TokenKind, &'a PrefixParser>,
     infix_parsers: HashMap<TokenKind, &'a InfixParser>,
-    // inside_statement: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -95,7 +94,6 @@ impl<'a> Parser<'a> {
             prefix_parsers: HashMap::new(),
             infix_parsers: HashMap::new(),
             expected: HashSet::new(),
-            // inside_statement: false,
         }
     }
 
@@ -132,7 +130,7 @@ impl<'a> Parser<'a> {
         let got = self
             .peek()
             .cloned()
-            .map(|t| t.kind().to_string())
+            .map(|t| TokenKind::Token(t).to_string())
             .unwrap_or_else(|| "end of input".into());
         let msg = match expected.len() {
             0 => panic!("no tokens expected"),
@@ -502,6 +500,8 @@ impl<'a> Parser<'a> {
             let span = start.merge(self.previous_span());
             let stmt = Statement::Let(name, typ, value);
             Ok(Spanned::new(stmt, span))
+        } else if self.check(Token::LeftBrace) {
+            self.parse_block()
         } else {
             let expr = self.parse_expr()?;
             self.expect_semicolon()?;
