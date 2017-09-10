@@ -1,0 +1,8 @@
+[package]
+name = "test_bin"
+version = "0.1.0"
+authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
+
+[dependencies]
+errors = { path = "../errors" }
+syntax = { path = "../syntax" }
