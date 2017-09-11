@@ -1,75 +1,55 @@
-<w>                 ::= "" | <mandatory-w>
-<mandatory-w>       ::= <w-char> <w>
-<w-char>            ::= " " | "\n" | "\t" | "\r"
-
-<program>           ::= <w> <item> <program> | <w>
+<program>           ::= <item> <program> | ""
 <item>              ::= <function> | <struct>
-<item-name>         ::= <ident> | <ident> <w> "<" <w> <ident-list> <w> ">"
-<ident-list>        ::= <ident> | <ident> <w> "," <w> <ident-list>
+<item-name>         ::= <ident> | <ident> "<" <ident-list> ">"
+<ident-list>        ::= <ident> | <ident> "," <ident-list>
 
-<struct>            ::= "struct" <mandatory-w> <item-name> <w> "{" <field-list> "}"
-<field-list>        ::= <w> | <w> <field> <w> | <w> <field> <w> "," <field-list>
-<field>             ::= <ident> <w> ":" <w> <type>
+<struct>            ::= "struct" <item-name> "{" <field-list> "}"
+<field-list>        ::= "" | <field> | <field> "," <field-list>
+<field>             ::= <ident> ":" <type>
 
-<function-type>     ::= "extern" <mandatory-w> | ""
-<function>          ::= <function-type> <function-header> <w> <function-body>
+<function-type>     ::= "extern" | ""
+<function>          ::= <function-type> <function-header> <function-body>
 <function-body>     ::= <block> | ";"
-<function-header>   ::= "fn" <mandatory-w> <item-name> <w> "(" <param-list> ")" <w> "->" <w> <type>
-<param-list>        ::= <w> | <w> <param> <w> | <w> <param> <w> "," <param-list>
-<param>             ::= <ident> <w> ":" <w> <type>
+<function-header>   ::= "fn" <item-name> "(" <param-list> ")" "->" <type>
+<param-list>        ::= "" | <param> | <param> "," <param-list>
+<param>             ::= <ident> ":" <type>
 
-<type>              ::= "_" | "*" <w> <type> | <fn-type> | <type-name>
-<fn-type>           ::= "fn" <w> "(" <type-list> ")" <w> "->" <w> <type>
-<type-list>         ::= <w> | <w> <type> <w> | <w> <type> <w> "," <type-list>
-<type-name>         ::= <ident> | <ident> <w> "<" <w> <type-param-list> <w> ">"
-<type-param-list>   ::= <type> | <type> <w> "," <w> <type-param-list>
+<type>              ::= "_" | "*" <type> | <fn-type> | <type-name> | <builtin-type>
+<fn-type>           ::= "fn" "(" <type-list> ")" "->" <type>
+<type-list>         ::= "" | <type> | <type> "," <type-list>
+<type-name>         ::= <ident> | <ident> "<" <type-param-list> ">"
+<builtin-type>      ::= "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "bool"
+<type-param-list>   ::= <type> | <type> "," <type-param-list>
 
 <block>             ::= "{" <statement-list> "}"
-<statement-list>    ::= <w> | <w> <statement> <statement-list>
+<statement-list>    ::= "" | <statement> <statement-list>
 <statement>         ::= <if> | <loop> | <while> | <break> | <cont> | <return> | <let> | <block> | <expr-statement>
-<if>                ::= "if" <w> <expr-w> <w> <block> <opt-else>
-<opt-else>          ::= "" | <w> "else" <w> <block>
-<loop>              ::= "loop" <w> <block>
-<while>             ::= "while" <w> <expr-w> <w> <block>
-<break>             ::= "break" <w> ";"
-<cont>              ::= "continue" <w> ";"
-<return>            ::= "return" <w> <expr-w> <w> ";"
-<expr-statement>    ::= <expr> <w> ";"
+<if>                ::= "if" <expr> <block> <opt-else>
+<opt-else>          ::= "" | "else" <block>
+<loop>              ::= "loop" <block>
+<while>             ::= "while" <expr> <block>
+<break>             ::= "break" ";"
+<cont>              ::= "continue" ";"
+<return>            ::= "return" <expr> ";"
+<expr-statement>    ::= <expr> ";"
 
-<let>               ::= "let" <mandatory-w> <ident> <opt-type> <w> "=" <w> <expr> <w> ";"
-<opt-type>          ::= "" | <w> ":" <type>
+<let>               ::= "let" <ident> <opt-type> "=" <expr> ";"
+<opt-type>          ::= "" | ":" <type>
 
 <expr>              ::= <assign>
-<assign>            ::= <or> | <or> <w> "=" <w> <assign>
-<or>                ::= <and> | <or> <w> "||" <w> <and>
-<and>               ::= <equation> | <and> <w> "&&" <w> <equation>
+<assign>            ::= <or> | <or> "=" <assign>
+<or>                ::= <and> | <or> "||" <and>
+<and>               ::= <equation> | <and> "&&" <equation>
 <equation>          ::= <comparision> | <equation> <equation-op> <comparision>
 <comparision>       ::= <sum> | <comparision> <compare-op> <sum>
 <sum>               ::= <product> | <sum> <add-op> <product>
 <product>           ::= <unary> | <product> <mul-op> <unary>
-<unary>             ::= <call> | <unary-op> <w> <unary>
-<call>              ::= <term> | <term> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
-<term>              ::= <literal> | <name> | "(" <w> <expr> <w> ")"
-<literal>           ::= <bool> | <int> | <char> | <string>
+<unary>             ::= <call> | <unary-op> <unary>
+<call>              ::= <term> | <call> "." <ident> | <call> "(" <call-param-list> ")"
+<term>              ::= <literal> | <name> | "(" <expr> ")"
 
-<expr-w>            ::= <assign-w>
-<assign-w>          ::= <or-w> | <or-w> <w> "=" <w> <assign>
-<or-w>              ::= <and-w> | <or-w> <w> "||" <w> <and>
-<and-w>             ::= <equation-w> | <and-w> <w> "&&" <w> <equation>
-<equation-w>        ::= <comparision-w> | <equation-w> <equation-op> <comparision>
-<comparision-w>     ::= <sum-w> | <comparision-w> <compare-op> <sum>
-<sum-w>             ::= <product-w> | <sum-w> <add-op> <product>
-<product-w>         ::= <unary-w> | <product-w> <mul-op> <unary>
-<unary-w>           ::= <call-w> | <unary-op> <w> <unary>
-<call-w>            ::= <term-w> | <term-w> <w> "." <w> <ident> | <term> <w> "(" <call-param-list> ")"
-<term-w>            ::= <literal-w> | <w-char> <name> | "(" <w> <expr> <w> ")"
-<literal-w>         ::= <w-char> <bool> | <w-char> <int> | <char> | <string>
-
-<call-param-list>   ::= <w> | <w> <call-param> <w> | <w> <call-param> <w> "," <call-param-list>
-<call-param>        ::= <expr> | <ident> <w> ":" <w> <expr>
-
-<bool>              ::= "true" | "false"
-<int>               ::= <digit> | <non-zero-digit> <int>
+<call-param-list>   ::= "" | <call-param> | <call-param> "," <call-param-list>
+<call-param>        ::= <expr> | <ident> ":" <expr>
 
 <equation-op>       ::= "==" | "!="
 <compare-op>        ::= "<" | "<=" | ">" | ">="
@@ -77,11 +57,23 @@
 <mul-op>            ::= "*" | "/" | "%"
 <unary-op>          ::= "+" | "-" | "*" | "&" | "!"
 
-<name>              ::= <ident> | <ident> <w> "::" <w> "<" <w> <type-param-list> <w> ">"
+<name>              ::= <ident> | <ident> "::" "<" <type-param-list> ">"
+
+-- below is lexer stuff
 
 <ident>             ::= <letter> <ident-suffix> | "_" <ident-char> <ident-suffix>
 <ident-suffix>      ::= "" | <ident-char> <ident-suffix>
 <ident-char>        ::= "_" | <letter> | <digit>
+
+<literal>           ::= <bool> | <int> | <char> | <string>
+
+<bool>              ::= "true" | "false"
+<digit-sequence>    ::= <digit> | <non-zero-digit> <int>
+<int>               ::= <digit-sequence> | <digit-sequence> <int-suffix>
+<int-suffix>        ::= "i" | "u" | "i8" | "i16" | "i32" | "u8" | "u16" | "u32"
+<char>              ::= "'" <string-char> "'" | "'\"'"
+<string>            ::= "\"" <string-suffix>
+<string-suffix>     ::= "\"" | <string-char> <string-suffix> | "'" <string-suffix>
 
 <letter>            ::= <uppercase> | <lowercase>
 <uppercase>         ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
@@ -89,11 +81,7 @@
 <non-zero-digit>    ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 <digit>             ::= "0" | <non-zero-digit>
 
-<char>              ::= "'" <string-char> "'"
-<string>            ::= "\"" <string-suffix>
-<string-suffix>     ::= "\"" | <string-char> <string-suffix>
-
-
---                                      \n      \"       \'      \\
-<string-char>       ::= <printable> | "\\n" | "\\\"" | "\\'" | "\\\\"
-<printable>         ::= ? any char with codepoint in range [32; 127] ?
+<hex-digit>         ::= <digit> | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F"
+<escape>            ::= "\\x" <hex-digit> <hex-digit>
+<string-char>       ::= <printable> | "\\n" | "\\\"" | "\\'" | "\\\\" | <escape>
+<printable>         ::= <letter> | <digit> | " " | "!" | "#" | "$" | "%" | "&" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "]" | "^" | "_" | "`" | "{" | "|" | "}" | "~"
