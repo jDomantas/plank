@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
@@ -11,9 +9,6 @@ extern crate simple_logging;
 extern crate url;
 extern crate syntax;
 extern crate errors;
-
-// mod protocol;
-// mod server;
 
 mod transport;
 mod jsonrpc;
