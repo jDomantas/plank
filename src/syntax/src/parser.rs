@@ -151,9 +151,10 @@ impl<'a> Parser<'a> {
                 msg
             }
         };
+        let span = self.peek_span();
         let builder = self.reporter
-            .error(format!("{}, got {}.", expected, got))
-            .span_note(self.peek_span(), format!("unexpected {}", got));
+            .error(format!("{}, got {}.", expected, got), span)
+            .span_note(span, format!("unexpected {}", got));
         if let Some((span, msg)) = helper {
             builder.span_note(span, msg).build();
         } else if !self.last_line_completed

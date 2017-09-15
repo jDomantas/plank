@@ -25,22 +25,32 @@ impl Reporter {
         self.diagnostics.borrow().clone()
     }
 
-    pub fn error<T>(&mut self, msg: T) -> Builder<S<S<Z>>>
-        where T: Into<String>
-    {
-        self.diagnostic(Severity::Error, msg)
+    pub fn global_error<T: Into<String>>(&mut self, msg: T) {
+        let diagnostic = Diagnostic {
+            message: msg.into(),
+            primary_span: None,
+            notes: Vec::new(),
+            severity: Severity::Error,
+        };
+        self.diagnostics.borrow_mut().push(diagnostic);
     }
 
-    pub fn warning<T>(&mut self, msg: T) -> Builder<S<S<Z>>>
+    pub fn error<T>(&mut self, msg: T, span: Span) -> Builder<S<S<Z>>>
         where T: Into<String>
     {
-        self.diagnostic(Severity::Warning, msg)
+        self.diagnostic(Severity::Error, msg, span)
     }
 
-    pub fn diagnostic<T>(&mut self, severity: Severity, msg: T) -> Builder<S<S<Z>>>
+    pub fn warning<T>(&mut self, msg: T, span: Span) -> Builder<S<S<Z>>>
         where T: Into<String>
     {
-        Builder::new(self, severity, msg.into())
+        self.diagnostic(Severity::Warning, msg, span)
+    }
+
+    pub fn diagnostic<T>(&mut self, severity: Severity, msg: T, span: Span) -> Builder<S<S<Z>>>
+        where T: Into<String>
+    {
+        Builder::new(self, severity, msg.into(), span)
     }
 }
 
@@ -53,6 +63,7 @@ pub enum Severity {
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub message: String,
+    pub primary_span: Option<Span>,
     pub severity: Severity,
     pub notes: Vec<Note>,
 }
@@ -71,13 +82,14 @@ pub struct Builder<N> {
 }
 
 impl<N: Nat> Builder<N> {
-    fn new(reporter: &Reporter, severity: Severity, msg: String) -> Self {
+    fn new(reporter: &Reporter, severity: Severity, msg: String, primary_span: Span) -> Self {
         Builder {
             phantom: PhantomData,
             reporter: reporter.clone(),
             diagnostic: Diagnostic {
                 message: msg,
                 severity,
+                primary_span: Some(primary_span),
                 notes: Vec::new(),
             },
         }

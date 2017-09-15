@@ -136,8 +136,9 @@ impl<'a> Printer<'a> {
                 println!("warning: {}", diagnostic.message);
             }
         }
-        assert!(diagnostic.notes.len() > 0, "got diagnostic without notes");
-        self.print_notes(&diagnostic.notes);
+        if diagnostic.notes.len() > 0 {
+            self.print_notes(&diagnostic.notes);
+        }
     }
 
     fn print_notes(&mut self, notes: &'a [Note]) {
@@ -196,7 +197,6 @@ impl<'a> Printer<'a> {
         let line_markers = ::std::mem::replace(&mut self.line_markers, BTreeMap::new());
         let mut last_printed = None;
         for (line, markers) in line_markers {
-            // println!("now: {}, prev: {:?}", line, last_printed);
             if let Some(prev) = last_printed {
                 if self.full_connection_cols.len() > 0 {
                     if line - prev > 3 {

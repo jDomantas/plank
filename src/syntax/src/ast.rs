@@ -4,12 +4,50 @@ use position::Spanned;
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
 pub struct Ident(pub String);
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Literal {
-    Number(u64),
+    Number(Number),
     Bool(bool),
     Char(u8),
     Str(Vec<u8>)
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub struct Number {
+    pub value: u64,
+    pub signedness: Option<Signedness>,
+    pub size: Option<Size>,
+}
+
+impl ::std::fmt::Display for Number {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.value)?;
+        match self.signedness {
+            Some(Signedness::Signed) => write!(f, "i")?,
+            Some(Signedness::Unsigned) => write!(f, "u")?,
+            None => {}
+        }
+        match self.size {
+            Some(Size::Bit8) => write!(f, "8")?,
+            Some(Size::Bit16) => write!(f, "16")?,
+            Some(Size::Bit32) => write!(f, "32")?,
+            None => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub enum Signedness {
+    Signed,
+    Unsigned,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub enum Size {
+    Bit8,
+    Bit16,
+    Bit32,
 }
 
 #[derive(Debug, Clone)]

@@ -1,10 +1,11 @@
 use std::fmt;
+pub use ast::Number;
 
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Token {
     Ident(String),
-    Number(u64),
+    Number(Number),
     Bool(bool),
     Char(u8),
     Str(Vec<u8>),

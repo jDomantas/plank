@@ -1,7 +1,7 @@
 use std::str::Chars;
 use errors::Reporter;
 use position::{Position, Span, Spanned};
-use tokens::{Token, Keyword};
+use tokens::{Token, Keyword, Number};
 
 
 pub fn lex(source: &str, reporter: Reporter) -> Vec<Spanned<Token>> {
@@ -67,6 +67,17 @@ impl<'a> Lexer<'a> {
         result
     }
 
+    fn consume_hex_digit(&mut self) -> Option<u8> {
+        match self.peek() {
+            Some(ch) if ch.is_digit(16) => {
+                self.consume().map(|c| c.to_digit(16).unwrap() as u8)
+            }
+            _ => {
+                None
+            }
+        }
+    }
+
     fn single_char(&mut self, tok: Token) -> Spanned<Token> {
         let start = self.current_pos;
         self.advance();
@@ -82,7 +93,7 @@ impl<'a> Lexer<'a> {
         } else {
             let span = start.span_to(self.current_pos.forward(1));
             self.reporter
-                .error(format!("unknown token: `{}`", first))
+                .error(format!("unknown token: `{}`", first), span)
                 .span_note(span, format!("maybe you wanted `{}{}`?", first, ch))
                 .build();
             Token::Error
@@ -129,7 +140,7 @@ impl<'a> Lexer<'a> {
                 }
                 None => {
                     self.reporter
-                        .error("unterminated block comment")
+                        .error("unterminated block comment", opener_span)
                         .span(opener_span)
                         .build();
                     break;
@@ -167,12 +178,11 @@ impl<'a> Lexer<'a> {
             }
         }
         let span = start.span_to(self.current_pos);
-        let tok = match str::parse::<u64>(&string) {
-            Ok(int) => Token::Number(int),
-            Err(_) => {
-                // TODO: make error more precise
+        let tok = match parse_number(&string) {
+            Ok(num) => Token::Number(num),
+            Err(err) => {
                 self.reporter
-                    .error("invalid int literal")
+                    .error(err, span)
                     .span(span)
                     .build();
                 Token::Error
@@ -216,15 +226,33 @@ impl<'a> Lexer<'a> {
                 Some('\\') => {
                     let escape_start = self.current_pos;
                     self.advance();
-                    // TODO: add more escape sequences
                     match self.consume() {
                         Some('\\') => string.push(b'\\'),
                         Some('\'') => string.push(b'\''),
                         Some('"') => string.push(b'"'),
+                        Some('n') => string.push(b'\n'),
+                        Some('x') => {
+                            let byte = self
+                                .consume_hex_digit()
+                                .and_then(|high| {
+                                    self.consume_hex_digit()
+                                        .map(|low| (high << 4) | low)
+                                });
+                            match byte {
+                                Some(byte) => string.push(byte),
+                                None => {
+                                    let span = self.current_pos.span_to(self.current_pos.forward(1));
+                                    self.reporter
+                                        .error("`x` should be followed by two hex digits", span)
+                                        .span(span)
+                                        .build();
+                                }
+                            }
+                        }
                         _ => {
                             let span = escape_start.span_to(self.current_pos);
                             self.reporter
-                                .error("bad escape sequence")
+                                .error("invalid escape sequence", span)
                                 .span(span)
                                 .build();
                         }
@@ -233,7 +261,7 @@ impl<'a> Lexer<'a> {
                 Some('\n') | Some('\r') | None => {
                     let span = start_pos.span_to(self.current_pos);
                     self.reporter
-                        .error("unterminated string")
+                        .error("unterminated string", span)
                         .span(span)
                         .build();
                     return Spanned::new(None, span);
@@ -248,7 +276,7 @@ impl<'a> Lexer<'a> {
                         self.advance();
                         let span = start.span_to(self.current_pos);
                         self.reporter
-                            .error(format!("unknown char in string (codepoint: {})", ch))
+                            .error(format!("unknown char in string (codepoint: {})", ch), span)
                             .span(span)
                             .build();
                     }
@@ -269,7 +297,7 @@ impl<'a> Lexer<'a> {
         if let Some(value) = Spanned::into_value(tok) {
             if value.len() != 1 {
                 self.reporter
-                    .error(format!("char literal must have 1 char, but it has {}", value.len()))
+                    .error(format!("char literal must have 1 char, but it has {}", value.len()), span)
                     .span(span)
                     .build();
                 Spanned::new(Token::Error, span)
@@ -326,9 +354,10 @@ impl<'a> Lexer<'a> {
                         } else {
                             format!("unknown char (codepoint: {})", codepoint)
                         };
+                        let span = Spanned::span(&tok);
                         self.reporter
-                            .error(msg)
-                            .span(Spanned::span(&tok))
+                            .error(msg, span)
+                            .span(span)
                             .build();
                     }
                     tok
@@ -378,4 +407,8 @@ fn keyword(s: &str) -> Option<Token> {
         "_" => Some(Token::Underscore),
         _ => None,
     }
+}
+
+fn parse_number(_s: &str) -> Result<Number, &str> {
+    unimplemented!()
 }
