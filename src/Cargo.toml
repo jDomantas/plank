@@ -2,6 +2,6 @@
 members = [
     "syntax",
     "errors",
-    "test_bin",
+    "test-bin",
     "lang-server",
 ]
