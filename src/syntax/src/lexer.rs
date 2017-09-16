@@ -2,6 +2,7 @@ use std::str::Chars;
 use errors::Reporter;
 use position::{Position, Span, Spanned};
 use tokens::{Token, Keyword, Number};
+use ast::{Signedness, Size};
 
 
 pub fn lex(source: &str, reporter: Reporter) -> Vec<Spanned<Token>> {
@@ -181,8 +182,9 @@ impl<'a> Lexer<'a> {
         let tok = match parse_number(&string) {
             Ok(num) => Token::Number(num),
             Err(err) => {
+                let msg = err.to_string();
                 self.reporter
-                    .error(err, span)
+                    .error(msg, span)
                     .span(span)
                     .build();
                 Token::Error
@@ -405,10 +407,92 @@ fn keyword(s: &str) -> Option<Token> {
         "true" => Some(Token::Bool(true)),
         "false" => Some(Token::Bool(false)),
         "_" => Some(Token::Underscore),
+        "i8" => Some(Token::Keyword(Keyword::I8)),
+        "u8" => Some(Token::Keyword(Keyword::U8)),
+        "i16" => Some(Token::Keyword(Keyword::I16)),
+        "u16" => Some(Token::Keyword(Keyword::U16)),
+        "i32" => Some(Token::Keyword(Keyword::I32)),
+        "u32" => Some(Token::Keyword(Keyword::U32)),
+        "bool" => Some(Token::Keyword(Keyword::Bool)),
         _ => None,
     }
 }
 
-fn parse_number(_s: &str) -> Result<Number, &str> {
-    unimplemented!()
+enum ParseNumberError {
+    BadInt,
+    TooLarge,
+    BadBitCount,
+}
+
+impl ::std::fmt::Display for ParseNumberError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        let msg = match *self {
+            ParseNumberError::BadInt => "invalid int literal",
+            ParseNumberError::TooLarge => "int literal is too big",
+            ParseNumberError::BadBitCount => "invalid int size",
+        };
+        write!(f, "{}", msg)
+    }
+}
+
+fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
+    match s.find(|c| c == 'i' || c == 'u') {
+        Some(index) => {
+            // we have a suffix
+            // parse prefix as number, parse rest as bit count
+            let prefix = s.get(..index).unwrap();
+            let suffix = s.get((index + 1)..).unwrap();
+            let value = parse_simple_number(prefix)?;
+            let signedness = if s.get(index..(index + 1)).unwrap() == "i" {
+                Signedness::Signed
+            } else {
+                Signedness::Unsigned
+            };
+            let size = match suffix {
+                "8" => Size::Bit8,
+                "16" => Size::Bit16,
+                "32" => Size::Bit32,
+                _ => return Err(ParseNumberError::BadBitCount),
+            };
+            Ok(Number {
+                value,
+                signedness: Some(signedness),
+                size: Some(size),
+            })
+        }
+        None => {
+            // no suffix, parse simple number
+            let value = parse_simple_number(s)?;
+            Ok(Number {
+                value,
+                signedness: None,
+                size: None,
+            })
+        }
+    }
+}
+
+fn parse_simple_number(s: &str) -> Result<u64, ParseNumberError> {
+    if s.len() == 0 {
+        return Err(ParseNumberError::BadInt);
+    }
+    if s.len() > 1 && s.chars().next() == Some('0') {
+        // we have a leading zero, and number is longer than one digit
+        return Err(ParseNumberError::BadInt);
+    }
+    let mut result = 0u64;
+    for ch in s.chars() {
+        match ch.to_digit(10) {
+            Some(digit) => {
+                result = result
+                    .checked_mul(10)
+                    .and_then(|n| n.checked_add(digit as u64))
+                    .ok_or(ParseNumberError::TooLarge)?;
+            }
+            None => {
+                return Err(ParseNumberError::BadInt);
+            }
+        }
+    }
+    Ok(result)
 }

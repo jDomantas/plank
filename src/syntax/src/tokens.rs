@@ -48,6 +48,13 @@ impl Token {
             Token::Bool(_) |
             Token::Char(_) |
             Token::Str(_) => TokenKind::Literal,
+            Token::Keyword(Keyword::I8) |
+            Token::Keyword(Keyword::U8) |
+            Token::Keyword(Keyword::I16) |
+            Token::Keyword(Keyword::U16) |
+            Token::Keyword(Keyword::I32) |
+            Token::Keyword(Keyword::U32) |
+            Token::Keyword(Keyword::Bool) => TokenKind::BuiltinType,
             ref tok => TokenKind::Token(tok.clone()),
         }
     }
@@ -107,6 +114,13 @@ pub enum Keyword {
     Break,
     Let,
     Return,
+    Bool,
+    I8,
+    U8,
+    I16,
+    U16,
+    I32,
+    U32,
 }
 
 impl fmt::Display for Keyword {
@@ -123,6 +137,13 @@ impl fmt::Display for Keyword {
             Keyword::Break => write!(f, "break"),
             Keyword::Let => write!(f, "let"),
             Keyword::Return => write!(f, "return"),
+            Keyword::I8 => write!(f, "i8"),
+            Keyword::I16 => write!(f, "i16"),
+            Keyword::I32 => write!(f, "i32"),
+            Keyword::U8 => write!(f, "u8"),
+            Keyword::U16 => write!(f, "u16"),
+            Keyword::U32 => write!(f, "u32"),
+            Keyword::Bool => write!(f, "bool"),
         }
     }
 }
@@ -132,6 +153,7 @@ pub enum TokenKind {
     Token(Token),
     Ident,
     Literal,
+    BuiltinType,
 }
 
 impl TokenKind {
@@ -175,6 +197,7 @@ impl fmt::Display for TokenKind {
         match *self {
             TokenKind::Ident => write!(f, "identifier"),
             TokenKind::Literal => write!(f, "literal"),
+            TokenKind::BuiltinType => write!(f, "builtin type"),
             TokenKind::Token(ref tok) => write!(f, "`{}`", tok),
         }
     }

@@ -109,6 +109,13 @@ pub enum Statement {
 #[derive(Debug, Clone)]
 pub enum Type {
     Wildcard,
+    I8,
+    U8,
+    I16,
+    U16,
+    I32,
+    U32,
+    Bool,
     Concrete(Spanned<Ident>, Vec<Spanned<Type>>),
     Pointer(Box<Spanned<Type>>),
     Function(Vec<Spanned<Type>>, Box<Spanned<Type>>),

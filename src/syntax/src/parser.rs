@@ -463,6 +463,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
+        self.expected.insert(Expectation::Token(TokenKind::BuiltinType));
         if self.check(Token::Star) {
             let start = self.previous_span();
             let typ = self.parse_type()?;
@@ -488,6 +489,27 @@ impl<'a> Parser<'a> {
         } else if self.check(Token::Underscore) {
             let span = self.previous_span();
             Ok(Spanned::new(Type::Wildcard, span))
+        } else if self.check(Token::Keyword(Keyword::I8)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::I8, span))
+        } else if self.check(Token::Keyword(Keyword::I16)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::I16, span))
+        } else if self.check(Token::Keyword(Keyword::I32)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::I32, span))
+        } else if self.check(Token::Keyword(Keyword::U8)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::U8, span))
+        } else if self.check(Token::Keyword(Keyword::U16)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::U16, span))
+        } else if self.check(Token::Keyword(Keyword::U32)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::U32, span))
+        } else if self.check(Token::Keyword(Keyword::Bool)) {
+            let span = self.previous_span();
+            Ok(Spanned::new(Type::Bool, span))
         } else {
             let name = self.consume_ident()?;
             let params = if self.check(Token::Less) {
