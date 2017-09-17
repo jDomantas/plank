@@ -72,7 +72,7 @@ Here is a table of tokens and their internal representation:
 | `}`          | `Token::RightBrace`                        |                 |
 | `->`         | `Token::Arrow`                             |                 |
 | `&&`         | `Token::And`                               |                 |
-| `||`         | `Token::Or`                                |                 |
+| `\|\|`       | `Token::Or`                                |                 |
 | `,`          | `Token::Comma`                             |                 |
 | `_`          | `Token::Underscore`                        |                 |
 | `:`          | `Token::Colon`                             |                 |
