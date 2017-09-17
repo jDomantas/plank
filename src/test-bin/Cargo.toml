@@ -6,3 +6,4 @@ authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 [dependencies]
 errors = { path = "../errors" }
 syntax = { path = "../syntax" }
+clap = "2.26.2"
