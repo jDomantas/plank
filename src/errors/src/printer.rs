@@ -323,7 +323,7 @@ impl<'a> Printer<'a> {
     fn print_immediate_markers(&mut self, markers: &[LineMarker]) {
         let (connect, arrow_end) = match markers.iter().next_back().unwrap() {
             &LineMarker::FromStart { connect_col, arrow_col, .. } => {
-                (Some(connect_col), arrow_col - 1)
+                (Some(connect_col), arrow_col.saturating_sub(1))
             }
             _ => {
                 (None, 0)
