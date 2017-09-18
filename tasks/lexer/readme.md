@@ -78,7 +78,7 @@ Here is a table of tokens and their internal representation:
 | `:`          | `Token::Colon`                             |                 |
 | `::`         | `Token::DoubleColon`                       |                 |
 | `;`          | `Token::Semicolon`                         |                 |
-| `~`          | `Token::Not`                               |                 |
+| `!`          | `Token::Not`                               |                 |
 | `=`          | `Token::Assign`                            |                 |
 
 
