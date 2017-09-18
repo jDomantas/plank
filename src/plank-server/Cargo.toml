@@ -1,5 +1,5 @@
 [package]
-name = "lang-server"
+name = "plank-server"
 version = "0.1.0"
 authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 

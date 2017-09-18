@@ -3,5 +3,5 @@ members = [
     "syntax",
     "errors",
     "test-bin",
-    "lang-server",
+    "plank-server",
 ]
