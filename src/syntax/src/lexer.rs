@@ -130,8 +130,15 @@ impl<'a> Lexer<'a> {
         while depth > 0 {
             match self.consume() {
                 Some('*') => {
-                    if self.consume() == Some('/') {
-                        depth -= 1;
+                    loop {
+                        match self.consume() {
+                            Some('/') => {
+                                depth -= 1;
+                                break;
+                            }
+                            Some('*') => {}
+                            _ => break,
+                        }
                     }
                 }
                 Some('/') => {
