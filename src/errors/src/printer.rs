@@ -136,7 +136,7 @@ impl<'a> Printer<'a> {
                 println!("warning: {}", diagnostic.message);
             }
         }
-        if diagnostic.notes.len() > 0 {
+        if !diagnostic.notes.is_empty() {
             self.print_notes(&diagnostic.notes);
         }
     }
@@ -198,7 +198,7 @@ impl<'a> Printer<'a> {
         let mut last_printed = None;
         for (line, markers) in line_markers {
             if let Some(prev) = last_printed {
-                if self.full_connection_cols.len() > 0 {
+                if !self.full_connection_cols.is_empty() {
                     if line - prev > 3 {
                         self.print_line(prev + 1);
                         self.print_gap_line();
@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
     }
 
     fn print_line_and_markers(&mut self, line: u32, mut markers: Vec<LineMarker>) {
-        assert!(markers.len() > 0, "line has no markers");
+        assert!(!markers.is_empty(), "line has no markers");
         self.print_line(line);
         self.print_immediate_markers(&markers);
         // last span has its message printed inline
@@ -257,12 +257,12 @@ impl<'a> Printer<'a> {
         }
         for i in (1..(markers.len() + 1)).rev() {
             let markers = &markers[0..i];
-            match &markers[i - 1] {
-                &LineMarker::FromTo { end_col, message, .. } => {
+            match markers[i - 1] {
+                LineMarker::FromTo { end_col, message, .. } => {
                     self.print_markers(markers, end_col - 1);
                     println!("{}", message.unwrap_or(""));
                 }
-                &LineMarker::FromStart { arrow_col, message, .. } => {
+                LineMarker::FromStart { arrow_col, message, .. } => {
                     self.print_markers(markers, arrow_col + 2);
                     println!("{}", message.unwrap_or(""));
                 }
@@ -321,8 +321,8 @@ impl<'a> Printer<'a> {
     }
 
     fn print_immediate_markers(&mut self, markers: &[LineMarker]) {
-        let (connect, arrow_end) = match markers.iter().next_back().unwrap() {
-            &LineMarker::FromStart { connect_col, arrow_col, .. } => {
+        let (connect, arrow_end) = match *markers.iter().next_back().unwrap() {
+            LineMarker::FromStart { connect_col, arrow_col, .. } => {
                 (Some(connect_col), arrow_col.saturating_sub(1))
             }
             _ => {
@@ -332,10 +332,11 @@ impl<'a> Printer<'a> {
         self.print_line_header(None, connect);
         let last_col = markers.iter().next_back().unwrap().end_col();
         for col in 1..last_col {
-            let mut part = MarkerPart::None;
-            if col <= arrow_end {
-                part = MarkerPart::ArrowBottom;
-            }
+            let mut part = if col <= arrow_end {
+                MarkerPart::ArrowBottom
+            } else {
+                MarkerPart::None
+            };
             for (index, marker) in markers.iter().rev().enumerate() {
                 match *marker {
                     LineMarker::FromStart { arrow_col, style, .. } => {
@@ -363,8 +364,8 @@ impl<'a> Printer<'a> {
     }
 
     fn print_markers(&mut self, markers: &[LineMarker], last_col: u32) {
-        let (connect, arrow_end) = match markers.iter().next_back().unwrap() {
-            &LineMarker::FromStart { connect_col, arrow_col, .. } => {
+        let (connect, arrow_end) = match *markers.iter().next_back().unwrap() {
+            LineMarker::FromStart { connect_col, arrow_col, .. } => {
                 (Some(connect_col), arrow_col - 1)
             }
             _ => {
@@ -373,10 +374,11 @@ impl<'a> Printer<'a> {
         };
         self.print_line_header(None, connect);
         for col in 1..last_col {
-            let mut part = MarkerPart::None;
-            if col <= arrow_end {
-                part = MarkerPart::ArrowBottom;
-            }
+            let mut part = if col <= arrow_end {
+                MarkerPart::ArrowBottom
+            } else {
+                MarkerPart::None
+            };
             for marker in markers.iter().rev() {
                 match *marker {
                     LineMarker::FromStart { arrow_col, .. } => {

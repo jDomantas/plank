@@ -309,11 +309,8 @@ impl<'a> Parser<'a> {
                 }
                 // don't stop on fn type - also check that after fn goes an ident
                 Some(&Token::Keyword(Keyword::Fn)) => {
-                    match self.peek2() {
-                        Some(&Token::Ident(_)) => {
-                            return;
-                        }
-                        _ => {}
+                    if let Some(&Token::Ident(_)) = self.peek2() {
+                        return;
                     }
                 }
                 _ => {}
@@ -337,11 +334,8 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 }
                 Some(&Token::Keyword(Keyword::Fn)) => {
-                    match self.peek2() {
-                        Some(&Token::Ident(_)) => {
-                            return Err(());
-                        }
-                        _ => {}
+                    if let Some(&Token::Ident(_)) = self.peek2() {
+                        return Err(());
                     }
                 }
                 Some(&Token::Keyword(Keyword::Struct)) |

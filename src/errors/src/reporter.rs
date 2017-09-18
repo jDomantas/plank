@@ -96,7 +96,7 @@ impl<N: Nat> Builder<N> {
     }
 
     pub fn build(self) {
-        assert!(self.diagnostic.notes.len() > 0, "built a diagnostic without any notes");
+        assert!(!self.diagnostic.notes.is_empty(), "built a diagnostic without any notes");
         self.reporter.diagnostics.borrow_mut().push(self.diagnostic);
     }
 }

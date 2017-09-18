@@ -72,7 +72,7 @@ fn run() -> Result<()> {
         }
     };
     if let Err(Error::Build(ref diagnostics)) = result {
-        errors::print_diagnostics(&input, &diagnostics);
+        errors::print_diagnostics(&input, diagnostics);
     }
     result
 }
@@ -80,15 +80,15 @@ fn run() -> Result<()> {
 fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Result<()> {
     match *command {
         Command::Lex => {
-            let tokens = lex(&input)?;
+            let tokens = lex(input)?;
             for tok in &tokens {
                 output.write_fmt(format_args!("{:?}\n", tok))?;
             }
             Ok(())
         }
         Command::Parse => {
-            let _ = parse(&input)?;
-            output.write(b"Program parsed successfully")?;
+            let _ = parse(input)?;
+            output.write_all(b"Program parsed successfully")?;
             Ok(())
         }
     }
@@ -115,12 +115,13 @@ fn parse_params() -> Result<Params> {
             .takes_value(true)
             .help("Set output file, uses stdout if none provided"))
         .get_matches();
+    let default_command = Command::Parse;
     let command = if matches.is_present("lex") {
         Command::Lex
     } else if matches.is_present("parse") {
         Command::Parse
     } else {
-        Command::Parse
+        default_command
     };
 
     let input = match matches.value_of_os("input") {
@@ -168,7 +169,7 @@ fn lex(source: &str) -> Result<Vec<syntax::tokens::Token>> {
     let reporter = errors::Reporter::new();
     let tokens = syntax::lex(source, reporter.clone());
     let diagnostics = reporter.get_diagnostics();
-    if diagnostics.len() == 0 {
+    if diagnostics.is_empty() {
         Ok(tokens
             .into_iter()
             .map(syntax::position::Spanned::into_value)
@@ -184,7 +185,7 @@ fn parse(source: &str) -> Result<syntax::ast::Program> {
     let tokens = syntax::lex(source, reporter.clone());
     let program = syntax::parse(tokens, reporter.clone());
     let diagnostics = reporter.get_diagnostics();
-    if diagnostics.len() == 0 {
+    if diagnostics.is_empty() {
         Ok(program)
     } else {
         Err(Error::Build(diagnostics))

@@ -24,7 +24,7 @@ pub struct ErrorResponse<T> {
 impl<T> ErrorResponse<T> {
     fn parse_error() -> Self {
         ErrorResponse {
-            code: -32700,
+            code: -32_700,
             message: "Parse error".into(),
             data: None,
         }
@@ -32,7 +32,7 @@ impl<T> ErrorResponse<T> {
 
     fn invalid_request() -> Self {
         ErrorResponse {
-            code: -32600,
+            code: -32_600,
             message: "Invalid request".into(),
             data: None,
         }
@@ -40,7 +40,7 @@ impl<T> ErrorResponse<T> {
 
     fn method_not_found() -> Self {
         ErrorResponse {
-            code: -32601,
+            code: -32_601,
             message: "Method not found".into(),
             data: None,
         }
@@ -48,7 +48,7 @@ impl<T> ErrorResponse<T> {
 
     fn invalid_params() -> Self {
         ErrorResponse {
-            code: -32602,
+            code: -32_602,
             message: "Invalid params".into(),
             data: None,
         }
@@ -56,7 +56,7 @@ impl<T> ErrorResponse<T> {
 
     fn internal_error() -> Self {
         ErrorResponse {
-            code: -32603,
+            code: -32_603,
             message: "Internal error".into(),
             data: None,
         }
@@ -147,7 +147,7 @@ impl<T, E> Response<T, E> {
 }
 
 impl<T: Serialize, E: Serialize> Response<T, E> {
-    fn to_raw(self, id: Option<lst::NumberOrString>) -> RawResponse<T, E> {
+    fn into_raw(self, id: Option<lst::NumberOrString>) -> RawResponse<T, E> {
         match self {
             Response::Success(value) => {
                 RawResponse::ok(value, id)
@@ -231,14 +231,14 @@ impl<'a> RpcHandler<'a> {
     pub fn handle_call(&mut self, input: &str) -> Option<String> {
         let value = match serde_json::from_str::<JsonValue>(input) {
             Ok(value) => value,
-            Err(_) => return basic_error(ErrorResponse::parse_error()),
+            Err(_) => return basic_error(&ErrorResponse::parse_error()),
         };
 
         let response = match value {
             JsonValue::Array(values) => {
                 // batch request
-                if values.len() == 0 {
-                    return basic_error(ErrorResponse::invalid_request());
+                if values.is_empty() {
+                    return basic_error(&ErrorResponse::invalid_request());
                 }
                 let mut responses = Vec::new();
                 for request in values {
@@ -274,7 +274,7 @@ impl<'a> RpcHandler<'a> {
         match self.handlers.get_mut(&request.method) {
             Some(handler) => {
                 let id = request.id;
-                handler(request.params).map(|resp| resp.to_raw(id))
+                handler(request.params).map(|resp| resp.into_raw(id))
             }
             None => {
                 error!("handler not found for: '{}'", request.method);
@@ -289,6 +289,6 @@ impl<'a> RpcHandler<'a> {
     }
 }
 
-fn basic_error(err: ErrorResponse<()>) -> Option<String> {
-    Some(serde_json::to_string(&err).expect("failed to serialize basic error"))
+fn basic_error(err: &ErrorResponse<()>) -> Option<String> {
+    Some(serde_json::to_string(err).expect("failed to serialize basic error"))
 }

@@ -40,7 +40,7 @@ impl<R: BufRead, W: Write> Transport<R, W> {
             self.reader.read_line(&mut self.read_buffer)?;
             if self.read_buffer.starts_with(LENGTH_HEADER) {
                 let len_str = self.read_buffer.get(LENGTH_HEADER.len()..).unwrap().trim();
-                let length = str::parse::<u64>(&len_str)
+                let length = str::parse::<u64>(len_str)
                     .map_err(|_| Error::BadInput("bad length"))?;
                 content_length = Some(length);
             } else if self.read_buffer == "\r\n" {

@@ -481,10 +481,10 @@ fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
 }
 
 fn parse_simple_number(s: &str) -> Result<u64, ParseNumberError> {
-    if s.len() == 0 {
+    if s.is_empty() {
         return Err(ParseNumberError::BadInt);
     }
-    if s.len() > 1 && s.chars().next() == Some('0') {
+    if s.len() > 1 && s.starts_with('0') {
         // we have a leading zero, and number is longer than one digit
         return Err(ParseNumberError::BadInt);
     }
@@ -494,7 +494,7 @@ fn parse_simple_number(s: &str) -> Result<u64, ParseNumberError> {
             Some(digit) => {
                 result = result
                     .checked_mul(10)
-                    .and_then(|n| n.checked_add(digit as u64))
+                    .and_then(|n| n.checked_add(u64::from(digit)))
                     .ok_or(ParseNumberError::TooLarge)?;
             }
             None => {
