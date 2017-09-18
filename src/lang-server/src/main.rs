@@ -125,11 +125,11 @@ fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {
     reporter
         .get_diagnostics()
         .into_iter()
-        .map(|d| note_to_diagnostic(&d.notes[0], d.message))
+        .filter_map(convert_diagnostic)
         .collect()
 }
 
-fn note_to_diagnostic(note: &errors::reporter::Note, msg: String) -> lst::Diagnostic {
+fn convert_diagnostic(d: errors::reporter::Diagnostic) -> Option<lst::Diagnostic> {
     fn convert_pos(pos: errors::position::Position) -> lst::Position {
         lst::Position {
             line: (pos.line - 1) as u64,
@@ -142,11 +142,19 @@ fn note_to_diagnostic(note: &errors::reporter::Note, msg: String) -> lst::Diagno
             end: convert_pos(range.end),
         }
     }
-    lst::Diagnostic {
-        range: convert_range(note.span),
-        severity: Some(lst::DiagnosticSeverity::Error),
+    let primary_span = match d.primary_span {
+        Some(span) => span,
+        None => return None,
+    };
+    let severity = match d.severity {
+        errors::reporter::Severity::Error => lst::DiagnosticSeverity::Error,
+        errors::reporter::Severity::Warning => lst::DiagnosticSeverity::Warning,
+    };
+    Some(lst::Diagnostic {
+        range: convert_range(primary_span),
+        severity: Some(severity),
         code: None,
         source: Some("plank".into()),
-        message: msg,
-    }
+        message: d.message,
+    })
 }
