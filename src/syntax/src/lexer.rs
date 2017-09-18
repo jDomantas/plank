@@ -456,15 +456,16 @@ fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
                 Signedness::Unsigned
             };
             let size = match suffix {
-                "8" => Size::Bit8,
-                "16" => Size::Bit16,
-                "32" => Size::Bit32,
+                "8" => Some(Size::Bit8),
+                "16" => Some(Size::Bit16),
+                "32" => Some(Size::Bit32),
+                "" => None,
                 _ => return Err(ParseNumberError::BadBitCount),
             };
             Ok(Number {
                 value,
                 signedness: Some(signedness),
-                size: Some(size),
+                size,
             })
         }
         None => {
