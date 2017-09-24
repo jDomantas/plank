@@ -723,6 +723,7 @@ impl InfixParser for CallParser {
 
     fn parse(&self, parser: &mut Parser, callee: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
         if parser.check(Token::LeftParen) {
+            let open_span = parser.previous_span();
             let mut params = Vec::new();
             while !parser.check(Token::RightParen) {
                 let ident_next = parser.peek().map(Token::kind) == Some(TokenKind::Ident);
@@ -743,7 +744,7 @@ impl InfixParser for CallParser {
                 if parser.check(Token::RightParen) {
                     break;
                 }
-                parser.expect(Token::Comma)?;
+                parser.expect_closing(Token::Comma, open_span)?;
             }
             let span = Spanned::span(&callee).merge(parser.previous_span());
             let expr = Expr::Call(Box::new(callee), params);
