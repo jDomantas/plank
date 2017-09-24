@@ -1,6 +1,6 @@
 # Parser
 
-Parser is implemented in [syntax/src/parser.rs](../../src/syntax/src/parser.rs). The module exports a single function -  `parse`. Parsing always produces a `Program` - if errors are encountered while parsing an item or statement, they will be absent from the parsed program. The `Program` and the rest of the AST is defined in [syntax/src/ast.rs](../../src/syntax/src/ast.rs). All errors are emitted to given `Reporter`.
+Parser is implemented in [plank-syntax/src/parser.rs](../../plank-syntax/src/parser.rs). The module exports a single function -  `parse`. Parsing always produces a `Program` - if errors are encountered while parsing an item or statement, they will be absent from the parsed program. The `Program` and the rest of the AST is defined in [plank-syntax/src/ast.rs](../../plank-syntax/src/ast.rs). All errors are emitted to given `Reporter`.
 
 
 ## Parsing algorithm

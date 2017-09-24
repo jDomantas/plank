@@ -1,6 +1,6 @@
 # Lexer
 
-Lexer is implemented in [syntax/src/lexer.rs](../../src/syntax/src/lexer.rs). The module exports a single function - `lex`. Lexing always produces some list of tokens - invalid input is represented as token `Token::Error`. All errors are emitted to given `Reporter`.
+Lexer is implemented in [plank-syntax/src/lexer.rs](../../plank-syntax/src/lexer.rs). The module exports a single function - `lex`. Lexing always produces some list of tokens - invalid input is represented as token `Token::Error`. All errors are emitted to given `Reporter`.
 
 ## Grammar
 
@@ -38,9 +38,9 @@ Also, all terminals in first part of grammar (like `fn`, `let`, `+`, and similar
 ## Tokens
 
 Lexer returns a list of `Spanned<Token>`.
-* `Token` is defined in [syntax/src/tokens.rs](../../src/syntax/src/tokens.rs).
-* `Spanned` is defined in [syntax/src/position.rs](../../src/syntax/src/position.rs).
-* `Span`, which is used in `Spanned`, is defined in [errors/src/position.rs](../../src/errors/src/position.rs).
+* `Token` is defined in [plank-syntax/src/tokens.rs](../../plank-syntax/src/tokens.rs).
+* `Spanned` is defined in [plank-syntax/src/position.rs](../../plank-syntax/src/position.rs).
+* `Span`, which is used in `Spanned`, is defined in [plank-errors/src/position.rs](../../plank-errors/src/position.rs).
 
 Here is a table of tokens and their internal representation:
 
