@@ -1,8 +1,8 @@
-#![allow(dead_code)]
-
 extern crate clap;
 extern crate errors;
 extern crate syntax;
+
+mod ast_printer;
 
 use std::convert::From;
 use std::io;
@@ -87,8 +87,10 @@ fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Resul
             Ok(())
         }
         Command::Parse => {
-            let _ = parse(input)?;
-            output.write_all(b"Program parsed successfully")?;
+            let program = parse(input)?;
+            let formatted = ast_printer::format_program(&program);
+            output.write_all(formatted.as_bytes())?;
+            output.write_all(b"\n")?;
             Ok(())
         }
     }
