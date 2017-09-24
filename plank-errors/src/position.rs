@@ -1,7 +1,7 @@
 //! Types to represent positions inside source file.
 
-/// Represents a position inside a source file. Both lines and columns
-/// are 0-indexed.
+/// Represents a position inside a source file. Both lines and columns start
+/// from zero.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub struct Position {
     #[allow(missing_docs)]
