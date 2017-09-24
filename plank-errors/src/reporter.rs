@@ -135,7 +135,7 @@ impl Reporter {
 }
 
 /// Diagnostics severity.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Severity {
     /// Represents a fatal error.
     Error,

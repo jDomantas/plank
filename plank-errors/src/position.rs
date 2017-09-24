@@ -49,7 +49,7 @@ impl Position {
 
 /// Represents a range inside source file. You can think of it as a selection
 /// inside the editor.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub struct Span {
     #[allow(missing_docs)]
     pub start: Position,
