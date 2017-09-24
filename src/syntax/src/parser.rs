@@ -31,7 +31,7 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     parser.prefix(TokenKind::Token(Token::LeftParen), &ParenthesisedParser);
 
     parser.infix(TokenKind::Token(Token::LeftParen), &CallParser);
-    parser.infix(TokenKind::Token(Token::Dot), &CallParser);
+    parser.infix(TokenKind::Token(Token::Dot), &FieldParser);
 
     parse_infix!(parser, And,           And,            And,            true);
     parse_infix!(parser, Or,            Or,             Or,             true);
@@ -722,41 +722,49 @@ impl InfixParser for CallParser {
     }
 
     fn parse(&self, parser: &mut Parser, callee: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
-        if parser.check(Token::LeftParen) {
-            let open_span = parser.previous_span();
-            let mut params = Vec::new();
-            while !parser.check(Token::RightParen) {
-                let ident_next = parser.peek().map(Token::kind) == Some(TokenKind::Ident);
-                if ident_next {
-                    parser.expected2.insert(Expectation::Token(
-                        TokenKind::Token(Token::Colon)
-                    ));
-                }
-                if ident_next && parser.peek2() == Some(&Token::Colon)
-                {
-                    let name = parser.consume_ident().expect("expected ident");
-                    parser.expect(Token::Colon).expect("expected ':'");
-                    let value = parser.parse_expr()?;
-                    params.push(CallParam::Named(name, value));
-                } else {
-                    params.push(CallParam::Unnamed(parser.parse_expr()?));
-                }
-                if parser.check(Token::RightParen) {
-                    break;
-                }
-                parser.expect_closing(Token::Comma, open_span)?;
+        parser.expect(Token::LeftParen).expect("expected left paren");
+        let open_span = parser.previous_span();
+        let mut params = Vec::new();
+        while !parser.check(Token::RightParen) {
+            let ident_next = parser.peek().map(Token::kind) == Some(TokenKind::Ident);
+            if ident_next {
+                parser.expected2.insert(Expectation::Token(
+                    TokenKind::Token(Token::Colon)
+                ));
             }
-            let span = Spanned::span(&callee).merge(parser.previous_span());
-            let expr = Expr::Call(Box::new(callee), params);
-            Ok(Spanned::new(expr, span))
-        } else if parser.check(Token::Dot) {
-            let field = parser.consume_ident()?;
-            let span = Spanned::span(&callee).merge(Spanned::span(&field));
-            let expr = Expr::Field(Box::new(callee), field);
-            Ok(Spanned::new(expr, span))
-        } else {
-            panic!("expected dot or left paren")
+            if ident_next && parser.peek2() == Some(&Token::Colon)
+            {
+                let name = parser.consume_ident().expect("expected ident");
+                parser.expect(Token::Colon).expect("expected ':'");
+                let value = parser.parse_expr()?;
+                params.push(CallParam::Named(name, value));
+            } else {
+                params.push(CallParam::Unnamed(parser.parse_expr()?));
+            }
+            if parser.check(Token::RightParen) {
+                break;
+            }
+            parser.expect_closing(Token::Comma, open_span)?;
         }
+        let span = Spanned::span(&callee).merge(parser.previous_span());
+        let expr = Expr::Call(Box::new(callee), params);
+        Ok(Spanned::new(expr, span))
+    }
+}
+
+struct FieldParser;
+
+impl InfixParser for FieldParser {
+    fn precedence(&self) -> Precedence {
+        Precedence::CallOrField
+    }
+
+    fn parse(&self, parser: &mut Parser, value: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
+        parser.expect(Token::Dot).expect("expected dot");
+        let field = parser.consume_ident()?;
+        let span = Spanned::span(&value).merge(Spanned::span(&field));
+        let expr = Expr::Field(Box::new(value), field);
+        Ok(Spanned::new(expr, span))
     }
 }
 
