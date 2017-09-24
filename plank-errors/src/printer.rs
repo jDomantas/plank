@@ -1,3 +1,5 @@
+//! Functions to pretty-print diagnostics.
+
 use std::collections::{BTreeMap, HashSet};
 use reporter::{Diagnostic, Note, Severity};
 
@@ -407,10 +409,14 @@ fn number_length(mut num: u32) -> u32 {
     len
 }
 
+/// Print a single diagnostic to stdout.
 pub fn print_diagnostic(source: &str, diagnostic: &Diagnostic) {
     Printer::new(source).pretty_print(diagnostic)
 }
 
+/// Print all diagnostics to stdout.
+///
+/// Diagnostics will be printed in the given order.
 pub fn print_diagnostics(source: &str, diagnostics: &[Diagnostic]) {
     let mut printer = Printer::new(source);
     for diagnostic in diagnostics {

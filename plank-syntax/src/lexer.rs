@@ -95,7 +95,7 @@ impl<'a> Lexer<'a> {
             let span = start.span_to(self.current_pos.forward(1));
             self.reporter
                 .error(format!("unknown token: `{}`", first), span)
-                .span_note(span, format!("maybe you wanted `{}{}`?", first, ch))
+                .span_note(format!("maybe you wanted `{}{}`?", first, ch), span)
                 .build();
             Token::Error
         };

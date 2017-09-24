@@ -1,31 +1,61 @@
+//! Helpers to build and aggregate diagnostics.
+
 use std::cell::RefCell;
-use std::marker::PhantomData;
 use std::rc::Rc;
 use position::Span;
-use typenum::{Nat, Z, S};
 
 
+/// Reporter aggregates and allows building diagnostics.
+///
+/// Note that reporters created by cloning will share diagnostic list with the
+/// original reporter.
 #[derive(Default, Debug, Clone)]
 pub struct Reporter {
     diagnostics: Rc<RefCell<Vec<Diagnostic>>>,
 }
 
 impl Reporter {
+    /// Create a new reporter with no errors.
     pub fn new() -> Reporter {
         Default::default()
     }
 
+    /// Returns if the reporter has any errors.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use plank_errors::reporter::Reporter;
+    ///
+    /// let mut reporter = Reporter::new();
+    /// // empty reporter should not have any errors
+    /// assert!(!reporter.have_errors());
+    /// ```
     pub fn have_errors(&self) -> bool {
         self.diagnostics.borrow().iter().any(|d| {
             d.severity == Severity::Error
         })
     }
 
+    /// Return the list of diagnostics collected with this reporter.
+    ///
+    /// The diagnosics are returned in arbitrary order. Depending on how they
+    /// will be displayed, you might want to sort them.
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
         self.diagnostics.borrow().clone()
     }
 
-    pub fn global_error<T: Into<String>>(&mut self, msg: T) {
+    /// Create a new error without associated span.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use plank_errors::reporter::Reporter;
+    ///
+    /// let mut reporter = Reporter::new();
+    /// reporter.global_error("`main` function is missing");
+    /// ```
+    pub fn global_error<T: Into<String>>(&self, msg: T) {
         let diagnostic = Diagnostic {
             message: msg.into(),
             primary_span: None,
@@ -35,31 +65,81 @@ impl Reporter {
         self.diagnostics.borrow_mut().push(diagnostic);
     }
 
-    pub fn error<T>(&mut self, msg: T, span: Span) -> Builder<S<S<Z>>>
+    /// Create a builder for a new error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use plank_errors::reporter::Reporter;
+    /// use plank_errors::position::{Position, Span};
+    ///
+    /// let mut reporter = Reporter::new();
+    /// # let error_span = Span::new(Position::new(1, 1), Position::new(1, 1));
+    /// # let help_span = error_span;
+    /// reporter
+    ///     .error("error message", error_span)
+    ///     .span_note("shorter message", error_span)
+    ///     .span_note("helper note", help_span)
+    ///     .build();
+    /// ```
+    pub fn error<T>(&self, msg: T, span: Span) -> Builder
         where T: Into<String>
     {
         self.diagnostic(Severity::Error, msg, span)
     }
 
-    pub fn warning<T>(&mut self, msg: T, span: Span) -> Builder<S<S<Z>>>
+    /// Create a builder for a new warning.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use plank_errors::reporter::Reporter;
+    /// use plank_errors::position::{Position, Span};
+    ///
+    /// let mut reporter = Reporter::new();
+    /// # let warning_span = Span::new(Position::new(1, 1), Position::new(1, 1));
+    /// # let help_span = warning_span;
+    /// reporter
+    ///     .warning("warning message", warning_span)
+    ///     .span_note("shorter message", warning_span)
+    ///     .span_note("helper note", help_span)
+    ///     .build();
+    /// ```
+    pub fn warning<T>(&self, msg: T, span: Span) -> Builder
         where T: Into<String>
     {
         self.diagnostic(Severity::Warning, msg, span)
     }
 
-    pub fn diagnostic<T>(&mut self, severity: Severity, msg: T, span: Span) -> Builder<S<S<Z>>>
+    /// Create a builder for a new diagnostic.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use plank_errors::reporter::{Reporter, Severity};
+    /// use plank_errors::position::{Position, Span};
+    /// let mut reporter = Reporter::new();
+    /// # let error_span = Span::new(Position::new(1, 1), Position::new(1, 1));
+    /// reporter
+    ///     .diagnostic(Severity::Error, "error message", error_span)
+    ///     .span(error_span)
+    ///     .build();
+    /// ```
+    pub fn diagnostic<T>(&self, severity: Severity, msg: T, span: Span) -> Builder
         where T: Into<String>
     {
         Builder::new(self, severity, msg.into(), span)
     }
 }
 
+#[allow(missing_docs)]
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub enum Severity {
     Error,
     Warning,
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub message: String,
@@ -68,23 +148,23 @@ pub struct Diagnostic {
     pub notes: Vec<Note>,
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct Note {
     pub span: Span,
     pub message: Option<String>,
 }
 
+/// A helper for building a diagnostic.
 #[must_use]
-pub struct Builder<N> {
-    phantom: PhantomData<N>,
+pub struct Builder {
     reporter: Reporter,
     diagnostic: Diagnostic,
 }
 
-impl<N: Nat> Builder<N> {
+impl Builder {
     fn new(reporter: &Reporter, severity: Severity, msg: String, primary_span: Span) -> Self {
         Builder {
-            phantom: PhantomData,
             reporter: reporter.clone(),
             diagnostic: Diagnostic {
                 message: msg,
@@ -95,32 +175,35 @@ impl<N: Nat> Builder<N> {
         }
     }
 
+    /// Complete current diagnostic.
+    ///
+    /// # Panics
+    ///
+    /// Panics if current diagnostic has no notes. If you want an error without
+    /// any notes, use [`Reporter::global_error`]
+    /// (struct.Reporter.html#method.global_error) instead.
     pub fn build(self) {
         assert!(!self.diagnostic.notes.is_empty(), "built a diagnostic without any notes");
         self.reporter.diagnostics.borrow_mut().push(self.diagnostic);
     }
-}
 
-impl<N: Nat> Builder<S<N>> {
-    pub fn span(self, span: Span) -> Builder<N> {
-        self.note(span, None)
+    /// Add a new note that has only a span.
+    pub fn span(self, span: Span) -> Self {
+        self.note(None, span)
     }
 
-    pub fn span_note<T>(self, span: Span, msg: T) -> Builder<N>
+    /// Add a new note that has a message and a span.
+    pub fn span_note<T>(self, msg: T, span: Span) -> Self
         where T: Into<String>
     {
-        self.note(span, Some(msg.into()))
+        self.note(Some(msg.into()), span)
     }
 
-    fn note(mut self, span: Span, msg: Option<String>) -> Builder<N> {
+    fn note(mut self, msg: Option<String>, span: Span) -> Self {
         self.diagnostic.notes.push(Note {
             span,
             message: msg,
         });
-        Builder {
-            phantom: PhantomData,
-            reporter: self.reporter,
-            diagnostic: self.diagnostic,
-        }
+        self
     }
 }

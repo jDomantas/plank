@@ -154,16 +154,16 @@ impl<'a> Parser<'a> {
         let span = self.peek_span();
         let builder = self.reporter
             .error(format!("{}, got {}.", expected, got), span)
-            .span_note(span, format!("unexpected {}", got));
+            .span_note(format!("unexpected {}", got), span);
         if let Some((span, msg)) = helper {
-            builder.span_note(span, msg).build();
+            builder.span_note(msg, span).build();
         } else if !self.last_line_completed
             && self.prev_span.is_some()
             && self.prev_span.unwrap().end.line < self.peek_span().start.line
         {
             let last_pos = self.prev_span.unwrap().end;
             let help_span = last_pos.forward(1).span_to(last_pos.forward(2));
-            builder.span_note(help_span, expected).build();
+            builder.span_note(expected, help_span).build();
         } else {
             builder.build();
         }
