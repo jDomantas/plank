@@ -1,5 +1,5 @@
 use std::str::Chars;
-use errors::Reporter;
+use plank_errors::Reporter;
 use position::{Position, Span, Spanned};
 use tokens::{Token, Keyword, Number};
 use ast::{Signedness, Size};

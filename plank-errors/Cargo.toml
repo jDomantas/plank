@@ -1,5 +1,5 @@
 [package]
-name = "errors"
+name = "plank-errors"
 version = "0.1.0"
 authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 

@@ -7,8 +7,8 @@ extern crate languageserver_types;
 extern crate log;
 extern crate simple_logging;
 extern crate url;
-extern crate syntax;
-extern crate errors;
+extern crate plank_syntax;
+extern crate plank_errors;
 
 mod transport;
 mod jsonrpc;
@@ -119,9 +119,9 @@ fn publish_diagnostics<R, W>(source: &str, doc: Url, transport: &mut Transport<R
 }
 
 fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {
-    let reporter = errors::Reporter::new();
-    let tokens = syntax::lex(source, reporter.clone());
-    let _ = syntax::parse(tokens, reporter.clone());
+    let reporter = plank_errors::Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let _ = plank_syntax::parse(tokens, reporter.clone());
     reporter
         .get_diagnostics()
         .into_iter()
@@ -129,14 +129,14 @@ fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {
         .collect()
 }
 
-fn convert_diagnostic(d: errors::reporter::Diagnostic) -> Option<lst::Diagnostic> {
-    fn convert_pos(pos: errors::position::Position) -> lst::Position {
+fn convert_diagnostic(d: plank_errors::reporter::Diagnostic) -> Option<lst::Diagnostic> {
+    fn convert_pos(pos: plank_errors::position::Position) -> lst::Position {
         lst::Position {
             line: u64::from(pos.line - 1),
             character: u64::from(pos.column - 1),
         }
     }
-    fn convert_range(range: errors::position::Span) -> lst::Range {
+    fn convert_range(range: plank_errors::position::Span) -> lst::Range {
         lst::Range {
             start: convert_pos(range.start),
             end: convert_pos(range.end),
@@ -147,8 +147,8 @@ fn convert_diagnostic(d: errors::reporter::Diagnostic) -> Option<lst::Diagnostic
         None => return None,
     };
     let severity = match d.severity {
-        errors::reporter::Severity::Error => lst::DiagnosticSeverity::Error,
-        errors::reporter::Severity::Warning => lst::DiagnosticSeverity::Warning,
+        plank_errors::reporter::Severity::Error => lst::DiagnosticSeverity::Error,
+        plank_errors::reporter::Severity::Warning => lst::DiagnosticSeverity::Warning,
     };
     Some(lst::Diagnostic {
         range: convert_range(primary_span),

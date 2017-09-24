@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use errors::Reporter;
+use plank_errors::Reporter;
 use ast::{
     BinaryOp, Expr, Function, Ident, ItemName, Literal, Program, Statement,
     Struct, UnaryOp, Type, Var, FunctionType, CallParam,

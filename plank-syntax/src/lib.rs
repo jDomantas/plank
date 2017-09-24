@@ -1,4 +1,4 @@
-extern crate errors;
+extern crate plank_errors;
 
 
 pub mod ast;

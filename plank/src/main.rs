@@ -1,6 +1,6 @@
 extern crate clap;
-extern crate errors;
-extern crate syntax;
+extern crate plank_errors;
+extern crate plank_syntax;
 
 mod ast_printer;
 
@@ -8,7 +8,7 @@ use std::convert::From;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use errors::reporter::Diagnostic;
+use plank_errors::reporter::Diagnostic;
 
 
 #[derive(Debug)]
@@ -72,7 +72,7 @@ fn run() -> Result<()> {
         }
     };
     if let Err(Error::Build(ref diagnostics)) = result {
-        errors::print_diagnostics(&input, diagnostics);
+        plank_errors::print_diagnostics(&input, diagnostics);
     }
     result
 }
@@ -167,25 +167,25 @@ fn read_input(stream: &Stream) -> Result<String> {
     }
 }
 
-fn lex(source: &str) -> Result<Vec<syntax::tokens::Token>> {
-    let reporter = errors::Reporter::new();
-    let tokens = syntax::lex(source, reporter.clone());
+fn lex(source: &str) -> Result<Vec<plank_syntax::tokens::Token>> {
+    let reporter = plank_errors::Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
     let diagnostics = reporter.get_diagnostics();
     if diagnostics.is_empty() {
         Ok(tokens
             .into_iter()
-            .map(syntax::position::Spanned::into_value)
+            .map(plank_syntax::position::Spanned::into_value)
             .collect())
     } else {
         Err(Error::Build(diagnostics))
     }
 }
 
-fn parse(source: &str) -> Result<syntax::ast::Program> {
+fn parse(source: &str) -> Result<plank_syntax::ast::Program> {
     // don't reuse lex function, because we wan't to merge lex and parse errors
-    let reporter = errors::Reporter::new();
-    let tokens = syntax::lex(source, reporter.clone());
-    let program = syntax::parse(tokens, reporter.clone());
+    let reporter = plank_errors::Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let program = plank_syntax::parse(tokens, reporter.clone());
     let diagnostics = reporter.get_diagnostics();
     if diagnostics.is_empty() {
         Ok(program)

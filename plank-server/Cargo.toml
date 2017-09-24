@@ -11,5 +11,5 @@ serde_json = "1.0"
 log = "0.3.8"
 simple-logging = "1.0.1"
 url = "1.5.1"
-errors = { path = "../errors" }
-syntax = { path = "../syntax" }
+plank-errors = { path = "../plank-errors" }
+plank-syntax = { path = "../plank-syntax" }

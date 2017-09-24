@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 
 [dependencies]
-errors = { path = "../errors" }
-syntax = { path = "../syntax" }
+plank-errors = { path = "../plank-errors" }
+plank-syntax = { path = "../plank-syntax" }
 clap = "2.26.2"

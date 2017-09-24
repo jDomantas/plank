@@ -1,5 +1,5 @@
 use std::ops;
-pub use errors::position::{Position, Span};
+pub use plank_errors::position::{Position, Span};
 
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]

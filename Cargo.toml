@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "syntax",
-    "errors",
+    "plank-syntax",
+    "plank-errors",
     "plank",
     "plank-server",
 ]

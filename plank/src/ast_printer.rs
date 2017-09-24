@@ -1,4 +1,4 @@
-use syntax::ast::{Program, Statement, Expr, Function, Struct, Ident, Var, Type, FunctionType, BinaryOp, UnaryOp, CallParam, Literal, Signedness, Size};
+use plank_syntax::ast::{Program, Statement, Expr, Function, Struct, Ident, Var, Type, FunctionType, BinaryOp, UnaryOp, CallParam, Literal, Signedness, Size};
 
 
 #[derive(Copy, Clone)]
