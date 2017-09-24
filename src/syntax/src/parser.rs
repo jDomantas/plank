@@ -376,7 +376,7 @@ impl<'a> Parser<'a> {
                 if self.expect(Token::Keyword(Keyword::Fn)).is_err() {
                     self.synchronize_item();
                 }
-                if let Ok(f) = self.parse_function(FunctionType::Normal) {
+                if let Ok(f) = self.parse_function(FunctionType::Extern) {
                     program.functions.push(f);
                 } else {
                     self.synchronize_item();
