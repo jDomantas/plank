@@ -132,8 +132,8 @@ fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {
 fn convert_diagnostic(d: plank_errors::reporter::Diagnostic) -> Option<lst::Diagnostic> {
     fn convert_pos(pos: plank_errors::position::Position) -> lst::Position {
         lst::Position {
-            line: u64::from(pos.line - 1),
-            character: u64::from(pos.column - 1),
+            line: u64::from(pos.line),
+            character: u64::from(pos.column),
         }
     }
     fn convert_range(range: plank_errors::position::Span) -> lst::Range {

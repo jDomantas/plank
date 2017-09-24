@@ -1,7 +1,7 @@
 //! Types to represent positions inside source file.
 
 /// Represents a position inside a source file. Both lines and columns
-/// are 1-indexed.
+/// are 0-indexed.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub struct Position {
     #[allow(missing_docs)]
@@ -39,10 +39,9 @@ impl Position {
     ///
     /// # Panics
     ///
-    /// Panics if resulting column is too low (don't forget that position with
-    /// 0-th column is not allowed).
+    /// Panics if resulting column is negative.
     pub fn backwards(mut self, amount: u32) -> Position {
-        assert!(self.column > amount, "going back too far");
+        assert!(self.column >= amount, "going back too far");
         self.column -= amount;
         self
     }

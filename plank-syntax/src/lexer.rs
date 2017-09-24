@@ -29,7 +29,7 @@ impl<'a> Lexer<'a> {
         Lexer {
             chars,
             next_char,
-            current_pos: Position::new(1, 1),
+            current_pos: Position::new(0, 0),
             reporter,
             previous_error: false,
         }
@@ -43,7 +43,7 @@ impl<'a> Lexer<'a> {
         match self.next_char {
             Some('\n') => {
                 self.current_pos.line += 1;
-                self.current_pos.column = 1;
+                self.current_pos.column = 0;
             }
             Some(_) => {
                 self.current_pos.column += 1;

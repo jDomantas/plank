@@ -164,24 +164,24 @@ impl<'a> Printer<'a> {
 
     fn add_note_markers(&mut self, note: &'a Note, style: MarkerStyle) {
         if note.span.start.line == note.span.end.line {
-            self.add_line_marker(note.span.start.line, LineMarker::FromTo {
-                start_col: note.span.start.column,
-                end_col: note.span.end.column,
+            self.add_line_marker(note.span.start.line + 1, LineMarker::FromTo {
+                start_col: note.span.start.column + 1,
+                end_col: note.span.end.column + 1,
                 message: note.message.as_ref().map(AsRef::as_ref),
                 style,
             });
         } else {
             let connect_col = self.next_connect_col;
             self.next_connect_col += 2;
-            self.add_line_marker(note.span.start.line, LineMarker::FromStart {
+            self.add_line_marker(note.span.start.line + 1, LineMarker::FromStart {
                 connect_col,
-                arrow_col: note.span.start.column,
+                arrow_col: note.span.start.column + 1,
                 message: None,
                 style,
             });
-            self.add_line_marker(note.span.end.line, LineMarker::FromStart {
+            self.add_line_marker(note.span.end.line + 1, LineMarker::FromStart {
                 connect_col,
-                arrow_col: note.span.end.column - 1,
+                arrow_col: note.span.end.column,
                 message: note.message.as_ref().map(AsRef::as_ref),
                 style,
             });
