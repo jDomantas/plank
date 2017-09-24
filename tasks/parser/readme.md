@@ -36,7 +36,7 @@ Error recovery while parsing items is very similar - cases are basically the sam
 
 Also, when parsing statements the parser handles one little special case: if one of expected tokens is `;`, and the next token is on the next line, then programmer probably just forgot the semicolon. Parser emits an error with a hint, and continues parsing as if the semicolon was there.
 
-For example, if try to parse this program (note the missing semicolon on the second line):
+For example, if we try to parse this program (note the missing semicolon on the second line):
 
 ```plank
 fn main() -> Unit {
@@ -55,4 +55,4 @@ error: expected one of `(`, `.`, `;`, operator, got `let`.
   |      ^^^ unexpected `let`
 ```
 
-There is no error recovery when parsing expressions, mainly because it is difficult to have good error recovery in expressions. However, as the language is not expressions oriented, the expressions are usually quite small, and having just one error pointed out is usually enough to fix whole expression. Therefore error recovery only at statement and item level was deemed sufficient.
+There is no error recovery when parsing expressions, mainly because it is difficult to have good error recovery there. However, as the language is not expression oriented, the expressions are usually quite small, and having just one error pointed out is usually enough to fix whole expression. Therefore error recovery only at statement and item level was deemed sufficient.
