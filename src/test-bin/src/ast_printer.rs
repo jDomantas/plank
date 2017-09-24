@@ -25,7 +25,7 @@ impl LispFormatter {
     }
 
     fn start_list(&mut self) {
-        self.write_str("(");
+        self.write_symbol("(");
         self.list_stack.push(ListFormat::Singleline);
         self.at_list_start = true;
     }
@@ -47,11 +47,6 @@ impl LispFormatter {
     }
 
     fn write_symbol(&mut self, symbol: &str) {
-        self.write_str(symbol);
-        self.at_list_start = false;
-    }
-
-    fn write_str(&mut self, s: &str) {
         if !self.at_list_start {
             match self.list_stack.last() {
                 Some(&ListFormat::Singleline) => {
@@ -69,7 +64,8 @@ impl LispFormatter {
                 }
             }
         }
-        self.output.push_str(s);
+        self.output.push_str(symbol);
+        self.at_list_start = false;
     }
 
     fn make_list_multiline(&mut self) {
