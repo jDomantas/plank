@@ -22,6 +22,8 @@ impl Reporter {
 
     /// Returns if the reporter has any errors.
     ///
+    /// This function will return false even if reporter has any warnings.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -29,9 +31,9 @@ impl Reporter {
     ///
     /// let mut reporter = Reporter::new();
     /// // empty reporter should not have any errors
-    /// assert!(!reporter.have_errors());
+    /// assert!(!reporter.has_errors());
     /// ```
-    pub fn have_errors(&self) -> bool {
+    pub fn has_errors(&self) -> bool {
         self.diagnostics.borrow().iter().any(|d| {
             d.severity == Severity::Error
         })
@@ -132,10 +134,12 @@ impl Reporter {
     }
 }
 
-#[allow(missing_docs)]
+/// Diagnostics severity.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub enum Severity {
+    /// Represents a fatal error.
     Error,
+    /// Represents a non-fatal error.
     Warning,
 }
 
