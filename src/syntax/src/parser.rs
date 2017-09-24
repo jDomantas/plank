@@ -703,9 +703,9 @@ impl InfixParser for BinaryOpParser {
         let op_span = Spanned::span(&op);
         let binop = Spanned::new(self.op, op_span);
         let rhs_prec = if self.left_assoc {
-            self.prec.one_lower()
-        } else {
             self.prec
+        } else {
+            self.prec.one_lower()
         };
         let rhs = parser.pratt_parse(rhs_prec)?;
         let span = Spanned::span(&lhs).merge(Spanned::span(&rhs));
