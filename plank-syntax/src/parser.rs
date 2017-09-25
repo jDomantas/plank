@@ -409,6 +409,7 @@ impl<'a> Parser<'a> {
     fn parse_function(&mut self, fn_type: FunctionType) -> ParseResult<Function> {
         let name = self.parse_item_name()?;
         self.expect(Token::LeftParen)?;
+        let open_span = self.previous_span();
         let mut params = Vec::new();
         while !self.check(Token::RightParen) {
             let name = self.consume_ident()?;
@@ -418,7 +419,7 @@ impl<'a> Parser<'a> {
             if self.check(Token::RightParen) {
                 break;
             }
-            self.expect(Token::Comma)?;
+            self.expect_closing(Token::Comma, open_span)?;
         }
         self.expect(Token::Arrow)?;
         let return_type = self.parse_type()?;
@@ -440,12 +441,13 @@ impl<'a> Parser<'a> {
     fn parse_item_name(&mut self) -> ParseResult<ItemName> {
         let name = self.consume_ident()?;
         let type_params = if self.check(Token::Less) {
+            let open_span = self.previous_span();
             let mut type_params = Vec::new();
             type_params.push(self.consume_ident()?);
             while self.check(Token::Comma) {
                 type_params.push(self.consume_ident()?);
             }
-            self.expect(Token::Greater)?;
+            self.expect_closing(Token::Greater, open_span)?;
             type_params
         } else {
             Vec::new()
@@ -467,13 +469,14 @@ impl<'a> Parser<'a> {
         } else if self.check(Token::Keyword(Keyword::Fn)) {
             let start = self.previous_span();
             self.expect(Token::LeftParen)?;
+            let open_span = self.previous_span();
             let mut param_types = Vec::new();
             while !self.check(Token::RightParen) {
                 param_types.push(self.parse_type()?);
                 if self.check(Token::RightParen) {
                     break;
                 }
-                self.expect(Token::Comma)?;
+                self.expect_closing(Token::Comma, open_span)?;
             }
             self.expect(Token::Arrow)?;
             let return_type = self.parse_type()?;
@@ -507,8 +510,9 @@ impl<'a> Parser<'a> {
         } else {
             let name = self.consume_ident()?;
             let params = if self.check(Token::Less) {
+                let open_span = self.previous_span();
                 let types = self.parse_type_params()?;
-                self.expect(Token::Greater)?;
+                self.expect_closing(Token::Greater, open_span)?;
                 types
             } else {
                 Vec::new()
@@ -775,8 +779,9 @@ impl PrefixParser for NameParser {
         let ident = parser.consume_ident().expect("identifier disappeared");
         let type_params = if parser.check(Token::DoubleColon) {
             parser.expect(Token::Less)?;
+            let open_span = parser.previous_span();
             let types = parser.parse_type_params()?;
-            parser.expect(Token::Greater)?;
+            parser.expect_closing(Token::Greater, open_span)?;
             types
         } else {
             Vec::new()
