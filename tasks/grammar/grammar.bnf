@@ -25,7 +25,7 @@
 <statement-list>    ::= "" | <statement> <statement-list>
 <statement>         ::= <if> | <loop> | <while> | <break> | <cont> | <return> | <let> | <block> | <expr-statement>
 <if>                ::= "if" <expr> <block> <opt-else>
-<opt-else>          ::= "" | "else" <block>
+<opt-else>          ::= "" | "else" <block> | "else" <if>
 <loop>              ::= "loop" <block>
 <while>             ::= "while" <expr> <block>
 <break>             ::= "break" ";"

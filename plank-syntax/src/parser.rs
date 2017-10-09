@@ -423,11 +423,11 @@ impl<'a> Parser<'a> {
         }
         self.expect(Token::Arrow)?;
         let return_type = self.parse_type()?;
-        let body = if self.check(Token::Semicolon) {
-            None
-        } else {
-            self.expect(Token::LeftBrace)?;
+        let body = if self.check(Token::LeftBrace) {
             Some(self.parse_block()?)
+        } else {
+            self.expect_semicolon()?;
+            None
         };
         Ok(Function {
             fn_type,
@@ -535,19 +535,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> ParseResult<Spanned<Statement>> {
         self.last_line_completed = true;
         if self.check(Token::Keyword(Keyword::If)) {
-            let start = self.previous_span();
-            let cond = self.parse_expr()?;
-            self.expect(Token::LeftBrace)?;
-            let then = self.parse_block()?;
-            let else_ = if self.check(Token::Keyword(Keyword::Else)) {
-                self.expect(Token::LeftBrace)?;
-                Some(Box::new(self.parse_block()?))
-            } else {
-                None
-            };
-            let span = start.merge(self.previous_span());
-            let stmt = Statement::If(cond, Box::new(then), else_);
-            Ok(Spanned::new(stmt, span))
+            self.parse_if()
         } else if self.check(Token::Keyword(Keyword::Loop)) {
             let start = self.previous_span();
             self.expect(Token::LeftBrace)?;
@@ -600,6 +588,26 @@ impl<'a> Parser<'a> {
             let stmt = Statement::Expr(expr);
             Ok(Spanned::new(stmt, span))
         }
+    }
+
+    fn parse_if(&mut self) -> ParseResult<Spanned<Statement>> {
+        let start = self.previous_span();
+        let cond = self.parse_expr()?;
+        self.expect(Token::LeftBrace)?;
+        let then = self.parse_block()?;
+        let else_ = if self.check(Token::Keyword(Keyword::Else)) {
+            if self.check(Token::Keyword(Keyword::If)) {
+                Some(Box::new(self.parse_if()?))
+            } else {
+                self.expect(Token::LeftBrace)?;
+                Some(Box::new(self.parse_block()?))
+            }
+        } else {
+            None
+        };
+        let span = start.merge(self.previous_span());
+        let stmt = Statement::If(cond, Box::new(then), else_);
+        Ok(Spanned::new(stmt, span))
     }
 
     fn parse_block(&mut self) -> ParseResult<Spanned<Statement>> {
