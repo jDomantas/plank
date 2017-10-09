@@ -24,7 +24,7 @@ use transport::Transport;
 
 
 fn main() {
-    simple_logging::log_to_stderr(log::LogLevelFilter::Trace)
+    simple_logging::log_to_stderr(log::LogLevelFilter::Info)
         .expect("failed to initialize logging");
     
     let stdin = io::stdin();
