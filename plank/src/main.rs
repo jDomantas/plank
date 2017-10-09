@@ -186,10 +186,11 @@ fn parse(source: &str) -> Result<plank_syntax::ast::Program> {
     let reporter = plank_errors::Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
-    let diagnostics = reporter.get_diagnostics();
+    let mut diagnostics = reporter.get_diagnostics();
     if diagnostics.is_empty() {
         Ok(program)
     } else {
+        diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
         Err(Error::Build(diagnostics))
     }
 }
