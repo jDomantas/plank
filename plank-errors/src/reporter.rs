@@ -34,9 +34,10 @@ impl Reporter {
     /// assert!(!reporter.has_errors());
     /// ```
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.borrow().iter().any(|d| {
-            d.severity == Severity::Error
-        })
+        self.diagnostics
+            .borrow()
+            .iter()
+            .any(|d| d.severity == Severity::Error)
     }
 
     /// Return the list of diagnostics collected with this reporter.
@@ -85,7 +86,8 @@ impl Reporter {
     ///     .build();
     /// ```
     pub fn error<T>(&self, msg: T, span: Span) -> Builder
-        where T: Into<String>
+    where
+        T: Into<String>,
     {
         self.diagnostic(Severity::Error, msg, span)
     }
@@ -108,7 +110,8 @@ impl Reporter {
     ///     .build();
     /// ```
     pub fn warning<T>(&self, msg: T, span: Span) -> Builder
-        where T: Into<String>
+    where
+        T: Into<String>,
     {
         self.diagnostic(Severity::Warning, msg, span)
     }
@@ -128,7 +131,8 @@ impl Reporter {
     ///     .build();
     /// ```
     pub fn diagnostic<T>(&self, severity: Severity, msg: T, span: Span) -> Builder
-        where T: Into<String>
+    where
+        T: Into<String>,
     {
         Builder::new(self, severity, msg.into(), span)
     }
@@ -187,7 +191,10 @@ impl Builder {
     /// any notes, use [`Reporter::global_error`]
     /// (struct.Reporter.html#method.global_error) instead.
     pub fn build(self) {
-        assert!(!self.diagnostic.notes.is_empty(), "built a diagnostic without any notes");
+        assert!(
+            !self.diagnostic.notes.is_empty(),
+            "built a diagnostic without any notes"
+        );
         self.reporter.diagnostics.borrow_mut().push(self.diagnostic);
     }
 
@@ -198,16 +205,14 @@ impl Builder {
 
     /// Add a new note that has a message and a span.
     pub fn span_note<T>(self, msg: T, span: Span) -> Self
-        where T: Into<String>
+    where
+        T: Into<String>,
     {
         self.note(Some(msg.into()), span)
     }
 
     fn note(mut self, msg: Option<String>, span: Span) -> Self {
-        self.diagnostic.notes.push(Note {
-            span,
-            message: msg,
-        });
+        self.diagnostic.notes.push(Note { span, message: msg });
         self
     }
 }

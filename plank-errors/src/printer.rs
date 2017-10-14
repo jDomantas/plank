@@ -23,20 +23,16 @@ impl MarkerStyle {
 
     fn to_marker_part(self, is_arrow: bool) -> MarkerPart {
         match self {
-            MarkerStyle::Primary => {
-                if is_arrow {
-                    MarkerPart::ArrowPrimary
-                } else {
-                    MarkerPart::PrimaryMarker
-                }
-            }
-            MarkerStyle::Secondary => {
-                if is_arrow {
-                    MarkerPart::ArrowSecondary
-                } else {
-                    MarkerPart::SecondaryMarker
-                }
-            }
+            MarkerStyle::Primary => if is_arrow {
+                MarkerPart::ArrowPrimary
+            } else {
+                MarkerPart::PrimaryMarker
+            },
+            MarkerStyle::Secondary => if is_arrow {
+                MarkerPart::ArrowSecondary
+            } else {
+                MarkerPart::SecondaryMarker
+            },
         }
     }
 }
@@ -49,7 +45,7 @@ enum MarkerPart {
     PrimaryMarker,
     ArrowSecondary,
     ArrowPrimary,
-    SingleColumn
+    SingleColumn,
 }
 
 impl MarkerPart {
@@ -61,10 +57,8 @@ impl MarkerPart {
         match self {
             MarkerPart::None => ' ',
             MarkerPart::ArrowBottom => '_',
-            MarkerPart::SecondaryMarker |
-            MarkerPart::ArrowSecondary => '~',
-            MarkerPart::PrimaryMarker |
-            MarkerPart::ArrowPrimary => '^',
+            MarkerPart::SecondaryMarker | MarkerPart::ArrowSecondary => '~',
+            MarkerPart::PrimaryMarker | MarkerPart::ArrowPrimary => '^',
             MarkerPart::SingleColumn => '|',
         }
     }
@@ -89,8 +83,7 @@ enum LineMarker<'a> {
 impl<'a> LineMarker<'a> {
     fn message(&self) -> Option<&str> {
         match *self {
-            LineMarker::FromStart { message, .. } |
-            LineMarker::FromTo { message, .. } => message,
+            LineMarker::FromStart { message, .. } | LineMarker::FromTo { message, .. } => message,
         }
     }
 
@@ -164,27 +157,36 @@ impl<'a> Printer<'a> {
 
     fn add_note_markers(&mut self, note: &'a Note, style: MarkerStyle) {
         if note.span.start.line == note.span.end.line {
-            self.add_line_marker(note.span.start.line + 1, LineMarker::FromTo {
-                start_col: note.span.start.column + 1,
-                end_col: note.span.end.column + 1,
-                message: note.message.as_ref().map(AsRef::as_ref),
-                style,
-            });
+            self.add_line_marker(
+                note.span.start.line + 1,
+                LineMarker::FromTo {
+                    start_col: note.span.start.column + 1,
+                    end_col: note.span.end.column + 1,
+                    message: note.message.as_ref().map(AsRef::as_ref),
+                    style,
+                },
+            );
         } else {
             let connect_col = self.next_connect_col;
             self.next_connect_col += 2;
-            self.add_line_marker(note.span.start.line + 1, LineMarker::FromStart {
-                connect_col,
-                arrow_col: note.span.start.column + 1,
-                message: None,
-                style,
-            });
-            self.add_line_marker(note.span.end.line + 1, LineMarker::FromStart {
-                connect_col,
-                arrow_col: note.span.end.column,
-                message: note.message.as_ref().map(AsRef::as_ref),
-                style,
-            });
+            self.add_line_marker(
+                note.span.start.line + 1,
+                LineMarker::FromStart {
+                    connect_col,
+                    arrow_col: note.span.start.column + 1,
+                    message: None,
+                    style,
+                },
+            );
+            self.add_line_marker(
+                note.span.end.line + 1,
+                LineMarker::FromStart {
+                    connect_col,
+                    arrow_col: note.span.end.column,
+                    message: note.message.as_ref().map(AsRef::as_ref),
+                    style,
+                },
+            );
         }
     }
 
@@ -224,17 +226,15 @@ impl<'a> Printer<'a> {
         self.print_line(line);
         self.print_immediate_markers(&markers);
         // last span has its message printed inline
-        println!(" {}", markers
-            .iter()
-            .next_back()
-            .unwrap()
-            .message()
-            .unwrap_or(""));
+        println!(
+            " {}",
+            markers.iter().next_back().unwrap().message().unwrap_or("")
+        );
         markers.pop();
-        
+
         // non-arrow markers without messages don't extend below first line
         markers.retain(|m| m.message().is_some() || m.is_arrow());
-        
+
         // possibly print additional line so that instead of
         //      let x = 1;
         //          ~~~  ~ first note
@@ -249,8 +249,9 @@ impl<'a> Printer<'a> {
                 self.print_markers(&markers, end_col);
                 println!();
             }
-            Some(LineMarker::FromStart { arrow_col, message, .. })
-                if message.is_some() =>
+            Some(LineMarker::FromStart {
+                arrow_col, message, ..
+            }) if message.is_some() =>
             {
                 self.print_markers(&markers, arrow_col + 1);
                 println!();
@@ -260,11 +261,15 @@ impl<'a> Printer<'a> {
         for i in (1..(markers.len() + 1)).rev() {
             let markers = &markers[0..i];
             match markers[i - 1] {
-                LineMarker::FromTo { end_col, message, .. } => {
+                LineMarker::FromTo {
+                    end_col, message, ..
+                } => {
                     self.print_markers(markers, end_col - 1);
                     println!("{}", message.unwrap_or(""));
                 }
-                LineMarker::FromStart { arrow_col, message, .. } => {
+                LineMarker::FromStart {
+                    arrow_col, message, ..
+                } => {
                     self.print_markers(markers, arrow_col + 2);
                     println!("{}", message.unwrap_or(""));
                 }
@@ -324,12 +329,12 @@ impl<'a> Printer<'a> {
 
     fn print_immediate_markers(&mut self, markers: &[LineMarker]) {
         let (connect, arrow_end) = match *markers.iter().next_back().unwrap() {
-            LineMarker::FromStart { connect_col, arrow_col, .. } => {
-                (Some(connect_col), arrow_col.saturating_sub(1))
-            }
-            _ => {
-                (None, 0)
-            }
+            LineMarker::FromStart {
+                connect_col,
+                arrow_col,
+                ..
+            } => (Some(connect_col), arrow_col.saturating_sub(1)),
+            _ => (None, 0),
         };
         self.print_line_header(None, connect);
         let last_col = markers.iter().next_back().unwrap().end_col();
@@ -341,12 +346,17 @@ impl<'a> Printer<'a> {
             };
             for (index, marker) in markers.iter().rev().enumerate() {
                 match *marker {
-                    LineMarker::FromStart { arrow_col, style, .. } => {
-                        if arrow_col == col {
-                            part = part.or(style.to_marker_part(true));
-                        }
-                    }
-                    LineMarker::FromTo { start_col, end_col, style, message } => {
+                    LineMarker::FromStart {
+                        arrow_col, style, ..
+                    } => if arrow_col == col {
+                        part = part.or(style.to_marker_part(true));
+                    },
+                    LineMarker::FromTo {
+                        start_col,
+                        end_col,
+                        style,
+                        message,
+                    } => {
                         if start_col <= col && col < end_col {
                             part = part.or(style.to_marker_part(false));
                         }
@@ -354,7 +364,8 @@ impl<'a> Printer<'a> {
                             && end_col == start_col + 1 // marker is one col wide
                             && index > 0 // and not the last one in line
                             && message.is_some() // and has a message
-                            && style != MarkerStyle::Primary // and it is not primary
+                            && style != MarkerStyle::Primary
+                        // and it is not primary
                         {
                             part = part.or(MarkerPart::SingleColumn);
                         }
@@ -367,12 +378,12 @@ impl<'a> Printer<'a> {
 
     fn print_markers(&mut self, markers: &[LineMarker], last_col: u32) {
         let (connect, arrow_end) = match *markers.iter().next_back().unwrap() {
-            LineMarker::FromStart { connect_col, arrow_col, .. } => {
-                (Some(connect_col), arrow_col - 1)
-            }
-            _ => {
-                (None, 0)
-            }
+            LineMarker::FromStart {
+                connect_col,
+                arrow_col,
+                ..
+            } => (Some(connect_col), arrow_col - 1),
+            _ => (None, 0),
         };
         self.print_line_header(None, connect);
         for col in 1..last_col {
@@ -383,16 +394,14 @@ impl<'a> Printer<'a> {
             };
             for marker in markers.iter().rev() {
                 match *marker {
-                    LineMarker::FromStart { arrow_col, .. } => {
-                        if arrow_col == col {
-                            part = MarkerPart::SingleColumn;
-                        }
-                    }
-                    LineMarker::FromTo { end_col, message, .. } => {
-                        if end_col == col + 1 && message.is_some() {
-                            part = MarkerPart::SingleColumn;
-                        }
-                    }
+                    LineMarker::FromStart { arrow_col, .. } => if arrow_col == col {
+                        part = MarkerPart::SingleColumn;
+                    },
+                    LineMarker::FromTo {
+                        end_col, message, ..
+                    } => if end_col == col + 1 && message.is_some() {
+                        part = MarkerPart::SingleColumn;
+                    },
                 }
             }
             print!("{}", part.to_char());

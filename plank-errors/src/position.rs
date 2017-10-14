@@ -4,19 +4,14 @@
 /// from zero.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub struct Position {
-    #[allow(missing_docs)]
-    pub line: u32,
-    #[allow(missing_docs)]
-    pub column: u32,
+    #[allow(missing_docs)] pub line: u32,
+    #[allow(missing_docs)] pub column: u32,
 }
 
 impl Position {
     /// Create a new position with given line and column.
     pub fn new(line: u32, column: u32) -> Position {
-        Position {
-            line,
-            column,
-        }
+        Position { line, column }
     }
 
     /// Create a span that starts here, and goes to given position. If
@@ -51,10 +46,8 @@ impl Position {
 /// inside the editor.
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub struct Span {
-    #[allow(missing_docs)]
-    pub start: Position,
-    #[allow(missing_docs)]
-    pub end: Position,
+    #[allow(missing_docs)] pub start: Position,
+    #[allow(missing_docs)] pub end: Position,
 }
 
 impl Span {
@@ -65,10 +58,7 @@ impl Span {
     /// Panics if `start > end`.
     pub fn new(start: Position, end: Position) -> Span {
         assert!(start <= end);
-        Span {
-            start,
-            end,
-        }
+        Span { start, end }
     }
 
     /// Return the smallest span that contains both `self` and `other` spans.
