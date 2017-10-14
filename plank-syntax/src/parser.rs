@@ -1,9 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use plank_errors::Reporter;
-use ast::{
-    BinaryOp, Expr, Function, Ident, ItemName, Literal, Program, Statement,
-    Struct, UnaryOp, Type, Var, FunctionType, CallParam,
-};
+use ast::{BinaryOp, CallParam, Expr, Function, FunctionType, Ident, ItemName, Literal, Program,
+          Statement, Struct, Type, UnaryOp, Var};
 use position::{Position, Span, Spanned};
 use tokens::{Keyword, Token, TokenKind};
 
@@ -23,30 +21,39 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
 
     parser.prefix(TokenKind::Literal, &LiteralParser);
     parser.prefix(TokenKind::Ident, &NameParser);
-    parser.prefix(TokenKind::Token(Token::Ampersand), &UnaryOpParser(UnaryOp::AddressOf));
+    parser.prefix(
+        TokenKind::Token(Token::Ampersand),
+        &UnaryOpParser(UnaryOp::AddressOf),
+    );
     parser.prefix(TokenKind::Token(Token::Plus), &UnaryOpParser(UnaryOp::Plus));
-    parser.prefix(TokenKind::Token(Token::Minus), &UnaryOpParser(UnaryOp::Minus));
-    parser.prefix(TokenKind::Token(Token::Star), &UnaryOpParser(UnaryOp::Deref));
+    parser.prefix(
+        TokenKind::Token(Token::Minus),
+        &UnaryOpParser(UnaryOp::Minus),
+    );
+    parser.prefix(
+        TokenKind::Token(Token::Star),
+        &UnaryOpParser(UnaryOp::Deref),
+    );
     parser.prefix(TokenKind::Token(Token::Not), &UnaryOpParser(UnaryOp::Not));
     parser.prefix(TokenKind::Token(Token::LeftParen), &ParenthesisedParser);
 
     parser.infix(TokenKind::Token(Token::LeftParen), &CallParser);
     parser.infix(TokenKind::Token(Token::Dot), &FieldParser);
 
-    parse_infix!(parser, And,           And,            And,            true);
-    parse_infix!(parser, Or,            Or,             Or,             true);
-    parse_infix!(parser, Plus,          Add,            Addition,       true);
-    parse_infix!(parser, Minus,         Subtract,       Addition,       true);
-    parse_infix!(parser, Star,          Multiply,       Multiplication, true);
-    parse_infix!(parser, Slash,         Divide,         Multiplication, true);
-    parse_infix!(parser, Percent,       Modulo,         Multiplication, true);
-    parse_infix!(parser, Less,          Less,           Comparision,    true);
-    parse_infix!(parser, LessEqual,     LessEqual,      Comparision,    true);
-    parse_infix!(parser, Greater,       Greater,        Comparision,    true);
-    parse_infix!(parser, GreaterEqual,  GreaterEqual,   Comparision,    true);
-    parse_infix!(parser, Equal,         Equal,          Equation,       true);
-    parse_infix!(parser, NotEqual,      NotEqual,       Equation,       true);
-    parse_infix!(parser, Assign,        Assign,         Assignment,     false);
+    parse_infix!(parser, And, And, And, true);
+    parse_infix!(parser, Or, Or, Or, true);
+    parse_infix!(parser, Plus, Add, Addition, true);
+    parse_infix!(parser, Minus, Subtract, Addition, true);
+    parse_infix!(parser, Star, Multiply, Multiplication, true);
+    parse_infix!(parser, Slash, Divide, Multiplication, true);
+    parse_infix!(parser, Percent, Modulo, Multiplication, true);
+    parse_infix!(parser, Less, Less, Comparision, true);
+    parse_infix!(parser, LessEqual, LessEqual, Comparision, true);
+    parse_infix!(parser, Greater, Greater, Comparision, true);
+    parse_infix!(parser, GreaterEqual, GreaterEqual, Comparision, true);
+    parse_infix!(parser, Equal, Equal, Equation, true);
+    parse_infix!(parser, NotEqual, NotEqual, Equation, true);
+    parse_infix!(parser, Assign, Assign, Assignment, false);
 
     parser.parse_program()
 }
@@ -84,7 +91,8 @@ struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn new<I>(tokens: I, reporter: Reporter) -> Self
-        where I: IntoIterator<Item=Spanned<Token>>
+    where
+        I: IntoIterator<Item = Spanned<Token>>,
     {
         let mut tokens = tokens.into_iter().collect::<VecDeque<_>>();
         let next_token = tokens.pop_front();
@@ -131,8 +139,7 @@ impl<'a> Parser<'a> {
             .map(ToString::to_string)
             .collect::<Vec<_>>();
         expected.sort();
-        let got = self
-            .peek()
+        let got = self.peek()
             .cloned()
             .map(|t| TokenKind::Token(t).to_string())
             .unwrap_or_else(|| "end of input".into());
@@ -157,8 +164,7 @@ impl<'a> Parser<'a> {
             .span_note(format!("unexpected {}", got), span);
         if let Some((span, msg)) = helper {
             builder.span_note(msg, span).build();
-        } else if !self.last_line_completed
-            && self.prev_span.is_some()
+        } else if !self.last_line_completed && self.prev_span.is_some()
             && self.prev_span.unwrap().end.line < self.peek_span().start.line
         {
             let last_pos = self.prev_span.unwrap().end;
@@ -176,7 +182,7 @@ impl<'a> Parser<'a> {
         let (helper, res) = match (self.prev_span, &self.next_token) {
             (Some(span), &Some(ref tok)) => {
                 let prev_line = span.end.line;
-                let next_line = Spanned::span(tok).start.line;      
+                let next_line = Spanned::span(tok).start.line;
                 assert!(prev_line <= next_line);
                 if next_line > prev_line {
                     // make specialized error about expected
@@ -210,17 +216,13 @@ impl<'a> Parser<'a> {
 
     fn peek_span(&self) -> Span {
         match (self.next_token.as_ref(), self.prev_span) {
-            (Some(tok), _) => {
-                Spanned::span(tok)
-            }
+            (Some(tok), _) => Spanned::span(tok),
             (None, Some(span)) => {
                 let start = span.end.forward(1);
                 let end = start.forward(1);
                 start.span_to(end)
             }
-            (None, None) => {
-                Position::new(1, 1).span_to(Position::new(1, 2))
-            }
+            (None, None) => Position::new(1, 1).span_to(Position::new(1, 2)),
         }
     }
 
@@ -251,9 +253,7 @@ impl<'a> Parser<'a> {
                 self.prev_span = Some(Spanned::span(&tok));
                 Ok(tok)
             }
-            None => {
-                Err(())
-            }
+            None => Err(()),
         }
     }
 
@@ -280,9 +280,7 @@ impl<'a> Parser<'a> {
             Ok(tok) => {
                 let span = Spanned::span(&tok);
                 match Spanned::into_value(tok) {
-                    Token::Ident(ident) => {
-                        Some(Spanned::new(Ident(ident), span))
-                    }
+                    Token::Ident(ident) => Some(Spanned::new(Ident(ident), span)),
                     _ => unreachable!(),
                 }
             }
@@ -338,8 +336,7 @@ impl<'a> Parser<'a> {
                         return Err(());
                     }
                 }
-                Some(&Token::Keyword(Keyword::Struct)) |
-                None => {
+                Some(&Token::Keyword(Keyword::Struct)) | None => {
                     return Err(());
                 }
                 _ => {}
@@ -452,14 +449,12 @@ impl<'a> Parser<'a> {
         } else {
             Vec::new()
         };
-        Ok(ItemName {
-            name,
-            type_params,
-        })
+        Ok(ItemName { name, type_params })
     }
 
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
-        self.expected.insert(Expectation::Token(TokenKind::BuiltinType));
+        self.expected
+            .insert(Expectation::Token(TokenKind::BuiltinType));
         if self.check(Token::Star) {
             let start = self.previous_span();
             let typ = self.parse_type()?;
@@ -636,10 +631,8 @@ impl<'a> Parser<'a> {
             .parse(self)?;
         loop {
             self.expected.insert(Expectation::Operator);
-            self.expected.extend(self.infix_parsers
-                .keys()
-                .cloned()
-                .map(Expectation::Token));
+            self.expected
+                .extend(self.infix_parsers.keys().cloned().map(Expectation::Token));
             if prec >= self.next_precedence() {
                 break;
             }
@@ -734,18 +727,19 @@ impl InfixParser for CallParser {
     }
 
     fn parse(&self, parser: &mut Parser, callee: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
-        parser.expect(Token::LeftParen).expect("expected left paren");
+        parser
+            .expect(Token::LeftParen)
+            .expect("expected left paren");
         let open_span = parser.previous_span();
         let mut params = Vec::new();
         while !parser.check(Token::RightParen) {
             let ident_next = parser.peek().map(Token::kind) == Some(TokenKind::Ident);
             if ident_next {
-                parser.expected2.insert(Expectation::Token(
-                    TokenKind::Token(Token::Colon)
-                ));
+                parser
+                    .expected2
+                    .insert(Expectation::Token(TokenKind::Token(Token::Colon)));
             }
-            if ident_next && parser.peek2() == Some(&Token::Colon)
-            {
+            if ident_next && parser.peek2() == Some(&Token::Colon) {
                 let name = parser.consume_ident().expect("expected ident");
                 parser.expect(Token::Colon).expect("expected ':'");
                 let value = parser.parse_expr()?;

@@ -9,11 +9,3 @@ mod parser;
 
 pub use lexer::lex;
 pub use parser::parse;
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-    }
-}

@@ -9,7 +9,7 @@ pub enum Literal {
     Number(Number),
     Bool(bool),
     Char(u8),
-    Str(Vec<u8>)
+    Str(Vec<u8>),
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
@@ -95,7 +95,11 @@ pub enum UnaryOp {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    If(Spanned<Expr>, Box<Spanned<Statement>>, Option<Box<Spanned<Statement>>>),
+    If(
+        Spanned<Expr>,
+        Box<Spanned<Statement>>,
+        Option<Box<Spanned<Statement>>>,
+    ),
     Loop(Box<Spanned<Statement>>),
     While(Spanned<Expr>, Box<Spanned<Statement>>),
     Break,

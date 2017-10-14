@@ -44,10 +44,9 @@ impl Token {
     pub fn kind(&self) -> TokenKind {
         match *self {
             Token::Ident(_) => TokenKind::Ident,
-            Token::Number(_) |
-            Token::Bool(_) |
-            Token::Char(_) |
-            Token::Str(_) => TokenKind::Literal,
+            Token::Number(_) | Token::Bool(_) | Token::Char(_) | Token::Str(_) => {
+                TokenKind::Literal
+            }
             Token::Keyword(Keyword::I8) |
             Token::Keyword(Keyword::U8) |
             Token::Keyword(Keyword::I16) |

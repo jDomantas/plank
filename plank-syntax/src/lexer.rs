@@ -1,7 +1,7 @@
 use std::str::Chars;
 use plank_errors::Reporter;
 use position::{Position, Span, Spanned};
-use tokens::{Token, Keyword, Number};
+use tokens::{Keyword, Number, Token};
 use ast::{Signedness, Size};
 
 
@@ -70,12 +70,8 @@ impl<'a> Lexer<'a> {
 
     fn consume_hex_digit(&mut self) -> Option<u8> {
         match self.peek() {
-            Some(ch) if ch.is_digit(16) => {
-                self.consume().map(|c| c.to_digit(16).unwrap() as u8)
-            }
-            _ => {
-                None
-            }
+            Some(ch) if ch.is_digit(16) => self.consume().map(|c| c.to_digit(16).unwrap() as u8),
+            _ => None,
         }
     }
 
@@ -122,30 +118,23 @@ impl<'a> Lexer<'a> {
 
     fn skip_block_comment(&mut self) {
         // make span of starting `/*`
-        let opener_span = Span::new(
-            self.current_pos.backwards(2),
-            self.current_pos
-        );
+        let opener_span = Span::new(self.current_pos.backwards(2), self.current_pos);
         let mut depth = 1;
         while depth > 0 {
             match self.consume() {
-                Some('*') => {
-                    loop {
-                        match self.consume() {
-                            Some('/') => {
-                                depth -= 1;
-                                break;
-                            }
-                            Some('*') => {}
-                            _ => break,
+                Some('*') => loop {
+                    match self.consume() {
+                        Some('/') => {
+                            depth -= 1;
+                            break;
                         }
+                        Some('*') => {}
+                        _ => break,
                     }
-                }
-                Some('/') => {
-                    if self.consume() == Some('*') {
-                        depth += 1;
-                    }
-                }
+                },
+                Some('/') => if self.consume() == Some('*') {
+                    depth += 1;
+                },
                 None => {
                     self.reporter
                         .error("unterminated block comment", opener_span)
@@ -190,10 +179,7 @@ impl<'a> Lexer<'a> {
             Ok(num) => Token::Number(num),
             Err(err) => {
                 let msg = err.to_string();
-                self.reporter
-                    .error(msg, span)
-                    .span(span)
-                    .build();
+                self.reporter.error(msg, span).span(span).build();
                 Token::Error
             }
         };
@@ -241,16 +227,14 @@ impl<'a> Lexer<'a> {
                         Some('"') => string.push(b'"'),
                         Some('n') => string.push(b'\n'),
                         Some('x') => {
-                            let byte = self
-                                .consume_hex_digit()
-                                .and_then(|high| {
-                                    self.consume_hex_digit()
-                                        .map(|low| (high << 4) | low)
-                                });
+                            let byte = self.consume_hex_digit().and_then(
+                                |high| self.consume_hex_digit().map(|low| (high << 4) | low),
+                            );
                             match byte {
                                 Some(byte) => string.push(byte),
                                 None => {
-                                    let span = self.current_pos.span_to(self.current_pos.forward(1));
+                                    let span =
+                                        self.current_pos.span_to(self.current_pos.forward(1));
                                     self.reporter
                                         .error("`x` should be followed by two hex digits", span)
                                         .span(span)
@@ -306,7 +290,10 @@ impl<'a> Lexer<'a> {
         if let Some(value) = Spanned::into_value(tok) {
             if value.len() != 1 {
                 self.reporter
-                    .error(format!("char literal must have 1 char, but it has {}", value.len()), span)
+                    .error(
+                        format!("char literal must have 1 char, but it has {}", value.len()),
+                        span,
+                    )
                     .span(span)
                     .build();
                 Spanned::new(Token::Error, span)
@@ -345,13 +332,11 @@ impl<'a> Lexer<'a> {
                 Some('>') => self.test_second('=', Token::Greater, Token::GreaterEqual),
                 Some('-') => self.test_second('>', Token::Minus, Token::Arrow),
                 Some('=') => self.test_second('=', Token::Assign, Token::Equal),
-                Some('/') => {
-                    if let Some(tok) = self.slash_or_comment() {
-                        tok
-                    } else {
-                        continue;
-                    }
-                }
+                Some('/') => if let Some(tok) = self.slash_or_comment() {
+                    tok
+                } else {
+                    continue;
+                },
                 Some('"') => self.lex_string(),
                 Some('\'') => self.lex_char(),
                 Some(ch) => {
@@ -364,10 +349,7 @@ impl<'a> Lexer<'a> {
                             format!("unknown char (codepoint: {})", codepoint)
                         };
                         let span = Spanned::span(&tok);
-                        self.reporter
-                            .error(msg, span)
-                            .span(span)
-                            .build();
+                        self.reporter.error(msg, span).span(span).build();
                     }
                     tok
                 }
@@ -381,7 +363,7 @@ impl<'a> Lexer<'a> {
             if Spanned::value(&tok) == &Token::Error {
                 // don't report two lexing errors in a row
                 if !self.previous_error {
-                    return Some(tok)
+                    return Some(tok);
                 }
             } else {
                 self.previous_error = false;
