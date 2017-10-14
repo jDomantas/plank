@@ -1,6 +1,7 @@
 extern crate clap;
 extern crate plank_errors;
 extern crate plank_syntax;
+extern crate plank_frontend;
 
 mod ast_printer;
 
@@ -27,6 +28,7 @@ impl From<io::Error> for Error {
 enum Command {
     Lex,
     Parse,
+    EmitIr,
 }
 
 #[derive(Debug)]
@@ -93,6 +95,9 @@ fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Resul
             output.write_all(b"\n")?;
             Ok(())
         }
+        Command::EmitIr => {
+            emit_ir(input)
+        }
     }
 }
 
@@ -103,11 +108,15 @@ fn parse_params() -> Result<Params> {
         .arg(Arg::with_name("lex")
             .long("lex")
             .help("List tokens in input")
-            .conflicts_with_all(&["parse"]))
+            .conflicts_with_all(&["parse", "emit-ir"]))
         .arg(Arg::with_name("parse")
             .long("parse")
             .help("Parse input")
-            .conflicts_with_all(&["lex"]))
+            .conflicts_with_all(&["lex", "emit-ir"]))
+        .arg(Arg::with_name("emit-ir")
+            .long("emit-ir")
+            .help("Emit plank IR")
+            .conflicts_with_all(&["lex", "parse"]))
         .arg(Arg::with_name("input")
             .index(1)
             .help("Set input file, uses stdin if none provided"))
@@ -117,11 +126,13 @@ fn parse_params() -> Result<Params> {
             .takes_value(true)
             .help("Set output file, uses stdout if none provided"))
         .get_matches();
-    let default_command = Command::Parse;
+    let default_command = Command::EmitIr;
     let command = if matches.is_present("lex") {
         Command::Lex
     } else if matches.is_present("parse") {
         Command::Parse
+    } else if matches.is_present("emit-ir") {
+        Command::EmitIr
     } else {
         default_command
     };
@@ -189,6 +200,20 @@ fn parse(source: &str) -> Result<plank_syntax::ast::Program> {
     let mut diagnostics = reporter.get_diagnostics();
     if diagnostics.is_empty() {
         Ok(program)
+    } else {
+        diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
+        Err(Error::Build(diagnostics))
+    }
+}
+
+fn emit_ir(source: &str) -> Result<()> {
+    let reporter = plank_errors::Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let program = plank_syntax::parse(tokens, reporter.clone());
+    plank_frontend::compile(&program, reporter.clone());
+    let mut diagnostics = reporter.get_diagnostics();
+    if diagnostics.is_empty() {
+        Ok(())
     } else {
         diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
         Err(Error::Build(diagnostics))

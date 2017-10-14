@@ -2,6 +2,7 @@
 members = [
     "plank-syntax",
     "plank-errors",
+    "plank-frontend",
     "plank",
     "plank-server",
 ]
