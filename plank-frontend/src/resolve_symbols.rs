@@ -101,7 +101,12 @@ impl<'a> Resolver<'a> {
     {
         match self.global_functions.entry(name.into()) {
             Entry::Vacant(entry) => {
-                let symbol = self.ctx.symbols.new_symbol(name);
+                // symbol might have already be defined for struct,
+                // so check for that
+                let symbol = self.global_structs
+                    .get(name)
+                    .map(|&(s, _)| s)
+                    .unwrap_or(self.ctx.symbols.new_symbol(name));
                 entry.insert(Function {
                     name: symbol,
                     name_span: span,
