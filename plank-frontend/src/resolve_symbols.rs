@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use plank_syntax::ast as p;
 use plank_syntax::position::{Span, Spanned};
-use resolved_ast::{self as r, Symbol};
+use ast::resolved::{self as r, Symbol};
 use CompileCtx;
 
 

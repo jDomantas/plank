@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use resolved_ast::Symbol;
+use ast::resolved::Symbol;
 
 
 #[derive(Debug, Default)]

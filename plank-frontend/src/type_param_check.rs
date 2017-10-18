@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use plank_syntax::position::Spanned;
-use resolved_ast::{Program, Struct, Function, Statement, Expr, Symbol, Type};
+use ast::resolved::{Program, Struct, Function, Statement, Expr, Symbol, Type};
 use CompileCtx;
 
 

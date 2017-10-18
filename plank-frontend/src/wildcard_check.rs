@@ -1,6 +1,6 @@
 use plank_errors::reporter::Builder;
 use plank_syntax::position::{Span, Spanned};
-use resolved_ast::{Program, Function, Struct, Type};
+use ast::resolved::{Program, Function, Struct, Type};
 use CompileCtx;
 
 

@@ -1,7 +1,9 @@
 extern crate plank_errors;
 extern crate plank_syntax;
 
-mod resolved_ast;
+mod ast {
+    pub mod resolved;
+}
 mod symbols;
 mod resolve_symbols;
 mod type_param_check;
