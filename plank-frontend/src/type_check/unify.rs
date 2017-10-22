@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use ast::typed::{Type, TypeVar, Signedness, Size};
+use ast::typed::{Signedness, Size, Type, TypeVar};
 use super::rollback_map::Map;
 
 
@@ -58,17 +58,15 @@ impl UnifyTable {
         let b = self.shallow_normalize(b);
         match (a, b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => {
-                if a == b {
-                    assert!(ap.len() == bp.len());
-                    for (a, b) in ap.iter().zip(bp.iter()) {
-                        self.unify_raw(a, b)?;
-                    }
-                    Ok(())
-                } else {
-                    Err(())
+            (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => if a == b {
+                assert!(ap.len() == bp.len());
+                for (a, b) in ap.iter().zip(bp.iter()) {
+                    self.unify_raw(a, b)?;
                 }
-            }
+                Ok(())
+            } else {
+                Err(())
+            },
             (Type::Function(ref ap, ref a), Type::Function(ref bp, ref b)) => {
                 if ap.len() == bp.len() {
                     for (a, b) in ap.iter().zip(bp.iter()) {
@@ -86,12 +84,8 @@ impl UnifyTable {
                     Err(())
                 }
             }
-            (Type::Pointer(ref a), Type::Pointer(ref b)) => {
-                self.unify_raw(a, b)
-            }
-            (Type::Var(a), ty) | (ty, Type::Var(a)) => {
-                self.unify_var_type(a, ty)
-            }
+            (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
+            (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
             (_, _) => Err(()),
         }
     }
@@ -100,63 +94,50 @@ impl UnifyTable {
         let at = self.var_target.get(&a).cloned();
         let bt = self.var_target.get(&b).cloned();
         match (at, bt) {
-            (Some(VarTarget::Type(_)), _) |
-            (_, Some(VarTarget::Type(_))) => {
+            (Some(VarTarget::Type(_)), _) | (_, Some(VarTarget::Type(_))) => {
                 panic!("cannot unify non-normalized var")
             }
-            (None, _) |
-            (Some(VarTarget::Int), Some(_)) => {
+            (None, _) | (Some(VarTarget::Int), Some(_)) => {
                 self.var_target.insert(a, VarTarget::Type(Type::Var(b)));
                 Ok(())
             }
-            (_, None) |
-            (Some(_), Some(VarTarget::Int)) => {
+            (_, None) | (Some(_), Some(VarTarget::Int)) => {
                 self.var_target.insert(b, VarTarget::Type(Type::Var(a)));
                 Ok(())
             }
-            (Some(VarTarget::UnsizedInt(s1)), Some(VarTarget::UnsizedInt(s2))) => {
-                if s1 == s2 {
-                    self.var_target.insert(a, VarTarget::Type(Type::Var(b)));
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            }
+            (Some(VarTarget::UnsizedInt(s1)), Some(VarTarget::UnsizedInt(s2))) => if s1 == s2 {
+                self.var_target.insert(a, VarTarget::Type(Type::Var(b)));
+                Ok(())
+            } else {
+                Err(())
+            },
         }
     }
 
     fn unify_var_type(&mut self, v: TypeVar, b: Type) -> Result<(), ()> {
         let vt = self.var_target.get(&v).cloned();
         match (vt, b) {
-            (Some(VarTarget::Type(_)), _) => {
-                panic!("cannot unify non-normalized var")
-            }
-            (_, Type::Var(b)) => {
-                self.unify_var_var(v, b)
-            }
-            (None, ty) |
-            (Some(VarTarget::Int), ty @ Type::Int(_, _)) => {
+            (Some(VarTarget::Type(_)), _) => panic!("cannot unify non-normalized var"),
+            (_, Type::Var(b)) => self.unify_var_var(v, b),
+            (None, ty) | (Some(VarTarget::Int), ty @ Type::Int(_, _)) => {
                 self.var_target.insert(v, VarTarget::Type(ty));
                 Ok(())
             }
-            (Some(VarTarget::UnsizedInt(sign)), Type::Int(sign2, size)) => {
-                if sign == sign2 {
-                    self.var_target.insert(v, VarTarget::Type(Type::Int(sign2, size)));
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            }
-            _ => Err(())
+            (Some(VarTarget::UnsizedInt(sign)), Type::Int(sign2, size)) => if sign == sign2 {
+                self.var_target
+                    .insert(v, VarTarget::Type(Type::Int(sign2, size)));
+                Ok(())
+            } else {
+                Err(())
+            },
+            _ => Err(()),
         }
     }
 
     fn get_var_type(&self, var: TypeVar) -> Type {
         match self.var_target.get(&var) {
             Some(&VarTarget::Type(ref ty)) => self.shallow_normalize(ty),
-            Some(&VarTarget::Int) |
-            Some(&VarTarget::UnsizedInt(_)) |
-            None => Type::Var(var),
+            Some(&VarTarget::Int) | Some(&VarTarget::UnsizedInt(_)) | None => Type::Var(var),
         }
     }
 

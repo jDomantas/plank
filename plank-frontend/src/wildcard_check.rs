@@ -1,6 +1,6 @@
 use plank_errors::reporter::Builder;
 use plank_syntax::position::{Span, Spanned};
-use ast::resolved::{Program, Function, Struct, Type};
+use ast::resolved::{Function, Program, Struct, Type};
 use CompileCtx;
 
 
@@ -68,11 +68,9 @@ impl<'a> Context<'a> {
                 }
                 self.check_type(out);
             }
-            Type::Concrete(_, ref params) => {
-                for param in params {
-                    self.check_type(param);
-                }
-            }
+            Type::Concrete(_, ref params) => for param in params {
+                self.check_type(param);
+            },
             Type::Wildcard => self.report_error(Spanned::span(typ)),
         }
     }
@@ -85,9 +83,7 @@ impl<'a> Context<'a> {
                     "wildcard types are not allowed in {}s",
                     self.item_kind.unwrap(),
                 );
-                self.ctx.reporter
-                    .error(msg, span)
-                    .span(span)
+                self.ctx.reporter.error(msg, span).span(span)
             }
         });
     }

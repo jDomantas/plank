@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use plank_syntax::position::{Span, Spanned};
-use ast::resolved::{self as r, BinaryOp, UnaryOp, Symbol};
+use ast::resolved::{self as r, BinaryOp, Symbol, UnaryOp};
 use ast::typed::{self as t, Type};
 use CompileCtx;
 use self::unify::UnifyTable;
@@ -35,8 +35,7 @@ impl Scheme {
         fn walk<T: Borrow<Type>>(ty: &mut Type, vars: &[Symbol], params: &[T]) {
             let sym = match *ty {
                 Type::Concrete(sym, ref mut p) => {
-                    let params = p
-                        .iter()
+                    let params = p.iter()
                         .map(|p| {
                             let mut o = p.clone();
                             walk(&mut o, vars, params);
@@ -46,18 +45,14 @@ impl Scheme {
                     *p = params.into();
                     sym
                 }
-                Type::Bool |
-                Type::Int(_, _) |
-                Type::Error |
-                Type::Var(_) => return,
+                Type::Bool | Type::Int(_, _) | Type::Error | Type::Var(_) => return,
                 Type::Pointer(ref mut t) => {
                     walk(Rc::make_mut(t), vars, params);
                     return;
                 }
                 Type::Function(ref mut p, ref mut o) => {
                     walk(Rc::make_mut(o), vars, params);
-                    let params = p
-                        .iter()
+                    let params = p.iter()
                         .map(|p| {
                             let mut o = p.clone();
                             walk(&mut o, vars, params);
@@ -100,8 +95,17 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
                 if params.len() > 0 {
                     write!(f, "<")?;
                     for (index, param) in params.iter().enumerate() {
-                        if index > 0 { write!(f, ", ")?; }
-                        write!(f, "{}", TypeFormatter { typ: param, inferer: self.inferer })?;
+                        if index > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(
+                            f,
+                            "{}",
+                            TypeFormatter {
+                                typ: param,
+                                inferer: self.inferer,
+                            }
+                        )?;
                     }
                     write!(f, ">")?;
                 }
@@ -111,10 +115,26 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
             Type::Function(ref params, ref out) => {
                 write!(f, "(")?;
                 for (index, param) in params.iter().enumerate() {
-                    if index > 0 { write!(f, ", ")?; }
-                    write!(f, "{}", TypeFormatter { typ: param, inferer: self.inferer })?;
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(
+                        f,
+                        "{}",
+                        TypeFormatter {
+                            typ: param,
+                            inferer: self.inferer,
+                        }
+                    )?;
                 }
-                write!(f, ") -> {}", TypeFormatter { typ: out, inferer: self.inferer })
+                write!(
+                    f,
+                    ") -> {}",
+                    TypeFormatter {
+                        typ: out,
+                        inferer: self.inferer,
+                    }
+                )
             }
             Type::Int(sign, size) => {
                 match sign {
@@ -127,12 +147,15 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
                     r::Size::Bit32 => write!(f, "32"),
                 }
             }
-            Type::Pointer(ref typ) => {
-                write!(f, "*{}", TypeFormatter { typ, inferer: self.inferer })
-            }
-            Type::Var(var) => {
-                write!(f, "{}", self.inferer.unifier.describe_var(var))
-            }
+            Type::Pointer(ref typ) => write!(
+                f,
+                "*{}",
+                TypeFormatter {
+                    typ,
+                    inferer: self.inferer,
+                }
+            ),
+            Type::Var(var) => write!(f, "{}", self.inferer.unifier.describe_var(var)),
         }
     }
 }
@@ -179,8 +202,7 @@ impl<'a> Inferer<'a> {
                         let msg = format!("cannot assign `{}` to `{}`", got, expected);
                         (msg, span)
                     }
-                    Reason::IfCondition(span) |
-                    Reason::WhileCondition(span) => {
+                    Reason::IfCondition(span) | Reason::WhileCondition(span) => {
                         let msg = format!("condition has type `{}`", got);
                         (msg, span)
                     }
@@ -193,27 +215,17 @@ impl<'a> Inferer<'a> {
                         (msg, span)
                     }
                     Reason::UnaryOperand(span) => {
-                        let msg = format!(
-                            "operand should be `{}`, but is `{}`",
-                            expected,
-                            got,
-                        );
+                        let msg = format!("operand should be `{}`, but is `{}`", expected, got,);
                         (msg, span)
                     }
                     Reason::LeftOperand(span) => {
-                        let msg = format!(
-                            "left operand should be `{}`, but is `{}`",
-                            expected,
-                            got,
-                        );
+                        let msg =
+                            format!("left operand should be `{}`, but is `{}`", expected, got,);
                         (msg, span)
                     }
                     Reason::RightOperand(span) => {
-                        let msg = format!(
-                            "right operand should be `{}`, but is `{}`",
-                            expected,
-                            got,
-                        );
+                        let msg =
+                            format!("right operand should be `{}`, but is `{}`", expected, got,);
                         (msg, span)
                     }
                     Reason::FunctionParam(mut index, span) => {
@@ -235,22 +247,16 @@ impl<'a> Inferer<'a> {
                         (msg, span)
                     }
                 };
-                self.ctx
-                    .reporter
-                    .error(msg, span)
-                    .span(span)
-                    .build();
+                self.ctx.reporter.error(msg, span).span(span).build();
             }
         }
     }
 
     fn format_type<'b>(&'b self, typ: &'b Type) -> TypeFormatter<'b>
-    where 'a: 'b
+    where
+        'a: 'b,
     {
-        TypeFormatter {
-            typ,
-            inferer: self,
-        }
+        TypeFormatter { typ, inferer: self }
     }
 
     fn convert_resolved_type(&mut self, typ: &r::Type) -> Type {
@@ -300,16 +306,12 @@ impl<'a> Inferer<'a> {
 
     fn infer_literal(&mut self, literal: &r::Literal) -> Type {
         match *literal {
-            r::Literal::Number(num) => {
-                match (num.signedness, num.size) {
-                    (None, None) => self.fresh_int_var(),
-                    (Some(sign), None) => {
-                        Type::Var(self.unifier.fresh_int_var(Some(sign)))
-                    }
-                    (Some(sign), Some(size)) => Type::Int(sign, size),
-                    (None, Some(_)) => panic!("int literal with size but no sign"),
-                }
-            }
+            r::Literal::Number(num) => match (num.signedness, num.size) {
+                (None, None) => self.fresh_int_var(),
+                (Some(sign), None) => Type::Var(self.unifier.fresh_int_var(Some(sign))),
+                (Some(sign), Some(size)) => Type::Int(sign, size),
+                (None, Some(_)) => panic!("int literal with size but no sign"),
+            },
             r::Literal::Bool(_) => Type::Bool,
             r::Literal::Char(_) => Type::Int(t::Signedness::Unsigned, t::Size::Bit8),
             r::Literal::Str(_) => self.string_type.clone(),
@@ -328,8 +330,7 @@ impl<'a> Inferer<'a> {
                 let lhs = self.infer_expr(lhs);
                 let rhs = self.infer_expr(rhs);
                 let (param_type, out_type) = match Spanned::into_value(op) {
-                    BinaryOp::Equal |
-                    BinaryOp::NotEqual => (self.fresh_var(), Type::Bool),
+                    BinaryOp::Equal | BinaryOp::NotEqual => (self.fresh_var(), Type::Bool),
                     BinaryOp::Add |
                     BinaryOp::Divide |
                     BinaryOp::Modulo |
@@ -338,8 +339,7 @@ impl<'a> Inferer<'a> {
                         let var = self.fresh_int_var();
                         (var.clone(), var)
                     }
-                    BinaryOp::And |
-                    BinaryOp::Or => (Type::Bool, Type::Bool),
+                    BinaryOp::And | BinaryOp::Or => (Type::Bool, Type::Bool),
                     BinaryOp::Greater |
                     BinaryOp::GreaterEqual |
                     BinaryOp::Less |
@@ -364,42 +364,41 @@ impl<'a> Inferer<'a> {
                 let expr = self.infer_expr(expr);
                 let expr_type = self.unifier.shallow_normalize(&expr.typ);
                 match expr_type {
-                    Type::Function(param_types, out_type) => {
-                        if params.len() != param_types.len() {
-                            let end = if
-                                param_types.len() % 100 == 11
-                                || param_types.len() % 10 != 1
-                            {
-                                "s"
-                            } else {
-                                ""
-                            };
-                            let msg = format!("function expects {} parameter{}, got {}",
-                                param_types.len(),
-                                end,
-                                params.len());
-                            let short_msg = format!("expected {} parameter{}", param_types.len(), end);
-                            self.ctx.reporter
-                                .error(msg, expr.span)
-                                .span_note(short_msg, expr.span)
-                                .build();
-                            (t::Expr::Error, Type::Error)
+                    Type::Function(param_types, out_type) => if params.len() != param_types.len() {
+                        let end = if param_types.len() % 100 == 11 || param_types.len() % 10 != 1 {
+                            "s"
                         } else {
-                            let params = params
-                                .iter()
-                                .map(|p| self.infer_expr(p))
-                                .collect::<Vec<_>>();
-                            for i in 0..params.len() {
-                                let reason = Reason::FunctionParam(i, params[i].span);
-                                self.unify(&params[i].typ, &param_types[i], reason);
-                            }
-                            let expr = t::Expr::Call(expr, params);
-                            (expr, (*out_type).clone())
+                            ""
+                        };
+                        let msg = format!(
+                            "function expects {} parameter{}, got {}",
+                            param_types.len(),
+                            end,
+                            params.len()
+                        );
+                        let short_msg = format!("expected {} parameter{}", param_types.len(), end);
+                        self.ctx
+                            .reporter
+                            .error(msg, expr.span)
+                            .span_note(short_msg, expr.span)
+                            .build();
+                        (t::Expr::Error, Type::Error)
+                    } else {
+                        let params = params
+                            .iter()
+                            .map(|p| self.infer_expr(p))
+                            .collect::<Vec<_>>();
+                        for i in 0..params.len() {
+                            let reason = Reason::FunctionParam(i, params[i].span);
+                            self.unify(&params[i].typ, &param_types[i], reason);
                         }
-                    }
+                        let expr = t::Expr::Call(expr, params);
+                        (expr, (*out_type).clone())
+                    },
                     Type::Error => (t::Expr::Error, Type::Error),
                     Type::Var(_) => {
-                        self.ctx.reporter
+                        self.ctx
+                            .reporter
                             .error("cannot infer the type before call", expr.span)
                             .span(expr.span)
                             .build();
@@ -407,7 +406,8 @@ impl<'a> Inferer<'a> {
                     }
                     typ => {
                         let msg = format!("cannot call {}", self.type_name(&typ));
-                        self.ctx.reporter
+                        self.ctx
+                            .reporter
                             .error(msg, expr.span)
                             .span(expr.span)
                             .build();
@@ -421,20 +421,22 @@ impl<'a> Inferer<'a> {
                 let expr_type = self.unifier.shallow_normalize(&expr.typ);
                 match expr_type {
                     Type::Concrete(sym, ref params) => {
-                        let res = self.fields.get(&sym)
-                            .and_then(|f| f.get(&**field));
+                        let res = self.fields.get(&sym).and_then(|f| f.get(&**field));
                         match res {
-                            Some(&(index, ref scheme)) => {       
+                            Some(&(index, ref scheme)) => {
                                 debug_assert_eq!(scheme.vars.len(), params.len());
                                 let typ = scheme.instantiate(params);
                                 let expr = t::Expr::Field(expr, Spanned::map_ref(field, |_| index));
                                 (expr, typ)
                             }
                             None => {
-                                let msg = format!("{} does not have field `{}`",
+                                let msg = format!(
+                                    "{} does not have field `{}`",
                                     self.type_name(&expr_type),
-                                    Spanned::value(field));
-                                self.ctx.reporter
+                                    Spanned::value(field)
+                                );
+                                self.ctx
+                                    .reporter
                                     .error(msg, Spanned::span(field))
                                     .span(Spanned::span(field))
                                     .build();
@@ -444,17 +446,21 @@ impl<'a> Inferer<'a> {
                     }
                     Type::Error => (t::Expr::Error, Type::Error),
                     Type::Var(_) => {
-                        self.ctx.reporter
+                        self.ctx
+                            .reporter
                             .error("cannot infer the type before field access", expr.span)
                             .span(expr.span)
                             .build();
                         (t::Expr::Error, Type::Error)
                     }
                     typ => {
-                        let msg = format!("no field `{}` on {}",
+                        let msg = format!(
+                            "no field `{}` on {}",
                             Spanned::value(field),
-                            self.type_name(&typ));
-                        self.ctx.reporter
+                            self.type_name(&typ)
+                        );
+                        self.ctx
+                            .reporter
                             .error(msg, expr.span)
                             .span(expr.span)
                             .build();
@@ -486,8 +492,7 @@ impl<'a> Inferer<'a> {
                         let var = self.fresh_var();
                         (Type::Pointer(Rc::new(var.clone())), var)
                     }
-                    UnaryOp::Minus |
-                    UnaryOp::Plus => {
+                    UnaryOp::Minus | UnaryOp::Plus => {
                         let var = self.fresh_int_var();
                         (var.clone(), var)
                     }
@@ -506,23 +511,21 @@ impl<'a> Inferer<'a> {
 
     fn infer_statement(&mut self, stmt: &r::Statement) -> t::Statement {
         match *stmt {
-            r::Statement::Block(ref stmts) => {
-                t::Statement::Block(stmts
+            r::Statement::Block(ref stmts) => t::Statement::Block(
+                stmts
                     .iter()
                     .map(|s| Spanned::map_ref(s, |s| self.infer_statement(s)))
-                    .collect())
-            }
+                    .collect(),
+            ),
             r::Statement::Break => t::Statement::Break,
             r::Statement::Continue => t::Statement::Continue,
-            r::Statement::Expr(ref expr) => {
-                t::Statement::Expr(self.infer_expr(expr))
-            }
+            r::Statement::Expr(ref expr) => t::Statement::Expr(self.infer_expr(expr)),
             r::Statement::If(ref cond, ref then, ref else_) => {
                 let cond = self.infer_expr(cond);
                 let then = Spanned::map_ref(then, |s| self.infer_statement(s));
-                let else_ = else_.as_ref().map(|e| {
-                    Spanned::map_ref(e, |e| self.infer_statement(e))
-                });
+                let else_ = else_
+                    .as_ref()
+                    .map(|e| Spanned::map_ref(e, |e| self.infer_statement(e)));
                 self.unify(&cond.typ, &Type::Bool, Reason::IfCondition(cond.span));
                 t::Statement::If(cond, Box::new(then), else_.map(Box::new))
             }
@@ -531,7 +534,10 @@ impl<'a> Inferer<'a> {
                 let ty = self.convert_resolved_type(typ);
                 let reason = Reason::Assign(value.span);
                 self.unify(&value.typ, &ty, reason);
-                let scheme = Scheme { vars: Vec::new(), typ: ty.clone() };
+                let scheme = Scheme {
+                    vars: Vec::new(),
+                    typ: ty.clone(),
+                };
                 self.env.insert(Spanned::into_value(sym), scheme);
                 let typ = Spanned::new(ty, Spanned::span(typ));
                 t::Statement::Let(sym, typ, value)
@@ -559,7 +565,10 @@ impl<'a> Inferer<'a> {
         let mut params = Vec::new();
         for param in &function.params {
             let typ = self.convert_resolved_type(&param.typ);
-            let scheme = Scheme { vars: Vec::new(), typ: typ.clone() };
+            let scheme = Scheme {
+                vars: Vec::new(),
+                typ: typ.clone(),
+            };
             self.env.insert(Spanned::into_value(param.name), scheme);
             params.push(t::Var {
                 name: Spanned::into_value(param.name),
@@ -595,17 +604,13 @@ impl<'a> Inferer<'a> {
                     self.normalize_statement(stmt);
                 }
             }
-            t::Statement::Break |
-            t::Statement::Continue => {}
-            t::Statement::Return(ref mut expr) |
-            t::Statement::Expr(ref mut expr) => {
+            t::Statement::Break | t::Statement::Continue => {}
+            t::Statement::Return(ref mut expr) | t::Statement::Expr(ref mut expr) => {
                 self.normalize_expr(expr);
             }
-            t::Statement::Block(ref mut stmts) => {
-                for stmt in stmts {
-                    self.normalize_statement(stmt);
-                }
-            }
+            t::Statement::Block(ref mut stmts) => for stmt in stmts {
+                self.normalize_statement(stmt);
+            },
             t::Statement::Loop(ref mut stmt) => {
                 self.normalize_statement(stmt);
             }
@@ -619,7 +624,8 @@ impl<'a> Inferer<'a> {
                     Ok(t) => *Spanned::value_mut(typ) = t,
                     Err(()) => {
                         let span = Spanned::span(typ);
-                        self.ctx.reporter
+                        self.ctx
+                            .reporter
                             .error("could not completely infer type", span)
                             .span(span)
                             .build();
@@ -636,8 +642,7 @@ impl<'a> Inferer<'a> {
                 self.normalize_expr(lhs);
                 self.normalize_expr(rhs);
             }
-            t::Expr::Field(ref mut expr, _) |
-            t::Expr::Unary(_, ref mut expr) => {
+            t::Expr::Field(ref mut expr, _) | t::Expr::Unary(_, ref mut expr) => {
                 self.normalize_expr(expr);
             }
             t::Expr::Call(ref mut expr, ref mut params) => {
@@ -646,23 +651,21 @@ impl<'a> Inferer<'a> {
                     self.normalize_expr(param);
                 }
             }
-            t::Expr::Error |
-            t::Expr::Literal(_) => {}
-            t::Expr::Name(_, ref mut params) => {
-                for param in params {
-                    match self.unifier.normalize(param) {
-                        Ok(t) => *Spanned::value_mut(param) = t,
-                        Err(()) => {
-                            let span = Spanned::span(param);
-                            self.ctx.reporter
-                                .error("could not completely infer type", span)
-                                .span(span)
-                                .build();
-                            *Spanned::value_mut(param) = Type::Error;
-                        }
+            t::Expr::Error | t::Expr::Literal(_) => {}
+            t::Expr::Name(_, ref mut params) => for param in params {
+                match self.unifier.normalize(param) {
+                    Ok(t) => *Spanned::value_mut(param) = t,
+                    Err(()) => {
+                        let span = Spanned::span(param);
+                        self.ctx
+                            .reporter
+                            .error("could not completely infer type", span)
+                            .span(span)
+                            .build();
+                        *Spanned::value_mut(param) = Type::Error;
                     }
                 }
-            }
+            },
         }
         expr.typ = self.unifier.normalize(&expr.typ).unwrap();
     }
@@ -679,24 +682,15 @@ impl<'a> Inferer<'a> {
         for f in &program.functions {
             functions.push(self.infer_function(f));
         }
-        t::Program {
-            structs,
-            functions,
-        }
+        t::Program { structs, functions }
     }
 
     fn add_function_to_env(&mut self, f: &r::Function) {
-        let param_types = f
-            .params
+        let param_types = f.params
             .iter()
             .map(|p| self.convert_resolved_type(&p.typ))
             .collect::<Vec<_>>();
-        let vars = f
-            .name
-            .type_params
-            .iter()
-            .map(|p| **p)
-            .collect();
+        let vars = f.name.type_params.iter().map(|p| **p).collect();
         let return_type = self.convert_resolved_type(&f.return_type);
         let typ = Type::Function(param_types.into(), Rc::new(return_type));
         let scheme = Scheme { vars, typ };
@@ -704,33 +698,33 @@ impl<'a> Inferer<'a> {
     }
 
     fn convert_struct(&mut self, s: &r::Struct) -> t::Struct {
-        let param_types = s
-            .fields
+        let param_types = s.fields
             .iter()
             .map(|f| self.convert_resolved_type(&f.typ))
             .collect::<Vec<_>>();
-        let vars = s
-            .name
-            .type_params
-            .iter()
-            .map(|p| **p)
-            .collect::<Vec<_>>();
-        let return_type = Type::Concrete(Spanned::into_value(s.name.name), s
-            .name
-            .type_params
-            .iter()
-            .map(|p| Type::Concrete(**p, Vec::new().into()))
-            .collect::<Vec<_>>()
-            .into());
+        let vars = s.name.type_params.iter().map(|p| **p).collect::<Vec<_>>();
+        let return_type = Type::Concrete(
+            Spanned::into_value(s.name.name),
+            s.name
+                .type_params
+                .iter()
+                .map(|p| Type::Concrete(**p, Vec::new().into()))
+                .collect::<Vec<_>>()
+                .into(),
+        );
         let typ = Type::Function(param_types.into(), Rc::new(return_type));
-        let scheme = Scheme { vars: vars.clone(), typ };
+        let scheme = Scheme {
+            vars: vars.clone(),
+            typ,
+        };
         self.env.insert(Spanned::into_value(s.name.name), scheme);
-        let fields = s
-            .fields
+        let fields = s.fields
             .iter()
-            .map(|f| t::Var {
-                name: Spanned::into_value(f.name),
-                typ: self.convert_resolved_type(&f.typ),
+            .map(|f| {
+                t::Var {
+                    name: Spanned::into_value(f.name),
+                    typ: self.convert_resolved_type(&f.typ),
+                }
             })
             .collect();
         for (index, field) in s.fields.iter().enumerate() {
@@ -757,5 +751,3 @@ pub(crate) fn type_check(program: &r::Program, ctx: &mut CompileCtx) -> t::Progr
     let mut inferer = Inferer::new(ctx);
     inferer.infer_program(program)
 }
-
-

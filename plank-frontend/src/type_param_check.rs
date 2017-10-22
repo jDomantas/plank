@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use plank_syntax::position::Spanned;
-use ast::resolved::{Program, Struct, Function, Statement, Expr, Symbol, Type};
+use ast::resolved::{Expr, Function, Program, Statement, Struct, Symbol, Type};
 use CompileCtx;
 
 
@@ -99,14 +99,10 @@ impl<'a> Context<'a> {
                 let params_expected = self.params_taken(name);
                 if params.len() != params_expected {
                     let name = self.ctx.symbols.get_name(name);
-                    let msg = make_error_message(
-                        "type",
-                        name,
-                        params_expected,
-                        params.len(),
-                    );
+                    let msg = make_error_message("type", name, params_expected, params.len());
                     let short_msg = make_short_message(params_expected);
-                    self.ctx.reporter
+                    self.ctx
+                        .reporter
                         .error(msg, name_span)
                         .span_note(short_msg, name_span)
                         .build();
@@ -120,15 +116,13 @@ impl<'a> Context<'a> {
 
     fn check_statement(&mut self, stmt: &mut Spanned<Statement>) {
         match *Spanned::value_mut(stmt) {
-            Statement::Block(ref mut stmts) => {
-                for stmt in stmts {
-                    self.check_statement(stmt);
-                }
+            Statement::Block(ref mut stmts) => for stmt in stmts {
+                self.check_statement(stmt);
+            },
+            Statement::Break | Statement::Continue => {}
+            Statement::Expr(ref mut expr) | Statement::Return(ref mut expr) => {
+                self.check_expr(expr)
             }
-            Statement::Break |
-            Statement::Continue => {}
-            Statement::Expr(ref mut expr) |
-            Statement::Return(ref mut expr) => self.check_expr(expr),
             Statement::If(ref mut cond, ref mut then, ref mut else_) => {
                 self.check_expr(cond);
                 self.check_statement(then);
@@ -162,13 +156,11 @@ impl<'a> Context<'a> {
                 }
                 return;
             }
-            Expr::Field(ref mut expr, _) |
-            Expr::Unary(_, ref mut expr) => {
+            Expr::Field(ref mut expr, _) | Expr::Unary(_, ref mut expr) => {
                 self.check_expr(expr);
                 return;
             }
-            Expr::Error |
-            Expr::Literal(_) => return,
+            Expr::Error | Expr::Literal(_) => return,
             Expr::Name(name, ref mut params) => {
                 let name_span = Spanned::span(&name);
                 let name = Spanned::into_value(name);
@@ -178,22 +170,15 @@ impl<'a> Context<'a> {
                 let params_expected = self.params_taken(name);
                 if params.len() == 0 {
                     for _ in 0..params_expected {
-                        params.push(Spanned::new(
-                            Type::Wildcard,
-                            name_span,
-                        ));
+                        params.push(Spanned::new(Type::Wildcard, name_span));
                     }
                     return;
                 } else if params_expected != params.len() {
                     let name = self.ctx.symbols.get_name(name);
-                    let msg = make_error_message(
-                        "value",
-                        name,
-                        params_expected,
-                        params.len(),
-                    );
+                    let msg = make_error_message("value", name, params_expected, params.len());
                     let short_msg = make_short_message(params_expected);
-                    self.ctx.reporter
+                    self.ctx
+                        .reporter
                         .error(msg, name_span)
                         .span_note(short_msg, name_span)
                         .build();
@@ -208,11 +193,7 @@ impl<'a> Context<'a> {
 
 fn make_error_message(kind: &str, name: &str, expected: usize, got: usize) -> String {
     if expected == 0 {
-        format!(
-            "{} `{}` does not take type parameters",
-            kind,
-            name,
-        )
+        format!("{} `{}` does not take type parameters", kind, name,)
     } else if expected % 10 == 1 && expected % 100 != 11 {
         format!(
             "{} `{}` expects {} type parameter, got {}",
