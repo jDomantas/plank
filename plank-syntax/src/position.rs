@@ -1,4 +1,4 @@
-use std::ops;
+use std::{borrow, ops};
 pub use plank_errors::position::{Position, Span};
 
 
@@ -35,6 +35,13 @@ impl<T> Spanned<T> {
             span: this.span,
         }
     }
+
+    pub fn map_ref<U, F: FnOnce(&T) -> U>(this: &Self, f: F) -> Spanned<U> {
+        Spanned {
+            value: f(&this.value),
+            span: this.span,
+        }
+    }
 }
 
 impl<T> ops::Deref for Spanned<T> {
@@ -47,6 +54,18 @@ impl<T> ops::Deref for Spanned<T> {
 
 impl<T> ops::DerefMut for Spanned<T> {
     fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T> borrow::Borrow<T> for Spanned<T> {
+    fn borrow(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> borrow::BorrowMut<T> for Spanned<T> {
+    fn borrow_mut(&mut self) -> &mut T {
         &mut self.value
     }
 }
