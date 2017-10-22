@@ -7,7 +7,7 @@ pub struct Map<K, V> {
     new: HashMap<K, V>,
 }
 
-impl<K: Eq + Hash + Clone, V: Clone> Map<K, V> {
+impl<K: Eq + Hash, V> Map<K, V> {
     pub fn new() -> Self {
         Map {
             committed: HashMap::new(),
