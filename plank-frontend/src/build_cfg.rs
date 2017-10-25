@@ -20,10 +20,8 @@ enum LValue {
 impl LValue {
     fn add_field(&mut self, index: usize) {
         match *self {
-            LValue::Reg(_, ref mut fields) |
-            LValue::Deref(_, ref mut fields) => fields.push(index),
-            LValue::Error |
-            LValue::Invalid => {}
+            LValue::Reg(_, ref mut fields) | LValue::Deref(_, ref mut fields) => fields.push(index),
+            LValue::Error | LValue::Invalid => {}
         }
     }
 }
@@ -111,19 +109,17 @@ impl<'a> Builder<'a> {
             }
             LValue::Error => {}
             LValue::Deref(val, fields) => {
-                self.emit_instruction(cfg::Instruction::DerefStore(
-                    val.as_value(),
-                    fields,
-                    value,
-                ), target_span);
+                self.emit_instruction(
+                    cfg::Instruction::DerefStore(val.as_value(), fields, value),
+                    target_span,
+                );
                 self.drop_value(&val, target_span);
             }
             LValue::Reg(reg, fields) => {
-                self.emit_instruction(cfg::Instruction::FieldStore(
-                    reg,
-                    fields,
-                    value,
-                ), target_span);
+                self.emit_instruction(
+                    cfg::Instruction::FieldStore(reg, fields, value),
+                    target_span,
+                );
             }
         }
     }
@@ -139,19 +135,21 @@ impl<'a> Builder<'a> {
             }
             LValue::Error => {}
             LValue::Deref(val, fields) => {
-                self.emit_instruction(cfg::Instruction::UnaryOp(
-                    target,
-                    cfg::UnaryOp::OffsetAddress(fields),
-                    val.as_value(),
-                ), value_span);
+                self.emit_instruction(
+                    cfg::Instruction::UnaryOp(
+                        target,
+                        cfg::UnaryOp::OffsetAddress(fields),
+                        val.as_value(),
+                    ),
+                    value_span,
+                );
                 self.drop_value(&val, value_span);
             }
             LValue::Reg(reg, fields) => {
-                self.emit_instruction(cfg::Instruction::TakeAddress(
-                    target,
-                    reg,
-                    fields,
-                ), value_span);
+                self.emit_instruction(
+                    cfg::Instruction::TakeAddress(target, reg, fields),
+                    value_span,
+                );
             }
         }
     }
@@ -165,11 +163,7 @@ impl<'a> Builder<'a> {
 
     fn end_block(&mut self, end: cfg::BlockEnd, link: cfg::BlockLink) {
         let (id, ops) = self.current_block.take().unwrap();
-        let block = cfg::Block {
-            ops,
-            end,
-            link,
-        };
+        let block = cfg::Block { ops, end, link };
         self.blocks.insert(id, block);
     }
 
@@ -191,47 +185,41 @@ impl<'a> Builder<'a> {
     fn build_statement(&mut self, s: &Spanned<t::Statement>) {
         let span = Spanned::span(s);
         match *Spanned::value(s) {
-            t::Statement::Block(ref stmts) => {
-                for stmt in stmts {
-                    let span = Spanned::span(stmt);
-                    self.emit_instruction(cfg::Instruction::StartStatement, span);
-                    self.build_statement(stmt);
+            t::Statement::Block(ref stmts) => for stmt in stmts {
+                let span = Spanned::span(stmt);
+                self.emit_instruction(cfg::Instruction::StartStatement, span);
+                self.build_statement(stmt);
+            },
+            t::Statement::Break => match self.current_loop {
+                Some(LoopDescr { after, .. }) => {
+                    let new = self.new_block();
+                    let link = cfg::BlockLink::Strong(new);
+                    self.end_block(cfg::BlockEnd::Jump(after), link);
+                    self.start_block(new);
                 }
-            }
-            t::Statement::Break => {
-                match self.current_loop {
-                    Some(LoopDescr { after, .. }) => {
-                        let new = self.new_block();
-                        let link = cfg::BlockLink::Strong(new);
-                        self.end_block(cfg::BlockEnd::Jump(after), link);
-                        self.start_block(new);
-                    }
-                    None => {
-                        self.ctx
-                            .reporter
-                            .error("cannot use `break` outside loop", span)
-                            .span(span)
-                            .build();
-                    }
+                None => {
+                    self.ctx
+                        .reporter
+                        .error("cannot use `break` outside loop", span)
+                        .span(span)
+                        .build();
                 }
-            }
-            t::Statement::Continue => {
-                match self.current_loop {
-                    Some(LoopDescr { start, .. }) => {
-                        let new = self.new_block();
-                        let link = cfg::BlockLink::Strong(new);
-                        self.end_block(cfg::BlockEnd::Jump(start), link);
-                        self.start_block(new);
-                    }
-                    None => {
-                        self.ctx
-                            .reporter
-                            .error("cannot use `continue` outside loop", span)
-                            .span(span)
-                            .build();
-                    }
+            },
+            t::Statement::Continue => match self.current_loop {
+                Some(LoopDescr { start, .. }) => {
+                    let new = self.new_block();
+                    let link = cfg::BlockLink::Strong(new);
+                    self.end_block(cfg::BlockEnd::Jump(start), link);
+                    self.start_block(new);
                 }
-            }
+                None => {
+                    self.ctx
+                        .reporter
+                        .error("cannot use `continue` outside loop", span)
+                        .span(span)
+                        .build();
+                }
+            },
             t::Statement::Expr(ref e) => {
                 let expr = self.build_expr(e);
                 self.drop_value(&expr, e.span);
@@ -273,7 +261,10 @@ impl<'a> Builder<'a> {
                 let typ = (**typ).clone();
                 let var_register = self.new_var_register(Spanned::into_value(name), typ);
                 let value = self.build_expr(value);
-                self.emit_instruction(cfg::Instruction::Assign(var_register, value.as_value()), span);
+                self.emit_instruction(
+                    cfg::Instruction::Assign(var_register, value.as_value()),
+                    span,
+                );
                 self.drop_value(&value, span);
             }
             t::Statement::Loop(ref body) => {
@@ -323,87 +314,73 @@ impl<'a> Builder<'a> {
 
     fn build_expr(&mut self, e: &t::TypedExpr) -> RValue {
         match *e.expr {
-            t::Expr::Binary(ref lhs, op, ref rhs) => {
-                match Spanned::into_value(op) {
-                    t::BinaryOp::Assign => {
-                        let target = self.build_expr_lvalue(lhs);
-                        let value = self.build_expr(rhs);
-                        self.emit_store(target, lhs.span, value.as_value());
-                        value
-                    }
-                    t::BinaryOp::And => {
-                        unimplemented!()
-                    }
-                    t::BinaryOp::Or => {
-                        unimplemented!()
-                    }
-                    op => if let Some(op) = binop_to_instruction(op, &lhs.typ) {
-                        let lhs = self.build_expr(lhs);
-                        let rhs = self.build_expr(rhs);
-                        let result = self.new_register(e.typ.clone());
-                        self.emit_instruction(cfg::Instruction::BinaryOp(
-                            result,
-                            op,
-                            lhs.as_value(),
-                            rhs.as_value(),
-                        ), e.span);
-                        self.drop_value(&lhs, e.span);
-                        self.drop_value(&rhs, e.span);
-                        RValue::Temp(cfg::Value::Reg(result))
-                    } else {
-                        RValue::Temp(cfg::Value::Error)
-                    }
+            t::Expr::Binary(ref lhs, op, ref rhs) => match Spanned::into_value(op) {
+                t::BinaryOp::Assign => {
+                    let target = self.build_expr_lvalue(lhs);
+                    let value = self.build_expr(rhs);
+                    self.emit_store(target, lhs.span, value.as_value());
+                    value
                 }
-            }
+                t::BinaryOp::And => unimplemented!(),
+                t::BinaryOp::Or => unimplemented!(),
+                op => if let Some(op) = binop_to_instruction(op, &lhs.typ) {
+                    let lhs = self.build_expr(lhs);
+                    let rhs = self.build_expr(rhs);
+                    let result = self.new_register(e.typ.clone());
+                    self.emit_instruction(
+                        cfg::Instruction::BinaryOp(result, op, lhs.as_value(), rhs.as_value()),
+                        e.span,
+                    );
+                    self.drop_value(&lhs, e.span);
+                    self.drop_value(&rhs, e.span);
+                    RValue::Temp(cfg::Value::Reg(result))
+                } else {
+                    RValue::Temp(cfg::Value::Error)
+                },
+            },
             t::Expr::Call(ref name, ref params) => {
                 let callee = self.build_expr(name);
                 let params = params
                     .iter()
                     .map(|p| self.build_expr(p))
                     .collect::<Vec<_>>();
-                let param_values = params
-                    .iter()
-                    .map(|p| p.as_value())
-                    .collect();
+                let param_values = params.iter().map(|p| p.as_value()).collect();
                 let target = self.new_register(e.typ.clone());
                 let instr = match callee {
                     RValue::Temp(cfg::Value::Symbol(sym, ref types)) => {
                         cfg::Instruction::Call(target, sym, types.clone(), param_values)
                     }
-                    ref val => {
-                        cfg::Instruction::VirtualCall(target, val.as_value(), param_values)
-                    }
+                    ref val => cfg::Instruction::VirtualCall(target, val.as_value(), param_values),
                 };
                 self.emit_instruction(instr, e.span);
                 self.drop_value(&callee, name.span);
                 RValue::Temp(cfg::Value::Reg(target))
             }
-            t::Expr::Error => {
-                RValue::Temp(cfg::Value::Error)
-            }
+            t::Expr::Error => RValue::Temp(cfg::Value::Error),
             t::Expr::Field(ref expr, index) => {
                 let expr = self.build_expr(expr);
                 let target = self.new_register(e.typ.clone());
-                self.emit_instruction(cfg::Instruction::UnaryOp(
-                    target,
-                    cfg::UnaryOp::FieldLoad(vec![Spanned::into_value(index)]),
-                    expr.as_value(),
-                ), e.span);
+                self.emit_instruction(
+                    cfg::Instruction::UnaryOp(
+                        target,
+                        cfg::UnaryOp::FieldLoad(vec![Spanned::into_value(index)]),
+                        expr.as_value(),
+                    ),
+                    e.span,
+                );
                 self.drop_value(&expr, e.span);
                 RValue::Temp(cfg::Value::Reg(target))
             }
-            t::Expr::Literal(ref literal) => {
-                RValue::Temp(match *literal {
-                    t::Literal::Bool(b) => if b {
-                        cfg::Value::Int(1)
-                    } else {
-                        cfg::Value::Int(0)
-                    },
-                    t::Literal::Char(c) => cfg::Value::Int(c as u64),
-                    t::Literal::Number(n) => cfg::Value::Int(n.value),
-                    t::Literal::Str(_) => unimplemented!(),
-                })
-            }
+            t::Expr::Literal(ref literal) => RValue::Temp(match *literal {
+                t::Literal::Bool(b) => if b {
+                    cfg::Value::Int(1)
+                } else {
+                    cfg::Value::Int(0)
+                },
+                t::Literal::Char(c) => cfg::Value::Int(c as u64),
+                t::Literal::Number(n) => cfg::Value::Int(n.value),
+                t::Literal::Str(_) => unimplemented!(),
+            }),
             t::Expr::Name(name, ref type_params) => {
                 let name = Spanned::into_value(name);
                 if let Some(reg) = self.var_registers.get(&name).cloned() {
@@ -428,11 +405,10 @@ impl<'a> Builder<'a> {
                     if let Some(op) = unop_to_instruction(op, &expr.typ) {
                         let expr = self.build_expr(expr);
                         let result = self.new_register(e.typ.clone());
-                        self.emit_instruction(cfg::Instruction::UnaryOp(
-                            result,
-                            op,
-                            expr.as_value(),
-                        ), e.span);
+                        self.emit_instruction(
+                            cfg::Instruction::UnaryOp(result, op, expr.as_value()),
+                            e.span,
+                        );
                         self.drop_value(&expr, e.span);
                         RValue::Temp(cfg::Value::Reg(result))
                     } else {
@@ -442,12 +418,10 @@ impl<'a> Builder<'a> {
             }
         }
     }
-    
+
     fn build_expr_lvalue(&mut self, e: &t::TypedExpr) -> LValue {
         match *e.expr {
-            t::Expr::Binary(_, _, _) |
-            t::Expr::Call(_, _) |
-            t::Expr::Literal(_) => LValue::Invalid,
+            t::Expr::Binary(_, _, _) | t::Expr::Call(_, _) | t::Expr::Literal(_) => LValue::Invalid,
             t::Expr::Error => LValue::Error,
             t::Expr::Field(ref expr, index) => {
                 let mut lvalue = self.build_expr_lvalue(expr);
@@ -462,15 +436,13 @@ impl<'a> Builder<'a> {
                     LValue::Invalid
                 }
             }
-            t::Expr::Unary(op, ref expr) => {
-                match Spanned::into_value(op) {
-                    t::UnaryOp::Deref => {
-                        let ptr = self.build_expr(expr);
-                        LValue::Deref(ptr, Vec::new())
-                    }
-                    _ => LValue::Invalid,
+            t::Expr::Unary(op, ref expr) => match Spanned::into_value(op) {
+                t::UnaryOp::Deref => {
+                    let ptr = self.build_expr(expr);
+                    LValue::Deref(ptr, Vec::new())
                 }
-            }
+                _ => LValue::Invalid,
+            },
         }
     }
 }
@@ -481,42 +453,18 @@ fn binop_to_instruction(op: t::BinaryOp, arg_type: &t::Type) -> Option<cfg::Bina
         _ => None,
     };
     match op {
-        t::BinaryOp::Add => {
-            int.map(|(sign, size)| cfg::BinaryOp::Add(sign, size))
-        }
-        t::BinaryOp::Divide => {
-            int.map(|(sign, size)| cfg::BinaryOp::Div(sign, size))
-        }
-        t::BinaryOp::Greater => {
-            int.map(|(sign, size)| cfg::BinaryOp::Greater(sign, size))
-        }
-        t::BinaryOp::GreaterEqual => {
-            int.map(|(sign, size)| cfg::BinaryOp::GreaterEq(sign, size))
-        }
-        t::BinaryOp::Less => {
-            int.map(|(sign, size)| cfg::BinaryOp::Less(sign, size))
-        }
-        t::BinaryOp::LessEqual => {
-            int.map(|(sign, size)| cfg::BinaryOp::LessEq(sign, size))
-        }
-        t::BinaryOp::Modulo => {
-            int.map(|(sign, size)| cfg::BinaryOp::Mod(sign, size))
-        }
-        t::BinaryOp::Multiply => {
-            int.map(|(sign, size)| cfg::BinaryOp::Mul(sign, size))
-        }
-        t::BinaryOp::Subtract => {
-            int.map(|(sign, size)| cfg::BinaryOp::Sub(sign, size))
-        }
-        t::BinaryOp::Equal => {
-            Some(cfg::BinaryOp::Eq)
-        }
-        t::BinaryOp::NotEqual =>{
-            Some(cfg::BinaryOp::Neq)
-        }
-        t::BinaryOp::And |
-        t::BinaryOp::Or |
-        t::BinaryOp::Assign => {
+        t::BinaryOp::Add => int.map(|(sign, size)| cfg::BinaryOp::Add(sign, size)),
+        t::BinaryOp::Divide => int.map(|(sign, size)| cfg::BinaryOp::Div(sign, size)),
+        t::BinaryOp::Greater => int.map(|(sign, size)| cfg::BinaryOp::Greater(sign, size)),
+        t::BinaryOp::GreaterEqual => int.map(|(sign, size)| cfg::BinaryOp::GreaterEq(sign, size)),
+        t::BinaryOp::Less => int.map(|(sign, size)| cfg::BinaryOp::Less(sign, size)),
+        t::BinaryOp::LessEqual => int.map(|(sign, size)| cfg::BinaryOp::LessEq(sign, size)),
+        t::BinaryOp::Modulo => int.map(|(sign, size)| cfg::BinaryOp::Mod(sign, size)),
+        t::BinaryOp::Multiply => int.map(|(sign, size)| cfg::BinaryOp::Mul(sign, size)),
+        t::BinaryOp::Subtract => int.map(|(sign, size)| cfg::BinaryOp::Sub(sign, size)),
+        t::BinaryOp::Equal => Some(cfg::BinaryOp::Eq),
+        t::BinaryOp::NotEqual => Some(cfg::BinaryOp::Neq),
+        t::BinaryOp::And | t::BinaryOp::Or | t::BinaryOp::Assign => {
             panic!("invalid binop");
         }
     }
@@ -528,19 +476,10 @@ fn unop_to_instruction(op: t::UnaryOp, arg_type: &t::Type) -> Option<cfg::UnaryO
         _ => None,
     };
     match op {
-        t::UnaryOp::Deref => {
-            Some(cfg::UnaryOp::DerefLoad)
-        }
-        t::UnaryOp::Minus => {
-            int.map(|(sign, size)| cfg::UnaryOp::Negate(sign, size))
-        }
-        t::UnaryOp::Not => {
-            Some(cfg::UnaryOp::Not)
-        }
-        t::UnaryOp::Plus |
-        t::UnaryOp::AddressOf => {
-            panic!("invalid unary op")
-        }
+        t::UnaryOp::Deref => Some(cfg::UnaryOp::DerefLoad),
+        t::UnaryOp::Minus => int.map(|(sign, size)| cfg::UnaryOp::Negate(sign, size)),
+        t::UnaryOp::Not => Some(cfg::UnaryOp::Not),
+        t::UnaryOp::Plus | t::UnaryOp::AddressOf => panic!("invalid unary op"),
     }
 }
 
@@ -570,8 +509,5 @@ pub(crate) fn build_cfg(program: &t::Program, ctx: &mut CompileCtx) -> cfg::Prog
         .map(|s| (s.name, s.clone()))
         .collect();
 
-    cfg::Program {
-        structs,
-        functions,
-    }
+    cfg::Program { structs, functions }
 }

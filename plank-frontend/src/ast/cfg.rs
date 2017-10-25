@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use plank_syntax::position::{Span, Spanned};
 use ast::typed;
-pub use ast::typed::{Symbol, Type, Signedness, Size};
+pub use ast::typed::{Signedness, Size, Symbol, Type};
 
 
 #[derive(Debug, Clone)]

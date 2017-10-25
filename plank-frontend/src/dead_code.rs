@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 use plank_syntax::position::Spanned;
-use ast::cfg::{Program, Function, Block, BlockId, BlockLink, BlockEnd, Instruction};
+use ast::cfg::{Block, BlockEnd, BlockId, BlockLink, Function, Instruction, Program};
 use CompileCtx;
 
 
@@ -10,8 +10,7 @@ fn function_block_chain(f: &Function) -> VecDeque<BlockId> {
     loop {
         blocks.push_back(current);
         match f.blocks[&current].link {
-            BlockLink::Strong(next) |
-            BlockLink::Weak(next) => current = next,
+            BlockLink::Strong(next) | BlockLink::Weak(next) => current = next,
             BlockLink::None => break,
         }
     }
@@ -58,8 +57,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
                     BlockEnd::Jump(next) => {
                         queue.push_back(next);
                     }
-                    BlockEnd::Return(_) |
-                    BlockEnd::Error => {}
+                    BlockEnd::Return(_) | BlockEnd::Error => {}
                 }
                 if follow_strong {
                     if let BlockLink::Strong(next) = block.link {
@@ -85,7 +83,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
 }
 
 pub(crate) fn remove_dead_code(program: &mut Program, ctx: &mut CompileCtx) {
-    for (_, f)  in &mut program.functions {
+    for (_, f) in &mut program.functions {
         analyze_function(f, ctx);
     }
 }

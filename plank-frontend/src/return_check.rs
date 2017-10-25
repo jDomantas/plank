@@ -1,4 +1,4 @@
-use ast::cfg::{Program, Function, BlockEnd};
+use ast::cfg::{BlockEnd, Function, Program};
 use CompileCtx;
 
 
