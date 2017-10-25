@@ -19,9 +19,6 @@ fn function_block_chain(f: &Function) -> VecDeque<BlockId> {
 }
 
 fn report_unreachable(block: &Block, ctx: &mut CompileCtx) {
-    if block.ops.is_empty() {
-        return;
-    }
     let mut span = Spanned::span(&block.ops[0]);
     for i in &block.ops {
         match *Spanned::value(i) {
@@ -76,7 +73,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
         }
         follow_strong = true;
         while let Some(block) = blocks.pop_front() {
-            if !reachable.contains(&block) {
+            if !reachable.contains(&block) && !f.blocks[&block].ops.is_empty() {
                 report_unreachable(&f.blocks[&block], ctx);
                 queue.push_back(block);
                 break;
