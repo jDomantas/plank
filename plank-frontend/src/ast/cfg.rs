@@ -14,6 +14,7 @@ pub struct Program {
 pub struct Function {
     pub complete_span: Span,
     pub type_params: Vec<Symbol>,
+    pub parameters: Vec<Reg>,
     pub registers: HashMap<Reg, Type>,
     pub blocks: HashMap<BlockId, Block>,
     pub start_block: BlockId,
@@ -102,43 +103,286 @@ pub enum UnaryOp {
 }
 
 
-pub mod printer {
-    use super::*;
+pub(crate) mod printer {
+    #![allow(dead_code)]
 
-    pub fn print_program(program: &Program) {
+    use super::*;
+    use CompileCtx;
+
+
+    fn write_int(
+        f: &mut ::std::fmt::Formatter,
+        sign: Signedness,
+        size: Size,
+    ) -> ::std::fmt::Result {
+        match sign {
+            Signedness::Signed => write!(f, "i")?,
+            Signedness::Unsigned => write!(f, "u")?,
+        }
+        match size {
+            Size::Bit8 => write!(f, "8"),
+            Size::Bit16 => write!(f, "16"),
+            Size::Bit32 => write!(f, "32"),
+        }
+    }
+
+    fn write_type(
+        f: &mut ::std::fmt::Formatter,
+        ty: &Type,
+        ctx: &CompileCtx,
+    ) -> ::std::fmt::Result {
+        match *ty {
+            Type::Bool => write!(f, "bool"),
+            Type::Concrete(sym, ref params) => {
+                write!(f, "{}", ctx.symbols.get_name(sym))?;
+                write_type_list(f, params, ctx)
+            }
+            Type::Error => write!(f, "?"),
+            Type::Function(ref _params, ref _out) => {
+                unimplemented!()
+            }
+            Type::Int(sign, size) => {
+                write_int(f, sign, size)
+            }
+            Type::Pointer(ref to) => {
+                write!(f, "*")?;
+                write_type(f, to, ctx)
+            }
+            Type::Var(_) => panic!("found type var"),
+        }
+    }
+
+    fn write_type_list(
+        f: &mut ::std::fmt::Formatter,
+        types: &[Type],
+        ctx: &CompileCtx,
+    ) -> ::std::fmt::Result {
+        if types.len() == 0 {
+            Ok(())
+        } else {
+            write!(f, "<")?;
+            let mut first = true;
+            for ty in types {
+                if !first { write!(f, ",")?; }
+                first = false;
+                write_type(f, ty, ctx)?;
+            }
+            write!(f, ">")
+        }
+    }
+
+    struct ValueDisplay<'a> {
+        value: &'a Value,
+        ctx: &'a CompileCtx,
+    }
+            
+    impl<'a> ::std::fmt::Display for ValueDisplay<'a> {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+            match *self.value {
+                Value::Error => write!(f, "?"),
+                Value::Int(i) => write!(f, "{}", i),
+                Value::Reg(reg) => write!(f, "r{}", reg.0),
+                Value::Symbol(sym, ref params) => {
+                    write!(f, "{:?}", self.ctx.symbols.get_name(sym))?;
+                    write_type_list(f, params, self.ctx)
+                }
+            }
+        }
+    }
+
+    fn d<'a>(value: &'a Value, ctx: &'a CompileCtx) -> ValueDisplay<'a> {
+        ValueDisplay { value, ctx }
+    }
+
+    struct BinaryOpDisplay<'a> {
+        op: &'a BinaryOp,
+    }
+
+    impl<'a> ::std::fmt::Display for BinaryOpDisplay<'a> {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+            match *self.op {
+                BinaryOp::Add(sign, size) => {
+                    write!(f, "add_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Div(sign, size) => {
+                    write!(f, "div_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Eq => {
+                    write!(f, "eq")
+                }
+                BinaryOp::Greater(sign, size) => {
+                    write!(f, "gt_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::GreaterEq(sign, size) => {
+                    write!(f, "gteq_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Less(sign, size) => {
+                    write!(f, "le_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::LessEq(sign, size) => {
+                    write!(f, "leeq_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Mod(sign, size) => {
+                    write!(f, "mod_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Mul(sign, size) => {
+                    write!(f, "mul_")?;
+                    write_int(f, sign, size)
+                }
+                BinaryOp::Neq => {
+                    write!(f, "neq")
+                }
+                BinaryOp::Sub(sign, size) => {
+                    write!(f, "sub_")?;
+                    write_int(f, sign, size)
+                }
+            }
+        }
+    }
+
+    fn db<'a>(op: &'a BinaryOp) -> BinaryOpDisplay<'a> {
+        BinaryOpDisplay { op }
+    }
+
+    struct UnaryOpDisplay<'a> {
+        op: &'a UnaryOp,
+    }
+
+    impl<'a> ::std::fmt::Display for UnaryOpDisplay<'a> {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+            match *self.op {
+                UnaryOp::DerefLoad => {
+                    write!(f, "deref")
+                }
+                UnaryOp::FieldLoad(ref fields) => {
+                    write!(f, "load_field ")?;
+                    for field in fields {
+                        write!(f, ".{}", field)?;
+                    }
+                    Ok(())
+                }
+                UnaryOp::Negate(sign, size) => {
+                    write!(f, "neg_")?;
+                    write_int(f, sign, size)
+                }
+                UnaryOp::Not => {
+                    write!(f, "not")
+                }
+                UnaryOp::OffsetAddress(ref fields) => {
+                    write!(f, "field_offset ")?;
+                    for field in fields {
+                        write!(f, ".{}", field)?;
+                    }
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn du<'a>(op: &'a UnaryOp) -> UnaryOpDisplay<'a> {
+        UnaryOpDisplay { op }
+    }
+
+    pub(crate) fn print_program(program: &Program, ctx: &CompileCtx) {
         for (id, f) in &program.functions {
             println!("function {:?}", id);
-            print_function(f);
+            print_function(f, ctx);
             println!();
         }
     }
 
-    fn print_function(f: &Function) {
+    fn print_function(f: &Function, ctx: &CompileCtx) {
         println!("start:");
         println!("    goto label_{}", f.start_block.0);
         for (id, block) in &f.blocks {
             println!("label_{}:", id.0);
-            print_block(block);
+            print_block(block, ctx);
         }
     }
 
-    fn print_block(block: &Block) {
+    fn print_block(block: &Block, ctx: &CompileCtx) {
         for i in &block.ops {
-            print_instruction(Spanned::value(i));
+            print_instruction(Spanned::value(i), ctx);
         }
-        print_block_end(&block.end);
+        print_block_end(&block.end, ctx);
     }
 
-    fn print_instruction(_i: &Instruction) {
-        println!("    <instruction>");
+    fn print_instruction(i: &Instruction, ctx: &CompileCtx) {
+        match *i {
+            Instruction::Assign(reg, ref value) => {
+                println!("    r{} = {}", reg.0, d(value, ctx));
+            }
+            Instruction::BinaryOp(reg, ref op, ref a, ref b) => {
+                println!("    r{} = {} {} {}", reg.0, db(op), d(a, ctx), d(b, ctx));
+            }
+            Instruction::Call(dest, sym, ref _types, ref params) => {
+                print!("    r{} = call {}", dest.0, ctx.symbols.get_name(sym));
+                print!("(");
+                let mut first = true;
+                for param in params {
+                    if !first { print!(",") }
+                    first = false;
+                    print!("{}", d(param, ctx));
+                }
+                println!(")");
+            }
+            Instruction::VirtualCall(dest, ref val, ref params) => {
+                print!("    r{} = virt_call {}", dest.0, d(val, ctx));
+                print!("(");
+                let mut first = true;
+                for param in params {
+                    if !first { print!(",") }
+                    first = false;
+                    print!("{}", d(param, ctx));
+                }
+                println!(")");
+            }
+            Instruction::DerefStore(ref dest, ref fields, ref value) => {
+                print!("    deref_store {} ", d(dest, ctx));
+                for field in fields {
+                    print!(".{}", field);
+                }
+                if fields.len() > 0 { print!(" ") }
+                println!("{}", d(value, ctx));
+            }
+            Instruction::Drop(reg) => {
+                println!("    drop r{}", reg.0);
+            }
+            Instruction::FieldStore(dest, ref fields, ref value) => {
+                print!("    store r{} ", dest.0);
+                for field in fields {
+                    print!(".{}", field);
+                }
+                if fields.len() > 0 { print!(" ") }
+                println!("{}", d(value, ctx));
+            }
+            Instruction::StartStatement => {
+                println!("    start_stmt");
+            }
+            Instruction::TakeAddress(dest, reg, ref fields) => {
+                print!("    r{} = address r{}", dest.0, reg.0);
+                for field in fields {
+                    print!(".{}", field);
+                }
+                println!();
+            }
+            Instruction::UnaryOp(dest, ref op, ref value) => {
+                println!("    r{} = {} {}", dest.0, du(op), d(value, ctx));
+            }
+        }
     }
-
-    fn print_block_end(end: &BlockEnd) {
+    
+    fn print_block_end(end: &BlockEnd, ctx: &CompileCtx) {
         match *end {
             BlockEnd::Branch(ref val, a, b) => {
-                print!("    branch ");
-                print_value(val);
-                println!(" label_{} label_{}", a.0, b.0);
+                println!("    branch {} label_{} label_{}", d(val, ctx), a.0, b.0);
             }
             BlockEnd::Error => {
                 println!("    error");
@@ -147,19 +391,8 @@ pub mod printer {
                 println!("    goto label_{}", id.0);
             }
             BlockEnd::Return(ref value) => {
-                print!("    return ");
-                print_value(value);
-                println!();
+                println!("    return {}", d(value, ctx));
             }
-        }
-    }
-
-    fn print_value(value: &Value) {
-        match *value {
-            Value::Error => print!("error"),
-            Value::Int(i) => print!("{}", i),
-            Value::Reg(reg) => print!("r{}", reg.0),
-            Value::Symbol(_, _) => unimplemented!(),
         }
     }
 }

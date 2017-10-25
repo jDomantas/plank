@@ -72,6 +72,7 @@ pub struct Var {
 
 #[derive(Debug, Clone)]
 pub struct Struct {
+    pub complete_span: Span,
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
     pub fields: Vec<Var>,

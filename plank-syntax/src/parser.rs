@@ -388,6 +388,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_struct(&mut self) -> ParseResult<Struct> {
+        let start_span = self.previous_span();
         let name = self.parse_item_name()?;
         self.expect(Token::LeftBrace)?;
         let mut fields = Vec::new();
@@ -402,7 +403,8 @@ impl<'a> Parser<'a> {
             }
             self.expect(Token::Comma)?;
         }
-        Ok(Struct { name, fields })
+        let complete_span = self.previous_span().merge(start_span);
+        Ok(Struct { name, fields, complete_span })
     }
 
     fn parse_function(&mut self, start_span: Span, fn_type: FunctionType) -> ParseResult<Function> {

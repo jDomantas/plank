@@ -155,6 +155,7 @@ pub struct Var {
 
 #[derive(Debug, Clone)]
 pub struct Struct {
+    pub complete_span: Span,
     pub name: ItemName,
     pub fields: Vec<Var>,
 }

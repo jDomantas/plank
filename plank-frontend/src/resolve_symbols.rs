@@ -134,7 +134,7 @@ impl<'a> Resolver<'a> {
     fn resolve_struct(&mut self, struct_: &p::Struct) -> r::Struct {
         let name = self.resolve_item_name(&struct_.name);
         let fields = self.resolve_var_list(&struct_.fields, "field");
-        r::Struct { name, fields }
+        r::Struct { name, fields, complete_span: struct_.complete_span }
     }
 
     fn resolve_item_name(&mut self, name: &p::ItemName) -> r::ItemName {

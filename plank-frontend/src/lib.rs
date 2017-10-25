@@ -14,6 +14,7 @@ mod type_check;
 mod build_cfg;
 mod dead_code;
 mod return_check;
+mod gen_constructors;
 
 use plank_errors::Reporter;
 use plank_syntax::ast::Program;
@@ -39,5 +40,6 @@ pub fn compile(program: &Program, reporter: Reporter) {
     let mut cfg = build_cfg::build_cfg(&typed, &mut ctx);
     dead_code::remove_dead_code(&mut cfg, &mut ctx);
     return_check::check_returns(&cfg, &mut ctx);
-    ast::cfg::printer::print_program(&cfg);
+    gen_constructors::add_constructors(&mut cfg);
+    ast::cfg::printer::print_program(&cfg, &ctx);
 }

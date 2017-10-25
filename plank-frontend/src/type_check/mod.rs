@@ -740,6 +740,7 @@ impl<'a> Inferer<'a> {
                 .insert(field_name.into(), (index, scheme));
         }
         t::Struct {
+            complete_span: s.complete_span,
             name: Spanned::into_value(s.name.name),
             type_params: vars,
             fields,

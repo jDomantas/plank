@@ -41,6 +41,7 @@ impl RValue {
 }
 
 struct Builder<'a> {
+    parameters: Vec<cfg::Reg>,
     registers: HashMap<cfg::Reg, cfg::Type>,
     blocks: HashMap<cfg::BlockId, cfg::Block>,
     current_loop: Option<LoopDescr>,
@@ -54,6 +55,7 @@ struct Builder<'a> {
 impl<'a> Builder<'a> {
     fn new(ctx: &'a mut CompileCtx) -> Self {
         Builder {
+            parameters: Vec::new(),
             registers: HashMap::new(),
             blocks: HashMap::new(),
             current_loop: None,
@@ -169,7 +171,8 @@ impl<'a> Builder<'a> {
 
     fn build_function(&mut self, f: &t::Function) -> cfg::BlockId {
         for var in &f.params {
-            self.new_var_register(var.name, var.typ.clone());
+            let param = self.new_var_register(var.name, var.typ.clone());
+            self.parameters.push(param);
         }
         let body_block = self.new_block();
         self.start_block(body_block);
@@ -488,6 +491,7 @@ fn compile_fn(f: &t::Function, ctx: &mut CompileCtx) -> cfg::Function {
     let start_block = builder.build_function(f);
     debug_assert!(builder.current_block.is_none());
     cfg::Function {
+        parameters: builder.parameters,
         complete_span: f.complete_span,
         type_params: f.type_params.clone(),
         registers: builder.registers,
