@@ -55,6 +55,7 @@ pub enum Type {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub name_span: Span,
     pub fn_type: FunctionType,
     pub name: Symbol,
     pub type_params: Vec<Symbol>,

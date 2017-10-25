@@ -584,8 +584,8 @@ impl<'a> Inferer<'a> {
                 stmt
             })
         });
-        // TODO: normalize types inside
         t::Function {
+            name_span: Spanned::span(&function.name.name),
             fn_type: function.fn_type,
             params,
             return_type: self.return_type.take().unwrap(),
