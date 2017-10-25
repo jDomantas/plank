@@ -116,6 +116,13 @@ impl UnifyTable {
     }
 
     fn unify_var_type(&mut self, v: TypeVar, b: Type) -> Result<(), ()> {
+        match b {
+            Type::Var(b) if b == v => return Ok(()),
+            _ => {}
+        }
+        if self.occurs(v, &b) {
+            return Err(());
+        }
         let vt = self.var_target.get(&v).cloned();
         match (vt, b) {
             (Some(VarTarget::Type(_)), _) => panic!("cannot unify non-normalized var"),
@@ -132,6 +139,33 @@ impl UnifyTable {
                 Err(())
             },
             _ => Err(()),
+        }
+    }
+
+    fn occurs(&mut self, var: TypeVar, typ: &Type) -> bool {
+        let typ = self.shallow_normalize(typ);
+        match typ {
+            Type::Bool |
+            Type::Error |
+            Type::Int(_, _) => false,
+            Type::Concrete(_, ref params) => {
+                for param in params.iter() {
+                    if self.occurs(var, param) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Type::Function(ref params, ref out) => {
+                for param in params.iter() {
+                    if self.occurs(var, param) {
+                        return true;
+                    }
+                }
+                self.occurs(var, out)
+            }
+            Type::Pointer(ref to) => self.occurs(var, to),
+            Type::Var(v) => var == v,
         }
     }
 
