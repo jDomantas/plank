@@ -86,6 +86,7 @@ impl UnifyTable {
             }
             (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
+            (Type::Bool, Type::Bool) => Ok(()),
             (_, _) => Err(()),
         }
     }
