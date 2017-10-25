@@ -163,12 +163,12 @@ impl<'a> Builder<'a> {
         self.current_block = Some((id, Vec::new()));
     }
 
-    fn end_block(&mut self, end: cfg::BlockEnd, weak_link: Option<cfg::BlockId>) {
+    fn end_block(&mut self, end: cfg::BlockEnd, link: cfg::BlockLink) {
         let (id, ops) = self.current_block.take().unwrap();
         let block = cfg::Block {
             ops,
             end,
-            weak_link,
+            link,
         };
         self.blocks.insert(id, block);
     }
@@ -183,7 +183,7 @@ impl<'a> Builder<'a> {
             self.build_statement(body);
         }
         if self.current_block.is_some() {
-            self.end_block(cfg::BlockEnd::Error, None);
+            self.end_block(cfg::BlockEnd::Error, cfg::BlockLink::None);
         }
         body_block
     }
@@ -202,7 +202,8 @@ impl<'a> Builder<'a> {
                 match self.current_loop {
                     Some(LoopDescr { after, .. }) => {
                         let new = self.new_block();
-                        self.end_block(cfg::BlockEnd::Jump(after), Some(new));
+                        let link = cfg::BlockLink::Strong(new);
+                        self.end_block(cfg::BlockEnd::Jump(after), link);
                         self.start_block(new);
                     }
                     None => {
@@ -218,7 +219,8 @@ impl<'a> Builder<'a> {
                 match self.current_loop {
                     Some(LoopDescr { start, .. }) => {
                         let new = self.new_block();
-                        self.end_block(cfg::BlockEnd::Jump(start), Some(new));
+                        let link = cfg::BlockLink::Strong(new);
+                        self.end_block(cfg::BlockEnd::Jump(start), link);
                         self.start_block(new);
                     }
                     None => {
@@ -239,26 +241,31 @@ impl<'a> Builder<'a> {
                 let body = self.new_block();
                 let else_body = self.new_block();
                 let after = self.new_block();
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, else_body), Some(after));
+                let link = cfg::BlockLink::Weak(body);
+                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, else_body), link);
                 self.start_block(body);
                 self.drop_value(&c, cond.span);
                 self.build_statement(then);
-                self.end_block(cfg::BlockEnd::Jump(after), Some(after));
+                let link = cfg::BlockLink::Weak(else_body);
+                self.end_block(cfg::BlockEnd::Jump(after), link);
                 self.start_block(else_body);
                 self.drop_value(&c, cond.span);
                 self.build_statement(else_);
-                self.end_block(cfg::BlockEnd::Jump(after), Some(after));
+                let link = cfg::BlockLink::Weak(after);
+                self.end_block(cfg::BlockEnd::Jump(after), link);
                 self.start_block(after);
             }
             t::Statement::If(ref cond, ref then, None) => {
                 let c = self.build_expr(cond);
                 let body = self.new_block();
                 let after = self.new_block();
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, after), Some(after));
+                let link = cfg::BlockLink::Weak(body);
+                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, after), link);
                 self.start_block(body);
                 self.drop_value(&c, cond.span);
                 self.build_statement(then);
-                self.end_block(cfg::BlockEnd::Jump(after), Some(after));
+                let link = cfg::BlockLink::Weak(after);
+                self.end_block(cfg::BlockEnd::Jump(after), link);
                 self.start_block(after);
                 self.drop_value(&c, cond.span);
             }
@@ -274,17 +281,20 @@ impl<'a> Builder<'a> {
                 let after = self.new_block();
                 let outer_loop = self.current_loop.take();
                 self.current_loop = Some(LoopDescr { start, after });
-                self.end_block(cfg::BlockEnd::Jump(start), Some(start));
+                let link = cfg::BlockLink::Weak(start);
+                self.end_block(cfg::BlockEnd::Jump(start), link);
                 self.start_block(start);
                 self.build_statement(body);
-                self.end_block(cfg::BlockEnd::Jump(start), Some(after));
+                let link = cfg::BlockLink::Weak(after);
+                self.end_block(cfg::BlockEnd::Jump(start), link);
                 self.current_loop = outer_loop;
                 self.start_block(after);
             }
             t::Statement::Return(ref e) => {
                 let value = self.build_expr(e);
                 let new = self.new_block();
-                self.end_block(cfg::BlockEnd::Return(value.as_value()), Some(new));
+                let link = cfg::BlockLink::Strong(new);
+                self.end_block(cfg::BlockEnd::Return(value.as_value()), link);
                 self.start_block(new);
             }
             t::Statement::While(ref cond, ref body) => {
@@ -293,14 +303,17 @@ impl<'a> Builder<'a> {
                 let after = self.new_block();
                 let outer_loop = self.current_loop.take();
                 self.current_loop = Some(LoopDescr { start, after });
-                self.end_block(cfg::BlockEnd::Jump(start), Some(start));
+                let link = cfg::BlockLink::Weak(start);
+                self.end_block(cfg::BlockEnd::Jump(start), link);
                 self.start_block(start);
                 let c = self.build_expr(cond);
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body_start, after), Some(after));
+                let link = cfg::BlockLink::Weak(body_start);
+                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body_start, after), link);
                 self.start_block(body_start);
                 self.drop_value(&c, cond.span);
                 self.build_statement(body);
-                self.end_block(cfg::BlockEnd::Jump(start), Some(after));
+                let link = cfg::BlockLink::Weak(after);
+                self.end_block(cfg::BlockEnd::Jump(start), link);
                 self.current_loop = outer_loop;
                 self.start_block(after);
                 self.drop_value(&c, cond.span);

@@ -28,7 +28,17 @@ pub struct BlockId(pub u32);
 pub struct Block {
     pub ops: Vec<Spanned<Instruction>>,
     pub end: BlockEnd,
-    pub weak_link: Option<BlockId>,
+    pub link: BlockLink,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum BlockLink {
+    /// Block would extend this block if not for `return`, `break`, or `continue`
+    Strong(BlockId),
+    /// Block lexically follows this block, but no real relation
+    Weak(BlockId),
+    /// No link
+    None,
 }
 
 #[derive(Debug, Clone)]

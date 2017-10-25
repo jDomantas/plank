@@ -12,6 +12,7 @@ mod type_param_check;
 mod wildcard_check;
 mod type_check;
 mod build_cfg;
+mod dead_code;
 
 use plank_errors::Reporter;
 use plank_syntax::ast::Program;
@@ -34,5 +35,7 @@ pub fn compile(program: &Program, reporter: Reporter) {
     type_param_check::check_type_params(&mut resolved, &mut ctx);
     wildcard_check::check_for_wildcards(&resolved, &mut ctx);
     let typed = type_check::type_check(&resolved, &mut ctx);
-    let _cfg = build_cfg::build_cfg(&typed, &mut ctx);
+    let mut cfg = build_cfg::build_cfg(&typed, &mut ctx);
+    dead_code::remove_dead_code(&mut cfg, &mut ctx);
+    ast::cfg::printer::print_program(&cfg);
 }
