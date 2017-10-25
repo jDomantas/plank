@@ -1,4 +1,4 @@
-use position::Spanned;
+use position::{Span, Spanned};
 
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
@@ -139,6 +139,7 @@ pub enum FunctionType {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub complete_span: Span,
     pub fn_type: FunctionType,
     pub name: ItemName,
     pub params: Vec<Var>,

@@ -364,16 +364,18 @@ impl<'a> Parser<'a> {
                     self.synchronize_item();
                 }
             } else if self.check(Token::Keyword(Keyword::Fn)) {
-                if let Ok(f) = self.parse_function(FunctionType::Normal) {
+                let start_span = self.previous_span();
+                if let Ok(f) = self.parse_function(start_span, FunctionType::Normal) {
                     program.functions.push(f);
                 } else {
                     self.synchronize_item();
                 }
             } else if self.check(Token::Keyword(Keyword::Extern)) {
+                let start_span = self.previous_span();
                 if self.expect(Token::Keyword(Keyword::Fn)).is_err() {
                     self.synchronize_item();
                 }
-                if let Ok(f) = self.parse_function(FunctionType::Extern) {
+                if let Ok(f) = self.parse_function(start_span, FunctionType::Extern) {
                     program.functions.push(f);
                 } else {
                     self.synchronize_item();
@@ -403,7 +405,7 @@ impl<'a> Parser<'a> {
         Ok(Struct { name, fields })
     }
 
-    fn parse_function(&mut self, fn_type: FunctionType) -> ParseResult<Function> {
+    fn parse_function(&mut self, start_span: Span, fn_type: FunctionType) -> ParseResult<Function> {
         let name = self.parse_item_name()?;
         self.expect(Token::LeftParen)?;
         let open_span = self.previous_span();
@@ -420,13 +422,18 @@ impl<'a> Parser<'a> {
         }
         self.expect(Token::Arrow)?;
         let return_type = self.parse_type()?;
+        let complete_span;
         let body = if self.check(Token::LeftBrace) {
-            Some(self.parse_block()?)
+            let body = self.parse_block()?;
+            complete_span = start_span.merge(Spanned::span(&body));
+            Some(body)
         } else {
             self.expect_semicolon()?;
+            complete_span = start_span.merge(self.previous_span());
             None
         };
         Ok(Function {
+            complete_span,
             fn_type,
             name,
             params,

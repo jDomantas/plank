@@ -1,5 +1,5 @@
 pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
-use plank_syntax::position::Spanned;
+use plank_syntax::position::{Span, Spanned};
 
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
@@ -64,6 +64,7 @@ pub struct ItemName {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub fn_type: FunctionType,
+    pub complete_span: Span,
     pub name: ItemName,
     pub params: Vec<Var>,
     pub return_type: Spanned<Type>,

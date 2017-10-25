@@ -585,7 +585,7 @@ impl<'a> Inferer<'a> {
             })
         });
         t::Function {
-            name_span: Spanned::span(&function.name.name),
+            complete_span: function.complete_span,
             fn_type: function.fn_type,
             params,
             return_type: self.return_type.take().unwrap(),

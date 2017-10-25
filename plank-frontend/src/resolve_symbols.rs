@@ -251,6 +251,7 @@ impl<'a> Resolver<'a> {
         self.scopes.clear();
 
         r::Function {
+            complete_span: f.complete_span,
             name,
             params,
             return_type,

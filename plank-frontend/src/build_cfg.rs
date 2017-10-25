@@ -549,6 +549,7 @@ fn compile_fn(f: &t::Function, ctx: &mut CompileCtx) -> cfg::Function {
     let start_block = builder.build_function(f);
     debug_assert!(builder.current_block.is_none());
     cfg::Function {
+        complete_span: f.complete_span,
         type_params: f.type_params.clone(),
         registers: builder.registers,
         blocks: builder.blocks,

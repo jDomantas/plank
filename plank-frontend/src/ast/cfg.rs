@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use plank_syntax::position::Spanned;
+use plank_syntax::position::{Span, Spanned};
 use ast::typed;
 pub use ast::typed::{Symbol, Type, Signedness, Size};
 
@@ -12,6 +12,7 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub complete_span: Span,
     pub type_params: Vec<Symbol>,
     pub registers: HashMap<Reg, Type>,
     pub blocks: HashMap<BlockId, Block>,
