@@ -100,3 +100,66 @@ pub enum UnaryOp {
     /// &(*<arg>).field1.field2...
     OffsetAddress(Vec<usize>),
 }
+
+
+pub mod printer {
+    use super::*;
+
+    pub fn print_program(program: &Program) {
+        for (id, f) in &program.functions {
+            println!("function {:?}", id);
+            print_function(f);
+            println!();
+        }
+    }
+
+    fn print_function(f: &Function) {
+        println!("start:");
+        println!("    goto label_{}", f.start_block.0);
+        for (id, block) in &f.blocks {
+            println!("label_{}:", id.0);
+            print_block(block);
+        }
+    }
+
+    fn print_block(block: &Block) {
+        for i in &block.ops {
+            print_instruction(Spanned::value(i));
+        }
+        print_block_end(&block.end);
+    }
+
+    fn print_instruction(_i: &Instruction) {
+        println!("    <instruction>");
+    }
+
+    fn print_block_end(end: &BlockEnd) {
+        match *end {
+            BlockEnd::Branch(ref val, a, b) => {
+                print!("    branch ");
+                print_value(val);
+                println!(" label_{} label_{}", a.0, b.0);
+            }
+            BlockEnd::Error => {
+                println!("    error");
+            }
+            BlockEnd::Jump(id) => {
+                println!("    goto label_{}", id.0);
+            }
+            BlockEnd::Return(ref value) => {
+                print!("    return ");
+                print_value(value);
+                println!();
+            }
+        }
+    }
+
+    fn print_value(value: &Value) {
+        match *value {
+            Value::Error => print!("error"),
+            Value::Int(i) => print!("{}", i),
+            Value::Reg(reg) => print!("r{}", reg.0),
+            Value::Symbol(_, _) => unimplemented!(),
+        }
+    }
+}
