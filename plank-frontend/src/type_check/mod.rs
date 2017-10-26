@@ -191,9 +191,9 @@ impl<'a> Inferer<'a> {
         Type::Var(self.unifier.fresh_int_var(None))
     }
 
-    fn unify(&mut self, a: &Type, b: &Type, reason: Reason) {
+    fn unify(&mut self, a: &Type, b: &Type, reason: Reason) -> Type {
         match self.unifier.unify(a, b) {
-            Ok(_ty) => {}
+            Ok(ty) => ty,
             Err(()) => {
                 let got = self.format_type(a).to_string();
                 let expected = self.format_type(b).to_string();
@@ -248,6 +248,7 @@ impl<'a> Inferer<'a> {
                     }
                 };
                 self.ctx.reporter.error(msg, span).span(span).build();
+                Type::Error
             }
         }
     }
@@ -346,8 +347,7 @@ impl<'a> Inferer<'a> {
                     BinaryOp::LessEqual => (self.fresh_int_var(), Type::Bool),
                     BinaryOp::Assign => {
                         let reason = Reason::Assign(rhs.span);
-                        self.unify(&rhs.typ, &lhs.typ, reason);
-                        let typ = lhs.typ.clone();
+                        let typ = self.unify(&rhs.typ, &lhs.typ, reason);
                         let typed = t::Expr::Binary(lhs, op, rhs);
                         return t::TypedExpr {
                             expr: Box::new(typed),
@@ -356,7 +356,7 @@ impl<'a> Inferer<'a> {
                         };
                     }
                 };
-                self.unify(&lhs.typ, &param_type, Reason::LeftOperand(lhs.span));
+                let param_type = self.unify(&lhs.typ, &param_type, Reason::LeftOperand(lhs.span));
                 self.unify(&rhs.typ, &param_type, Reason::RightOperand(rhs.span));
                 (t::Expr::Binary(lhs, op, rhs), out_type)
             }
@@ -533,10 +533,9 @@ impl<'a> Inferer<'a> {
                 let value = self.infer_expr(value);
                 let ty = self.convert_resolved_type(typ);
                 let reason = Reason::Assign(value.span);
-                self.unify(&value.typ, &ty, reason);
                 let scheme = Scheme {
                     vars: Vec::new(),
-                    typ: ty.clone(),
+                    typ: self.unify(&value.typ, &ty, reason),
                 };
                 self.env.insert(Spanned::into_value(sym), scheme);
                 let typ = Spanned::new(ty, Spanned::span(typ));
