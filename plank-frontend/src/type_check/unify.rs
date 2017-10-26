@@ -57,7 +57,6 @@ impl UnifyTable {
         let a = self.shallow_normalize(a);
         let b = self.shallow_normalize(b);
         match (a, b) {
-            (Type::Error, _) | (_, Type::Error) => Ok(()),
             (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => if a == b {
                 assert!(ap.len() == bp.len());
                 for (a, b) in ap.iter().zip(bp.iter()) {
@@ -87,6 +86,7 @@ impl UnifyTable {
             (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
             (Type::Bool, Type::Bool) => Ok(()),
+            (Type::Error, _) | (_, Type::Error) => Ok(()),
             (_, _) => Err(()),
         }
     }
@@ -125,6 +125,10 @@ impl UnifyTable {
         }
         let vt = self.var_target.get(&v).cloned();
         match (vt, b) {
+            (_, Type::Error) => {
+                self.var_target.insert(v, VarTarget::Type(Type::Error));
+                Ok(())
+            }
             (Some(VarTarget::Type(_)), _) => panic!("cannot unify non-normalized var"),
             (_, Type::Var(b)) => self.unify_var_var(v, b),
             (None, ty) | (Some(VarTarget::Int), ty @ Type::Int(_, _)) => {

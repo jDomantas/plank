@@ -650,7 +650,11 @@ impl<'a> Inferer<'a> {
                     self.normalize_expr(param);
                 }
             }
-            t::Expr::Error | t::Expr::Literal(_) => {}
+            t::Expr::Error => {
+                expr.typ = Type::Error;
+                return;
+            }
+            t::Expr::Literal(_) => {}
             t::Expr::Name(_, ref mut params) => for param in params {
                 match self.unifier.normalize(param) {
                     Ok(t) => *Spanned::value_mut(param) = t,
@@ -666,7 +670,17 @@ impl<'a> Inferer<'a> {
                 }
             },
         }
-        expr.typ = self.unifier.normalize(&expr.typ).unwrap();
+        match self.unifier.normalize(&expr.typ) {
+            Ok(typ) => expr.typ = typ,
+            Err(()) => {
+                expr.typ = t::Type::Error;
+                self.ctx
+                    .reporter
+                    .error("could not completely infer type", expr.span)
+                    .span(expr.span)
+                    .build();
+            }
+        }
     }
 
     fn infer_program(&mut self, program: &r::Program) -> t::Program {
