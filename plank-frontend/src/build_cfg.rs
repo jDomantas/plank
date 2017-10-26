@@ -142,6 +142,16 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
+            LValue::Deref(ref val, ref fields) if fields.is_empty() => {
+                self.emit_instruction(
+                    cfg::Instruction::Assign(
+                        target,
+                        val.as_value(),
+                    ),
+                    value_span,
+                );
+                self.drop_value(val, value_span);
+            }
             LValue::Deref(val, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::UnaryOp(
@@ -330,8 +340,8 @@ impl<'a> Builder<'a> {
                     self.emit_store(target, lhs.span, value.as_value());
                     value
                 }
-                t::BinaryOp::And => unimplemented!(),
-                t::BinaryOp::Or => unimplemented!(),
+                t::BinaryOp::And => self.build_and(lhs, rhs),
+                t::BinaryOp::Or => self.build_or(lhs, rhs),
                 op => if let Some(op) = binop_to_instruction(op, &lhs.typ) {
                     let lhs = self.build_expr(lhs);
                     let rhs = self.build_expr(rhs);
@@ -458,6 +468,50 @@ impl<'a> Builder<'a> {
                 _ => LValue::Invalid,
             },
         }
+    }
+
+    fn build_and(&mut self, lhs: &t::TypedExpr, rhs: &t::TypedExpr) -> RValue {
+        let built_lhs = self.build_expr(lhs);
+        let rhs_block = self.new_block();
+        let reset_block = self.new_block();
+        let after_block = self.new_block();
+        let result = self.new_register(t::Type::Bool);
+        let link = cfg::BlockLink::Strong(rhs_block);
+        self.end_block(cfg::BlockEnd::Branch(built_lhs.as_value(), rhs_block, reset_block), link);
+        self.start_block(rhs_block);
+        self.drop_value(&built_lhs, lhs.span);
+        let built_rhs = self.build_expr(rhs);
+        self.emit_instruction(cfg::Instruction::Assign(result, built_rhs.as_value()), rhs.span);
+        self.drop_value(&built_rhs, rhs.span);
+        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
+        self.start_block(reset_block);
+        self.drop_value(&built_lhs, lhs.span);
+        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(0)), lhs.span);
+        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
+        self.start_block(after_block);
+        RValue::Temp(cfg::Value::Reg(result))
+    }
+
+    fn build_or(&mut self, lhs: &t::TypedExpr, rhs: &t::TypedExpr) -> RValue {
+        let built_lhs = self.build_expr(lhs);
+        let rhs_block = self.new_block();
+        let reset_block = self.new_block();
+        let after_block = self.new_block();
+        let result = self.new_register(t::Type::Bool);
+        let link = cfg::BlockLink::Strong(rhs_block);
+        self.end_block(cfg::BlockEnd::Branch(built_lhs.as_value(), reset_block, rhs_block), link);
+        self.start_block(rhs_block);
+        self.drop_value(&built_lhs, lhs.span);
+        let built_rhs = self.build_expr(rhs);
+        self.emit_instruction(cfg::Instruction::Assign(result, built_rhs.as_value()), rhs.span);
+        self.drop_value(&built_rhs, rhs.span);
+        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
+        self.start_block(reset_block);
+        self.drop_value(&built_lhs, lhs.span);
+        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(1)), lhs.span);
+        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
+        self.start_block(after_block);
+        RValue::Temp(cfg::Value::Reg(result))
     }
 }
 
