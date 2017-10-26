@@ -65,6 +65,7 @@ pub enum Value {
     Int(u64),
     Reg(Reg),
     Symbol(Symbol, Vec<Type>),
+    Bytes(Vec<u8>),
     Error,
 }
 
@@ -186,6 +187,7 @@ pub(crate) mod printer {
                     write!(f, "{}", self.ctx.symbols.get_name(sym))?;
                     write_type_list(f, params, self.ctx)
                 }
+                Value::Bytes(_) => write!(f, "<bytes>"),
             }
         }
     }

@@ -388,7 +388,12 @@ impl<'a> Builder<'a> {
                 },
                 t::Literal::Char(c) => cfg::Value::Int(c as u64),
                 t::Literal::Number(n) => cfg::Value::Int(n.value),
-                t::Literal::Str(_) => unimplemented!(),
+                t::Literal::Str(ref bytes) => {
+                    let mut bytes = bytes.clone();
+                    // add null terminator
+                    bytes.push(0);
+                    cfg::Value::Bytes(bytes)
+                }
             }),
             t::Expr::Name(name, ref type_params) => {
                 let name = Spanned::into_value(name);
