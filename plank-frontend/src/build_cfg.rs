@@ -117,6 +117,12 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&val, target_span);
             }
+            LValue::Reg(reg, ref fields) if fields.is_empty() => {
+                self.emit_instruction(
+                    cfg::Instruction::Assign(reg, value),
+                    target_span
+                );
+            }
             LValue::Reg(reg, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::FieldStore(reg, fields, value),

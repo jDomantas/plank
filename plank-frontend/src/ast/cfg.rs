@@ -183,7 +183,7 @@ pub(crate) mod printer {
                 Value::Int(i) => write!(f, "{}", i),
                 Value::Reg(reg) => write!(f, "r{}", reg.0),
                 Value::Symbol(sym, ref params) => {
-                    write!(f, "{:?}", self.ctx.symbols.get_name(sym))?;
+                    write!(f, "{}", self.ctx.symbols.get_name(sym))?;
                     write_type_list(f, params, self.ctx)
                 }
             }
@@ -291,8 +291,8 @@ pub(crate) mod printer {
     }
 
     pub(crate) fn print_program(program: &Program, ctx: &CompileCtx) {
-        for (id, f) in &program.functions {
-            println!("function {:?}", id);
+        for (&id, f) in &program.functions {
+            println!("function {}", ctx.symbols.get_name(id));
             print_function(f, ctx);
             println!();
         }
