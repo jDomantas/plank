@@ -140,7 +140,7 @@ fn emit_value<W: Write>(val: &ir::Value, out: &mut W) -> io::Result<()> {
             write!(out, "\"")?;
             for &byte in bytes {
                 if byte < 32 || byte > 126 {
-                    write!(out, "\\x{:x}", byte)?;
+                    write!(out, "\\x{:0>2x}", byte)?;
                 } else if byte == b'"' {
                     write!(out, "\\\"")?;
                 } else {
