@@ -3,8 +3,8 @@ use ast::cfg::{Symbol, Type, Size};
 use ast::typed::Struct;
 
 
-const POINTER_SIZE: u32 = 4;
-const FN_POINTER_SIZE: u32 = 4;
+const POINTER_SIZE: u32 = ::plank_ir::ir::POINTER_SIZE;
+const FUNCTION_SIZE: u32 = ::plank_ir::ir::FUNCTION_SIZE;
 
 pub struct LayoutEngine<'a> {
     structs: &'a HashMap<Symbol, Struct>,
@@ -32,7 +32,7 @@ impl<'a> LayoutEngine<'a> {
             Type::Bool => Some((1, 1)),
             Type::Error => None,
             Type::Pointer(_) => Some((POINTER_SIZE, POINTER_SIZE)),
-            Type::Function(_, _) => Some((FN_POINTER_SIZE, FN_POINTER_SIZE)),
+            Type::Function(_, _) => Some((FUNCTION_SIZE, FUNCTION_SIZE)),
             Type::Int(_, Size::Bit8) => Some((1, 1)),
             Type::Int(_, Size::Bit16) => Some((2, 2)),
             Type::Int(_, Size::Bit32) => Some((4, 4)),

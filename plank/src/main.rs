@@ -99,6 +99,7 @@ fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Resul
         Command::EmitIr => {
             let ir = emit_ir(input)?;
             plank_ir::emit_program(&ir, output)?;
+            plank_ir::validate_ir(&ir);
             Ok(())
         }
     }

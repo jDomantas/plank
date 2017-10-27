@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 
+pub const POINTER_SIZE: u32 = 4;
+pub const FUNCTION_SIZE: u32 = 4;
+
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub struct Symbol(pub Rc<str>);
 

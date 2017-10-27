@@ -148,9 +148,9 @@ fn emit_value<W: Write>(val: &ir::Value, out: &mut W) -> io::Result<()> {
         }
         ir::Value::Int(value, size) => {
             match size {
-                ir::Size::Bit8 => write!(out, "{}{{8}}", value),
-                ir::Size::Bit16 => write!(out, "{}{{16}}", value),
-                ir::Size::Bit32 => write!(out, "{}{{32}}", value),
+                ir::Size::Bit8 => write!(out, "{}_b8", value),
+                ir::Size::Bit16 => write!(out, "{}_b16", value),
+                ir::Size::Bit32 => write!(out, "{}_b32", value),
             }
         }
         ir::Value::Reg(reg) => {
