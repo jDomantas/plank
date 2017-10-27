@@ -46,7 +46,14 @@ impl<'a> Builder<'a> {
         let parameters = self.function
             .parameters
             .iter()
-            .map(|r| ir::Reg(r.0))
+            .filter_map(|r| {
+                let reg = ir::Reg(r.0);
+                if self.registers[&reg].size > 0 {
+                    Some(reg)
+                } else {
+                    None
+                }
+            })
             .collect();
         let mut blocks = HashMap::new();
         for (&id, block) in &self.function.blocks {
@@ -54,6 +61,7 @@ impl<'a> Builder<'a> {
             let block = self.build_block(block);
             blocks.insert(ir_id, block);
         }
+        self.registers.retain(|_, layout| layout.size > 0);
         ir::Function {
             blocks,
             start_block: ir::BlockId(self.function.start_block.0),
@@ -82,7 +90,11 @@ impl<'a> Builder<'a> {
                 ir::BlockEnd::Jump(ir::BlockId(id.0))
             }
             cfg::BlockEnd::Return(ref val) => {
-                ir::BlockEnd::Return(self.convert_value(val))
+                if self.is_zero_sized_value(val) {
+                    ir::BlockEnd::ReturnProc
+                } else {
+                    ir::BlockEnd::Return(self.convert_value(val))
+                }
             }
         };
         ir::Block {
