@@ -19,6 +19,7 @@ pub struct Layout {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub parameters: Vec<Reg>,
+    pub output_layout: Option<Layout>,
     pub registers: HashMap<Reg, Layout>,
     pub blocks: HashMap<BlockId, Block>,
     pub start_block: BlockId,

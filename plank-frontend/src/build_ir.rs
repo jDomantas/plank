@@ -61,9 +61,17 @@ impl<'a> Builder<'a> {
             let block = self.build_block(block);
             blocks.insert(ir_id, block);
         }
+        let out_type = self.function.out_type.replace(&self.type_params);
+        let (s, a) = self.layouts.size_align(&out_type).unwrap();
+        let output_layout = if s == 0 {
+            None
+        } else {
+            Some(ir::Layout { size: s, align: a })
+        };
         self.registers.retain(|_, layout| layout.size > 0);
         ir::Function {
             blocks,
+            output_layout,
             start_block: ir::BlockId(self.function.start_block.0),
             parameters,
             registers: ::std::mem::replace(&mut self.registers, HashMap::new()),

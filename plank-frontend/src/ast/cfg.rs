@@ -15,6 +15,7 @@ pub struct Function {
     pub complete_span: Span,
     pub type_params: Vec<Symbol>,
     pub parameters: Vec<Reg>,
+    pub out_type: Type,
     pub registers: HashMap<Reg, Type>,
     pub blocks: HashMap<BlockId, Block>,
     pub start_block: BlockId,

@@ -18,7 +18,12 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
         first = false;
         write!(out, "%{}", param.0)?;
     }
-    writeln!(out, ")")?;
+    write!(out, ")")?;
+    if let Some(layout) = func.output_layout {
+        writeln!(out, ": {{ {}, {} }}", layout.size, layout.align)?;
+    } else {
+        writeln!(out)?;
+    }
     for (reg, layout) in &func.registers {
         writeln!(out, "    register %{}: size {}, align {}", reg.0, layout.size, layout.align)?;
     }

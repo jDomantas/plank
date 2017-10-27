@@ -25,7 +25,7 @@ fn generate_constructor(s: &Struct) -> Function {
         .map(|&s| t::Type::Concrete(s, Vec::new().into()))
         .collect::<Vec<_>>()
         .into());
-    registers.insert(Reg(0), complete_type);
+    registers.insert(Reg(0), complete_type.clone());
     let block = Block {
         ops,
         link: BlockLink::None,
@@ -38,6 +38,7 @@ fn generate_constructor(s: &Struct) -> Function {
         parameters,
         registers,
         type_params: s.type_params.clone(),
+        out_type: complete_type,
         start_block: BlockId(0),
         blocks,
     }

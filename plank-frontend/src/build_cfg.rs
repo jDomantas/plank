@@ -565,6 +565,7 @@ fn compile_fn(f: &t::Function, ctx: &mut CompileCtx) -> cfg::Function {
         complete_span: f.complete_span,
         type_params: f.type_params.clone(),
         registers: builder.registers,
+        out_type: f.return_type.clone(),
         blocks: builder.blocks,
         start_block,
     }
