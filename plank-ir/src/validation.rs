@@ -108,7 +108,7 @@ impl<'a> Context<'a> {
             Instruction::Load(dest, reg, offset) => {
                 let dest_size = self.register_size(dest);
                 let reg_size = self.register_size(reg);
-                assert!(dest_size >= reg_size + offset);
+                assert!(dest_size + offset <= reg_size);
             }
             Instruction::Store(reg, offset, ref value) => {
                 let reg_size = self.register_size(reg);
