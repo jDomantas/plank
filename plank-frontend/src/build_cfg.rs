@@ -12,7 +12,7 @@ struct LoopDescr {
 
 enum LValue {
     Reg(cfg::Reg, Vec<usize>),
-    Deref(RValue, Vec<usize>),
+    Deref(RValue, t::Type, Vec<usize>),
     Invalid,
     Error,
 }
@@ -20,7 +20,7 @@ enum LValue {
 impl LValue {
     fn add_field(&mut self, index: usize) {
         match *self {
-            LValue::Reg(_, ref mut fields) | LValue::Deref(_, ref mut fields) => fields.push(index),
+            LValue::Reg(_, ref mut fields) | LValue::Deref(_, _, ref mut fields) => fields.push(index),
             LValue::Error | LValue::Invalid => {}
         }
     }
@@ -110,9 +110,9 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(val, fields) => {
+            LValue::Deref(val, typ, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::DerefStore(val.as_value(), fields, value),
+                    cfg::Instruction::DerefStore(val.as_value(), typ, fields, value),
                     target_span,
                 );
                 self.drop_value(&val, target_span);
@@ -142,7 +142,7 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(ref val, ref fields) if fields.is_empty() => {
+            LValue::Deref(ref val, _, ref fields) if fields.is_empty() => {
                 self.emit_instruction(
                     cfg::Instruction::Assign(
                         target,
@@ -152,11 +152,11 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(val, value_span);
             }
-            LValue::Deref(val, fields) => {
+            LValue::Deref(val, typ, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::UnaryOp(
                         target,
-                        cfg::UnaryOp::OffsetAddress(fields),
+                        cfg::UnaryOp::OffsetAddress(typ, fields),
                         val.as_value(),
                     ),
                     value_span,
@@ -365,39 +365,44 @@ impl<'a> Builder<'a> {
                     .collect::<Vec<_>>();
                 let param_values = params.iter().map(|p| p.as_value()).collect();
                 let target = self.new_register(e.typ.clone());
-                let instr = match callee {
-                    RValue::Temp(cfg::Value::Symbol(sym, ref types)) => {
-                        cfg::Instruction::Call(target, sym, types.clone(), param_values)
-                    }
-                    ref val => cfg::Instruction::VirtualCall(target, val.as_value(), param_values),
-                };
+                let instr = cfg::Instruction::Call(target, callee.as_value(), param_values);
                 self.emit_instruction(instr, e.span);
                 self.drop_value(&callee, name.span);
+                for param in &params {
+                    self.drop_value(param, name.span);
+                }
                 RValue::Temp(cfg::Value::Reg(target))
             }
             t::Expr::Error => RValue::Temp(cfg::Value::Error),
             t::Expr::Field(ref expr, index) => {
-                let expr = self.build_expr(expr);
+                let c_expr = self.build_expr(expr);
                 let target = self.new_register(e.typ.clone());
                 self.emit_instruction(
                     cfg::Instruction::UnaryOp(
                         target,
-                        cfg::UnaryOp::FieldLoad(vec![Spanned::into_value(index)]),
-                        expr.as_value(),
+                        cfg::UnaryOp::FieldLoad(expr.typ.clone(), vec![Spanned::into_value(index)]),
+                        c_expr.as_value(),
                     ),
                     e.span,
                 );
-                self.drop_value(&expr, e.span);
+                self.drop_value(&c_expr, e.span);
                 RValue::Temp(cfg::Value::Reg(target))
             }
             t::Expr::Literal(ref literal) => RValue::Temp(match *literal {
                 t::Literal::Bool(b) => if b {
-                    cfg::Value::Int(1)
+                    cfg::Value::Int(1, cfg::Size::Bit8)
                 } else {
-                    cfg::Value::Int(0)
+                    cfg::Value::Int(0, cfg::Size::Bit8)
                 },
-                t::Literal::Char(c) => cfg::Value::Int(c as u64),
-                t::Literal::Number(n) => cfg::Value::Int(n.value),
+                t::Literal::Char(c) => cfg::Value::Int(c as u64, cfg::Size::Bit8),
+                t::Literal::Number(n) => {
+                    let size = match e.typ {
+                        t::Type::Int(_, size) => size,
+                        t::Type::Error => return RValue::Temp(cfg::Value::Error),
+                        _ => panic!("bad int type"),
+                    };
+                    cfg::Value::Int(n.value, size)
+                }
                 t::Literal::Str(ref bytes) => {
                     let mut bytes = bytes.clone();
                     // add null terminator
@@ -463,7 +468,7 @@ impl<'a> Builder<'a> {
             t::Expr::Unary(op, ref expr) => match Spanned::into_value(op) {
                 t::UnaryOp::Deref => {
                     let ptr = self.build_expr(expr);
-                    LValue::Deref(ptr, Vec::new())
+                    LValue::Deref(ptr, expr.typ.clone(), Vec::new())
                 }
                 _ => LValue::Invalid,
             },
@@ -486,7 +491,7 @@ impl<'a> Builder<'a> {
         self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
-        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(0)), lhs.span);
+        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(0, cfg::Size::Bit8)), lhs.span);
         self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
         self.start_block(after_block);
         RValue::Temp(cfg::Value::Reg(result))
@@ -508,7 +513,7 @@ impl<'a> Builder<'a> {
         self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
-        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(1)), lhs.span);
+        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(1, cfg::Size::Bit8)), lhs.span);
         self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
         self.start_block(after_block);
         RValue::Temp(cfg::Value::Reg(result))

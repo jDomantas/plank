@@ -6,3 +6,4 @@ authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 [dependencies]
 plank-errors = { path = "../plank-errors" }
 plank-syntax = { path = "../plank-syntax" }
+plank-ir = { path = "../plank-ir" }

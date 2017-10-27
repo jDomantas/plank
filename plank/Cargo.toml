@@ -7,4 +7,5 @@ authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 plank-errors = { path = "../plank-errors" }
 plank-syntax = { path = "../plank-syntax" }
 plank-frontend = { path = "../plank-frontend" }
+plank-ir = { path = "../plank-ir" }
 clap = "2.26.2"

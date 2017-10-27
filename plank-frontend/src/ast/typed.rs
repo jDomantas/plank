@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
 use plank_syntax::position::{Span, Spanned};
@@ -51,6 +52,42 @@ pub enum Type {
     Pointer(Rc<Type>),
     Function(Rc<[Type]>, Rc<Type>),
     Error,
+}
+
+impl Type {
+    pub fn replace(&self, mapping: &HashMap<Symbol, Type>) -> Type {
+        match *self {
+            Type::Bool |
+            Type::Error |
+            Type::Int(_, _) |
+            Type::Var(_) => self.clone(),
+            Type::Concrete(sym, ref params) => {
+                if let Some(typ) = mapping.get(&sym).cloned() {
+                    typ
+                } else {
+                    let params = params
+                        .iter()
+                        .map(|ty| ty.replace(mapping))
+                        .collect::<Vec<_>>()
+                        .into();
+                    Type::Concrete(sym, params)
+                }
+            }
+            Type::Function(ref params, ref out) => {
+                let params = params
+                    .iter()
+                    .map(|ty| ty.replace(mapping))
+                    .collect::<Vec<_>>()
+                    .into();
+                let out = out.replace(mapping);
+                Type::Function(params, Rc::new(out))
+            }
+            Type::Pointer(ref to) => {
+                let to = to.replace(mapping);
+                Type::Pointer(Rc::new(to))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

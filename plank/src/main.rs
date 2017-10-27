@@ -2,6 +2,7 @@ extern crate clap;
 extern crate plank_errors;
 extern crate plank_syntax;
 extern crate plank_frontend;
+extern crate plank_ir;
 
 mod ast_printer;
 
@@ -96,7 +97,9 @@ fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Resul
             Ok(())
         }
         Command::EmitIr => {
-            emit_ir(input)
+            let ir = emit_ir(input)?;
+            plank_ir::emit_program(&ir, output)?;
+            Ok(())
         }
     }
 }
@@ -206,16 +209,19 @@ fn parse(source: &str) -> Result<plank_syntax::ast::Program> {
     }
 }
 
-fn emit_ir(source: &str) -> Result<()> {
+fn emit_ir(source: &str) -> Result<plank_ir::Program> {
     let reporter = plank_errors::Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
-    plank_frontend::compile(&program, reporter.clone());
-    let mut diagnostics = reporter.get_diagnostics();
-    if diagnostics.is_empty() {
-        Ok(())
-    } else {
-        diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
-        Err(Error::Build(diagnostics))
+    match plank_frontend::compile(&program, reporter.clone()) {
+        Ok(ir) => {
+            Ok(ir)
+        }
+        Err(()) => {
+            let mut diagnostics = reporter.get_diagnostics();
+            assert!(reporter.has_errors());
+            diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
+            Err(Error::Build(diagnostics))
+        }
     }
 }

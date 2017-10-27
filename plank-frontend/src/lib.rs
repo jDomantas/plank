@@ -1,5 +1,6 @@
 extern crate plank_errors;
 extern crate plank_syntax;
+extern crate plank_ir;
 
 mod ast {
     pub mod resolved;
@@ -15,6 +16,8 @@ mod build_cfg;
 mod dead_code;
 mod return_check;
 mod gen_constructors;
+mod struct_layout;
+mod build_ir;
 
 use plank_errors::Reporter;
 use plank_syntax::ast::Program;
@@ -27,7 +30,7 @@ struct CompileCtx {
     reporter: Reporter,
 }
 
-pub fn compile(program: &Program, reporter: Reporter) {
+pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Program, ()> {
     let mut ctx = CompileCtx {
         symbols: Default::default(),
         reporter,
@@ -41,5 +44,10 @@ pub fn compile(program: &Program, reporter: Reporter) {
     dead_code::remove_dead_code(&mut cfg, &mut ctx);
     return_check::check_returns(&cfg, &mut ctx);
     gen_constructors::add_constructors(&mut cfg);
-    ast::cfg::printer::print_program(&cfg, &ctx);
+    // ast::cfg::printer::print_program(&cfg, &ctx);
+    if ctx.reporter.has_errors() {
+        Err(())
+    } else {
+        Ok(build_ir::build_ir(&cfg, &ctx))
+    }
 }

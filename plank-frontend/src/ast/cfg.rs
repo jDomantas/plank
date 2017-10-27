@@ -49,10 +49,9 @@ pub enum Instruction {
     Drop(Reg),
     BinaryOp(Reg, BinaryOp, Value, Value),
     UnaryOp(Reg, UnaryOp, Value),
-    Call(Reg, Symbol, Vec<Type>, Vec<Value>),
-    VirtualCall(Reg, Value, Vec<Value>),
+    Call(Reg, Value, Vec<Value>),
     /// (*value1).field1.field2... = value1
-    DerefStore(Value, Vec<usize>, Value),
+    DerefStore(Value, Type, Vec<usize>, Value),
     /// reg.field1.field2... = value
     FieldStore(Reg, Vec<usize>, Value),
     /// reg = &reg.field1.field2...
@@ -62,7 +61,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone)]
 pub enum Value {
-    Int(u64),
+    Int(u64, Size),
     Reg(Reg),
     Symbol(Symbol, Vec<Type>),
     Bytes(Vec<u8>),
@@ -98,9 +97,9 @@ pub enum UnaryOp {
     Not,
     DerefLoad,
     /// <arg>.field1.field2...
-    FieldLoad(Vec<usize>),
+    FieldLoad(Type, Vec<usize>),
     /// &(*<arg>).field1.field2...
-    OffsetAddress(Vec<usize>),
+    OffsetAddress(Type, Vec<usize>),
 }
 
 
@@ -181,7 +180,7 @@ pub(crate) mod printer {
         fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
             match *self.value {
                 Value::Error => write!(f, "?"),
-                Value::Int(i) => write!(f, "{}", i),
+                Value::Int(i, _) => write!(f, "{}", i),
                 Value::Reg(reg) => write!(f, "r{}", reg.0),
                 Value::Symbol(sym, ref params) => {
                     write!(f, "{}", self.ctx.symbols.get_name(sym))?;
@@ -263,7 +262,7 @@ pub(crate) mod printer {
                 UnaryOp::DerefLoad => {
                     write!(f, "deref")
                 }
-                UnaryOp::FieldLoad(ref fields) => {
+                UnaryOp::FieldLoad(_, ref fields) => {
                     write!(f, "load_field ")?;
                     for field in fields {
                         write!(f, ".{}", field)?;
@@ -277,7 +276,7 @@ pub(crate) mod printer {
                 UnaryOp::Not => {
                     write!(f, "not")
                 }
-                UnaryOp::OffsetAddress(ref fields) => {
+                UnaryOp::OffsetAddress(_, ref fields) => {
                     write!(f, "field_offset ")?;
                     for field in fields {
                         write!(f, ".{}", field)?;
@@ -324,8 +323,8 @@ pub(crate) mod printer {
             Instruction::BinaryOp(reg, ref op, ref a, ref b) => {
                 println!("    r{} = {} {} {}", reg.0, db(op), d(a, ctx), d(b, ctx));
             }
-            Instruction::Call(dest, sym, ref _types, ref params) => {
-                print!("    r{} = call {}", dest.0, ctx.symbols.get_name(sym));
+            Instruction::Call(dest, ref val, ref params) => {
+                print!("    r{} = call {}", dest.0, d(val, ctx));
                 print!("(");
                 let mut first = true;
                 for param in params {
@@ -335,18 +334,7 @@ pub(crate) mod printer {
                 }
                 println!(")");
             }
-            Instruction::VirtualCall(dest, ref val, ref params) => {
-                print!("    r{} = virt_call {}", dest.0, d(val, ctx));
-                print!("(");
-                let mut first = true;
-                for param in params {
-                    if !first { print!(",") }
-                    first = false;
-                    print!("{}", d(param, ctx));
-                }
-                println!(")");
-            }
-            Instruction::DerefStore(ref dest, ref fields, ref value) => {
+            Instruction::DerefStore(ref dest, _, ref fields, ref value) => {
                 print!("    deref_store {} ", d(dest, ctx));
                 for field in fields {
                     print!(".{}", field);
