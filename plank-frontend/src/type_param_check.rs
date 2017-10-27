@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use plank_syntax::position::Spanned;
-use ast::resolved::{Expr, Function, Program, Statement, Struct, Symbol, Type};
+use ast::resolved::{Expr, Function, Program, Statement, Struct, Symbol, Type, FunctionType};
 use CompileCtx;
 
 
@@ -39,6 +39,15 @@ impl<'a> Context<'a> {
                 Spanned::into_value(fn_.name.name),
                 fn_.name.type_params.len(),
             );
+
+            if fn_.fn_type == FunctionType::Extern && !fn_.name.type_params.is_empty() {
+                let span = Spanned::span(&fn_.name.name);
+                self.ctx
+                    .reporter
+                    .error("`extern` functions cannot have type parameters", span)
+                    .span(span)
+                    .build();
+            }
         }
 
         for struct_ in &mut program.structs {

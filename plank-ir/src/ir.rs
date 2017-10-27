@@ -25,7 +25,7 @@ pub struct Function {
     pub output_layout: Option<Layout>,
     pub registers: HashMap<Reg, Layout>,
     pub blocks: HashMap<BlockId, Block>,
-    pub start_block: BlockId,
+    pub start_block: Option<BlockId>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]

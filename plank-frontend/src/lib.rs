@@ -44,7 +44,6 @@ pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Progra
     dead_code::remove_dead_code(&mut cfg, &mut ctx);
     return_check::check_returns(&cfg, &mut ctx);
     gen_constructors::add_constructors(&mut cfg);
-    // ast::cfg::printer::print_program(&cfg, &ctx);
     if ctx.reporter.has_errors() {
         Err(())
     } else {

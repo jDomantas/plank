@@ -27,8 +27,11 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
     for (reg, layout) in &func.registers {
         writeln!(out, "    register %{}: size {}, align {}", reg.0, layout.size, layout.align)?;
     }
+    if func.start_block.is_none() {
+        return Ok(());
+    }
     writeln!(out, "start:")?;
-    writeln!(out, "    goto label_{}:", func.start_block.0)?;
+    writeln!(out, "    goto label_{}:", func.start_block.unwrap().0)?;
     for (id, block) in &func.blocks {
         writeln!(out, "label_{}:", id.0)?;
         for op in &block.ops {

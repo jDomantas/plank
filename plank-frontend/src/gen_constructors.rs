@@ -39,7 +39,7 @@ fn generate_constructor(s: &Struct) -> Function {
         registers,
         type_params: s.type_params.clone(),
         out_type: complete_type,
-        start_block: BlockId(0),
+        start_block: Some(BlockId(0)),
         blocks,
     }
 }

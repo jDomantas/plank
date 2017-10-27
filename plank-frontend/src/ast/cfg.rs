@@ -18,7 +18,7 @@ pub struct Function {
     pub out_type: Type,
     pub registers: HashMap<Reg, Type>,
     pub blocks: HashMap<BlockId, Block>,
-    pub start_block: BlockId,
+    pub start_block: Option<BlockId>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
@@ -301,11 +301,13 @@ pub(crate) mod printer {
     }
 
     fn print_function(f: &Function, ctx: &CompileCtx) {
-        println!("start:");
-        println!("    goto label_{}", f.start_block.0);
-        for (id, block) in &f.blocks {
-            println!("label_{}:", id.0);
-            print_block(block, ctx);
+        if let Some(block) = f.start_block {
+            println!("start:");
+            println!("    goto label_{}", block.0);
+            for (id, block) in &f.blocks {
+                println!("label_{}:", id.0);
+                print_block(block, ctx);
+            }
         }
     }
 

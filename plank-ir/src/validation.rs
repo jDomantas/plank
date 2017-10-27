@@ -25,7 +25,9 @@ impl<'a> Context<'a> {
         for &reg in &self.function.parameters {
             assert!(self.function.registers.contains_key(&reg));
         }
-        assert!(self.function.blocks.contains_key(&self.function.start_block));
+        if let Some(block) = self.function.start_block {
+            assert!(self.function.blocks.contains_key(&block));
+        }
         for block in self.function.blocks.values() {
             self.validate_block(block);
         }

@@ -69,10 +69,11 @@ impl<'a> Builder<'a> {
             Some(ir::Layout { size: s, align: a })
         };
         self.registers.retain(|_, layout| layout.size > 0);
+        let start_block = self.function.start_block.map(|b| ir::BlockId(b.0));
         ir::Function {
             blocks,
             output_layout,
-            start_block: ir::BlockId(self.function.start_block.0),
+            start_block,
             parameters,
             registers: ::std::mem::replace(&mut self.registers, HashMap::new()),
         }
@@ -440,6 +441,9 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
     }
     loop {
         let (symbol, sym, types) = if let Some(symbol) = queue.keys().next().cloned() {
+            if functions.contains_key(&symbol) {
+                continue;
+            }
             let (sym, t) = queue.remove(&symbol).unwrap();
             (symbol, sym, t)
         } else {

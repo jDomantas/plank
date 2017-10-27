@@ -6,7 +6,11 @@ use CompileCtx;
 
 fn function_block_chain(f: &Function) -> VecDeque<BlockId> {
     let mut blocks = VecDeque::new();
-    let mut current = f.start_block;
+    let mut current = if let Some(block) = f.start_block {
+        block
+    } else {
+        return blocks;
+    };
     loop {
         blocks.push_back(current);
         match f.blocks[&current].link {
@@ -42,7 +46,9 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
     let mut reachable = HashSet::new();
     let mut strong_reachable = None;
     let mut queue = VecDeque::new();
-    queue.push_back(f.start_block);
+    if let Some(block) = f.start_block {
+        queue.push_back(block);
+    }
     let mut follow_strong = false;
     while !queue.is_empty() {
         while let Some(block) = queue.pop_front() {
@@ -78,7 +84,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
             }
         }
     }
-    let strong_reachable = strong_reachable.unwrap();
+    let strong_reachable = strong_reachable.unwrap_or_default();
     f.blocks.retain(|k, _| strong_reachable.contains(k));
 }
 

@@ -185,20 +185,22 @@ impl<'a> Builder<'a> {
         self.blocks.insert(id, block);
     }
 
-    fn build_function(&mut self, f: &t::Function) -> cfg::BlockId {
+    fn build_function(&mut self, f: &t::Function) -> Option<cfg::BlockId> {
         for var in &f.params {
             let param = self.new_var_register(var.name, var.typ.clone());
             self.parameters.push(param);
         }
-        let body_block = self.new_block();
-        self.start_block(body_block);
         if let Some(ref body) = f.body {
+            let body_block = self.new_block();
+            self.start_block(body_block);
             self.build_statement(body);
+            if self.current_block.is_some() {
+                self.end_block(cfg::BlockEnd::Error, cfg::BlockLink::None);
+            }
+            Some(body_block)
+        } else {
+            None
         }
-        if self.current_block.is_some() {
-            self.end_block(cfg::BlockEnd::Error, cfg::BlockLink::None);
-        }
-        body_block
     }
 
     fn build_statement(&mut self, s: &Spanned<t::Statement>) {
