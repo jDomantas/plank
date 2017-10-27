@@ -441,10 +441,10 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
     }
     loop {
         let (symbol, sym, types) = if let Some(symbol) = queue.keys().next().cloned() {
+            let (sym, t) = queue.remove(&symbol).unwrap();
             if functions.contains_key(&symbol) {
                 continue;
             }
-            let (sym, t) = queue.remove(&symbol).unwrap();
             (symbol, sym, t)
         } else {
             break;
