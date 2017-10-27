@@ -113,7 +113,7 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
             }
             Type::Error => write!(f, "_"),
             Type::Function(ref params, ref out) => {
-                write!(f, "(")?;
+                write!(f, "fn(")?;
                 for (index, param) in params.iter().enumerate() {
                     if index > 0 {
                         write!(f, ", ")?;
