@@ -276,6 +276,7 @@ impl<'a> Resolver<'a> {
     fn resolve_type(&mut self, typ: &Spanned<p::Type>) -> Spanned<r::Type> {
         let span = Spanned::span(typ);
         let typ = match **typ {
+            p::Type::Unit => r::Type::Unit,
             p::Type::Bool => r::Type::Bool,
             p::Type::I8 => r::Type::I8,
             p::Type::U8 => r::Type::U8,

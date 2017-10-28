@@ -167,6 +167,7 @@ impl Formatter {
 
     fn format_type(&mut self, t: &Type) {
         match *t {
+            Type::Unit => self.fmt.write_symbol("unit"),
             Type::Bool => self.fmt.write_symbol("bool"),
             Type::I8 => self.fmt.write_symbol("i8"),
             Type::U8 => self.fmt.write_symbol("u8"),
@@ -346,6 +347,9 @@ impl Formatter {
 
     fn format_literal(&mut self, l: &Literal) {
         match *l {
+            Literal::Unit => {
+                self.fmt.write_symbol("unit");
+            }
             Literal::Bool(true) => {
                 self.fmt.write_symbol("true");
             }

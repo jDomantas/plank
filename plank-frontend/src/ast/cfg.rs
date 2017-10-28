@@ -68,6 +68,7 @@ pub enum Value {
     Reg(Reg),
     Symbol(Symbol, Vec<Type>),
     Bytes(Vec<u8>),
+    Unit,
     Error,
 }
 
@@ -135,6 +136,7 @@ pub(crate) mod printer {
         ctx: &CompileCtx,
     ) -> ::std::fmt::Result {
         match *ty {
+            Type::Unit => write!(f, "unit"),
             Type::Bool => write!(f, "bool"),
             Type::Concrete(sym, ref params) => {
                 write!(f, "{}", ctx.symbols.get_name(sym))?;
@@ -181,6 +183,7 @@ pub(crate) mod printer {
         fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
             match *self.value {
                 Value::Error => write!(f, "?"),
+                Value::Unit => write!(f, "unit"),
                 Value::Int(i, _) => write!(f, "{}", i),
                 Value::Reg(reg) => write!(f, "r{}", reg.0),
                 Value::Symbol(sym, ref params) => {

@@ -86,6 +86,7 @@ impl UnifyTable {
             (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
             (Type::Bool, Type::Bool) => Ok(()),
+            (Type::Unit, Type::Unit) => Ok(()),
             (Type::Error, _) | (_, Type::Error) => Ok(()),
             (_, _) => Err(()),
         }
@@ -149,7 +150,7 @@ impl UnifyTable {
     fn occurs(&mut self, var: TypeVar, typ: &Type) -> bool {
         let typ = self.shallow_normalize(typ);
         match typ {
-            Type::Bool | Type::Error | Type::Int(_, _) => false,
+            Type::Bool | Type::Error | Type::Int(_, _) | Type::Unit => false,
             Type::Concrete(_, ref params) => {
                 for param in params.iter() {
                     if self.occurs(var, param) {
@@ -188,6 +189,7 @@ impl UnifyTable {
     pub fn normalize(&mut self, a: &Type) -> Result<Type, ()> {
         match self.shallow_normalize(a) {
             Type::Bool => Ok(Type::Bool),
+            Type::Unit => Ok(Type::Unit),
             Type::Concrete(sym, ref params) => {
                 let mut normalized = Vec::new();
                 for param in &**params {

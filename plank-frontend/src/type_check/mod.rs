@@ -45,7 +45,7 @@ impl Scheme {
                     *p = params.into();
                     sym
                 }
-                Type::Bool | Type::Int(_, _) | Type::Error | Type::Var(_) => return,
+                Type::Bool | Type::Int(_, _) | Type::Error | Type::Var(_) | Type::Unit => return,
                 Type::Pointer(ref mut t) => {
                     walk(Rc::make_mut(t), vars, params);
                     return;
@@ -89,6 +89,7 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let typ = self.inferer.unifier.shallow_normalize(self.typ);
         match typ {
+            Type::Unit => write!(f, "unit"),
             Type::Bool => write!(f, "bool"),
             Type::Concrete(sym, ref params) => {
                 write!(f, "{}", self.inferer.ctx.symbols.get_name(sym))?;
@@ -262,6 +263,7 @@ impl<'a> Inferer<'a> {
 
     fn convert_resolved_type(&mut self, typ: &r::Type) -> Type {
         match *typ {
+            r::Type::Unit => Type::Unit,
             r::Type::Bool => Type::Bool,
             r::Type::Wildcard => self.fresh_var(),
             r::Type::I8 => Type::Int(t::Signedness::Signed, t::Size::Bit8),
@@ -295,6 +297,7 @@ impl<'a> Inferer<'a> {
 
     fn type_name(&self, typ: &Type) -> Cow<'static, str> {
         match *typ {
+            Type::Unit => "unit".into(),
             Type::Bool => "a bool".into(),
             Type::Concrete(sym, _) => format!("struct `{}`", self.ctx.symbols.get_name(sym)).into(),
             Type::Error => "error".into(),
@@ -316,6 +319,7 @@ impl<'a> Inferer<'a> {
             r::Literal::Bool(_) => Type::Bool,
             r::Literal::Char(_) => Type::Int(t::Signedness::Unsigned, t::Size::Bit8),
             r::Literal::Str(_) => self.string_type.clone(),
+            r::Literal::Unit => Type::Unit,
         }
     }
 

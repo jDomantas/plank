@@ -323,11 +323,12 @@ impl<'a> Builder<'a> {
 
     fn is_zero_sized_value(&self, value: &cfg::Value) -> bool {
         match *value {
-            cfg::Value::Bytes(_) => false,
-            cfg::Value::Error => panic!("cannot build ir with errors"),
-            cfg::Value::Int(_, _) => false,
-            cfg::Value::Reg(reg) => self.is_zero_sized(reg),
+            cfg::Value::Unit => true,
+            cfg::Value::Bytes(_) |
+            cfg::Value::Int(_, _) |
             cfg::Value::Symbol(_, _) => false,
+            cfg::Value::Reg(reg) => self.is_zero_sized(reg),
+            cfg::Value::Error => panic!("cannot build ir with errors"),
         }
     }
 
@@ -356,6 +357,7 @@ impl<'a> Builder<'a> {
 
     fn write_type(&self, to: &mut String, typ: &cfg::Type) {
         match *typ {
+            cfg::Type::Unit => to.push_str("unit"),
             cfg::Type::Bool => to.push_str("bool"),
             cfg::Type::Error => panic!("cannot build ir with errors"),
             cfg::Type::Var(_) => panic!("cannot build ir with type vars"),
@@ -402,6 +404,7 @@ impl<'a> Builder<'a> {
 
     fn convert_value(&mut self, value: &cfg::Value) -> ir::Value {
         match *value {
+            cfg::Value::Unit => panic!("cannot convert zero sized value"),
             cfg::Value::Bytes(ref bytes) => ir::Value::Bytes(bytes.clone()),
             cfg::Value::Int(value, size) => {
                 let size = match size {

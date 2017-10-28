@@ -404,6 +404,7 @@ fn keyword(s: &str) -> Option<Token> {
         "i32" => Some(Token::Keyword(Keyword::I32)),
         "u32" => Some(Token::Keyword(Keyword::U32)),
         "bool" => Some(Token::Keyword(Keyword::Bool)),
+        "unit" => Some(Token::Keyword(Keyword::Unit)),
         _ => None,
     }
 }

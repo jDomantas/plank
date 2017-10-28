@@ -398,6 +398,7 @@ impl<'a> Builder<'a> {
                 RValue::Temp(cfg::Value::Reg(target))
             }
             t::Expr::Literal(ref literal) => RValue::Temp(match *literal {
+                t::Literal::Unit => cfg::Value::Unit,
                 t::Literal::Bool(b) => if b {
                     cfg::Value::Int(1, cfg::Size::Bit8)
                 } else {

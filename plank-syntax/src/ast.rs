@@ -10,6 +10,7 @@ pub enum Literal {
     Bool(bool),
     Char(u8),
     Str(Vec<u8>),
+    Unit,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
@@ -122,6 +123,7 @@ pub enum Type {
     I32,
     U32,
     Bool,
+    Unit,
     Concrete(Spanned<Ident>, Vec<Spanned<Type>>),
     Pointer(Box<Spanned<Type>>),
     Function(Vec<Spanned<Type>>, Box<Spanned<Type>>),

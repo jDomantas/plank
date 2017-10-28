@@ -59,6 +59,7 @@ impl<'a> LayoutEngine<'a> {
             Type::Int(_, Size::Bit16) => LayoutResult::Ok((2, 2)),
             Type::Int(_, Size::Bit32) => LayoutResult::Ok((4, 4)),
             Type::Var(_) => LayoutResult::Error,
+            Type::Unit => LayoutResult::Ok((0, 1)),
             Type::Concrete(sym, ref params) => {
                 let s = match self.structs.get(&sym) {
                     Some(s) => s,
@@ -98,6 +99,7 @@ impl<'a> LayoutEngine<'a> {
 
     pub fn field_info(&self, ty: &Type, field: usize) -> (u32, Type) {
         match *ty {
+            Type::Unit |
             Type::Bool |
             Type::Error |
             Type::Pointer(_) |

@@ -121,6 +121,7 @@ pub enum Keyword {
     U16,
     I32,
     U32,
+    Unit,
 }
 
 impl fmt::Display for Keyword {
@@ -145,6 +146,7 @@ impl fmt::Display for Keyword {
             Keyword::U16 => write!(f, "u16"),
             Keyword::U32 => write!(f, "u32"),
             Keyword::Bool => write!(f, "bool"),
+            Keyword::Unit => write!(f, "unit"),
         }
     }
 }

@@ -49,6 +49,7 @@ pub struct TypeVar(pub u32);
 pub enum Type {
     Var(TypeVar),
     Bool,
+    Unit,
     Int(Signedness, Size),
     Concrete(Symbol, Rc<[Type]>),
     Pointer(Rc<Type>),
@@ -59,7 +60,7 @@ pub enum Type {
 impl Type {
     pub fn replace(&self, mapping: &HashMap<Symbol, Type>) -> Type {
         match *self {
-            Type::Bool | Type::Error | Type::Int(_, _) | Type::Var(_) => self.clone(),
+            Type::Bool | Type::Error | Type::Int(_, _) | Type::Var(_) | Type::Unit => self.clone(),
             Type::Concrete(sym, ref params) => if let Some(typ) = mapping.get(&sym).cloned() {
                 typ
             } else {

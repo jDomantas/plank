@@ -20,6 +20,7 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     let mut parser = Parser::new(tokens, reporter);
 
     parser.prefix(TokenKind::Literal, &LiteralParser);
+    parser.prefix(TokenKind::Token(Token::Keyword(Keyword::Unit)), &LiteralParser);
     parser.prefix(TokenKind::Ident, &NameParser);
     parser.prefix(
         TokenKind::Token(Token::Ampersand),
@@ -465,7 +466,11 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
         self.expected
             .insert(Expectation::Token(TokenKind::BuiltinType));
-        if self.check(Token::Star) {
+        if self.check(Token::Keyword(Keyword::Unit)) {
+            let span = self.previous_span();
+            let typ = Type::Unit;
+            Ok(Spanned::new(typ, span))
+        } else if self.check(Token::Star) {
             let start = self.previous_span();
             let typ = self.parse_type()?;
             let span = start.merge(Spanned::span(&typ));
@@ -852,6 +857,7 @@ impl PrefixParser for LiteralParser {
             Token::Bool(b) => Literal::Bool(b),
             Token::Char(c) => Literal::Char(c),
             Token::Str(s) => Literal::Str(s),
+            Token::Keyword(Keyword::Unit) => Literal::Unit,
             _ => panic!("expected a literal"),
         };
         let expr = Expr::Literal(literal);
