@@ -78,7 +78,7 @@ impl<'a> Context<'a> {
     }
 
     fn check_type(&mut self, typ: &mut Spanned<Type>) {
-        match *Spanned::value_mut(typ) {
+        match **typ {
             Type::Bool |
             Type::Error |
             Type::I8 |
@@ -120,11 +120,11 @@ impl<'a> Context<'a> {
                 }
             }
         }
-        *Spanned::value_mut(typ) = Type::Error;
+        **typ = Type::Error;
     }
 
     fn check_statement(&mut self, stmt: &mut Spanned<Statement>) {
-        match *Spanned::value_mut(stmt) {
+        match **stmt {
             Statement::Block(ref mut stmts) => for stmt in stmts {
                 self.check_statement(stmt);
             },
@@ -152,7 +152,7 @@ impl<'a> Context<'a> {
     }
 
     fn check_expr(&mut self, expr: &mut Spanned<Expr>) {
-        match *Spanned::value_mut(expr) {
+        match **expr {
             Expr::Binary(ref mut lhs, _, ref mut rhs) => {
                 self.check_expr(lhs);
                 self.check_expr(rhs);
@@ -196,7 +196,7 @@ impl<'a> Context<'a> {
                 }
             }
         }
-        *Spanned::value_mut(expr) = Expr::Error;
+        **expr = Expr::Error;
     }
 }
 

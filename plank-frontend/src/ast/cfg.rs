@@ -313,7 +313,7 @@ pub(crate) mod printer {
 
     fn print_block(block: &Block, ctx: &CompileCtx) {
         for i in &block.ops {
-            print_instruction(Spanned::value(i), ctx);
+            print_instruction(i, ctx);
         }
         print_block_end(&block.end, ctx);
     }

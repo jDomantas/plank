@@ -326,11 +326,11 @@ impl<'a> Inferer<'a> {
     }
 
     fn infer_expr(&mut self, expr: &Spanned<r::Expr>) -> t::TypedExpr {
-        let (typed, typ) = match *Spanned::value(expr) {
+        let (typed, typ) = match **expr {
             r::Expr::Binary(ref lhs, op, ref rhs) => {
                 let lhs = self.infer_expr(lhs);
                 let rhs = self.infer_expr(rhs);
-                let (param_type, out_type) = match Spanned::into_value(op) {
+                let (param_type, out_type) = match *op {
                     BinaryOp::Equal | BinaryOp::NotEqual => (self.fresh_var(), Type::Bool),
                     BinaryOp::Add |
                     BinaryOp::Divide |
@@ -433,7 +433,7 @@ impl<'a> Inferer<'a> {
                                 let msg = format!(
                                     "{} does not have field `{}`",
                                     self.type_name(&expr_type),
-                                    Spanned::value(field)
+                                    **field,
                                 );
                                 self.ctx
                                     .reporter
@@ -456,7 +456,7 @@ impl<'a> Inferer<'a> {
                     typ => {
                         let msg = format!(
                             "no field `{}` on {}",
-                            Spanned::value(field),
+                            **field,
                             self.type_name(&typ)
                         );
                         self.ctx
@@ -620,7 +620,7 @@ impl<'a> Inferer<'a> {
             t::Statement::Let(_, ref mut typ, ref mut value) => {
                 self.normalize_expr(value);
                 match self.unifier.normalize(typ) {
-                    Ok(t) => *Spanned::value_mut(typ) = t,
+                    Ok(t) => **typ = t,
                     Err(()) => {
                         let span = Spanned::span(typ);
                         self.ctx
@@ -628,7 +628,7 @@ impl<'a> Inferer<'a> {
                             .error("could not completely infer type", span)
                             .span(span)
                             .build();
-                        *Spanned::value_mut(typ) = Type::Error;
+                        **typ = Type::Error;
                     }
                 }
             }
@@ -657,7 +657,7 @@ impl<'a> Inferer<'a> {
             t::Expr::Literal(_) => {}
             t::Expr::Name(_, ref mut params) => for param in params {
                 match self.unifier.normalize(param) {
-                    Ok(t) => *Spanned::value_mut(param) = t,
+                    Ok(t) => **param = t,
                     Err(()) => {
                         let span = Spanned::span(param);
                         self.ctx
@@ -665,7 +665,7 @@ impl<'a> Inferer<'a> {
                             .error("could not completely infer type", span)
                             .span(span)
                             .build();
-                        *Spanned::value_mut(param) = Type::Error;
+                        **param = Type::Error;
                     }
                 }
             },

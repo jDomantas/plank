@@ -52,7 +52,7 @@ impl<'a> Context<'a> {
     }
 
     fn check_type(&mut self, typ: &Spanned<Type>) {
-        match *Spanned::value(typ) {
+        match **typ {
             Type::Bool |
             Type::Error |
             Type::I8 |

@@ -24,7 +24,7 @@ fn function_block_chain(f: &Function) -> VecDeque<BlockId> {
 fn report_unreachable(block: &Block, ctx: &mut CompileCtx) {
     let mut span = Spanned::span(&block.ops[0]);
     for i in &block.ops {
-        match *Spanned::value(i) {
+        match **i {
             Instruction::StartStatement => {
                 span = Spanned::span(i);
                 break;

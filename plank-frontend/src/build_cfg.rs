@@ -205,7 +205,7 @@ impl<'a> Builder<'a> {
 
     fn build_statement(&mut self, s: &Spanned<t::Statement>) {
         let span = Spanned::span(s);
-        match *Spanned::value(s) {
+        match **s {
             t::Statement::Block(ref stmts) => {
                 for stmt in stmts {
                     let span = Spanned::span(stmt);
@@ -469,8 +469,7 @@ impl<'a> Builder<'a> {
                 lvalue
             }
             t::Expr::Name(ref name, _) => {
-                let name = Spanned::value(name);
-                if let Some(reg) = self.var_registers.get(&name).cloned() {
+                if let Some(reg) = self.var_registers.get(&**name).cloned() {
                     LValue::Reg(reg, Vec::new())
                 } else {
                     LValue::Invalid

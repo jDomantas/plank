@@ -197,7 +197,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_type(&mut self, typ: &Spanned<p::Type>) -> Spanned<r::Type> {
         let span = Spanned::span(typ);
-        let typ = match *Spanned::value(typ) {
+        let typ = match **typ {
             p::Type::Bool => r::Type::Bool,
             p::Type::I8 => r::Type::I8,
             p::Type::U8 => r::Type::U8,
@@ -262,7 +262,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_statement(&mut self, s: &Spanned<p::Statement>) -> Spanned<r::Statement> {
         let span = Spanned::span(s);
-        let statement: r::Statement = match *Spanned::value(s) {
+        let statement: r::Statement = match **s {
             p::Statement::Block(ref statements) => {
                 self.scopes.push(HashMap::new());
                 let statements = statements
@@ -314,7 +314,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_expr(&mut self, e: &Spanned<p::Expr>) -> Spanned<r::Expr> {
         let span = Spanned::span(e);
-        let expr = match *Spanned::value(e) {
+        let expr = match **e {
             p::Expr::Binary(ref lhs, op, ref rhs) => {
                 let lhs = self.resolve_expr(lhs);
                 let rhs = self.resolve_expr(rhs);
