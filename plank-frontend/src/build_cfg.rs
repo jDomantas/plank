@@ -206,11 +206,20 @@ impl<'a> Builder<'a> {
     fn build_statement(&mut self, s: &Spanned<t::Statement>) {
         let span = Spanned::span(s);
         match *Spanned::value(s) {
-            t::Statement::Block(ref stmts) => for stmt in stmts {
-                let span = Spanned::span(stmt);
-                self.emit_instruction(cfg::Instruction::StartStatement, span);
-                self.build_statement(stmt);
-            },
+            t::Statement::Block(ref stmts) => {
+                for stmt in stmts {
+                    let span = Spanned::span(stmt);
+                    self.emit_instruction(cfg::Instruction::StartStatement, span);
+                    self.build_statement(stmt);
+                }
+                for stmt in stmts {
+                    if let t::Statement::Let(sym, _, _) = **stmt {
+                        let span = Spanned::span(stmt);
+                        let reg = self.var_registers[&sym];
+                        self.emit_instruction(cfg::Instruction::Drop(reg), span);
+                    }
+                }
+            }
             t::Statement::Break => match self.current_loop {
                 Some(LoopDescr { after, .. }) => {
                     let new = self.new_block();
