@@ -438,7 +438,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             ir::Instruction::Load(dest, reg, offset) => {
                 let (to, len) = self.register_address(dest);
                 let (from, _) = self.register_address(reg);
-                self.mem_copy(to, from + offset, len);
+                self.mem_copy(from + offset, to, len);
                 Ok(())
             }
             ir::Instruction::Store(dest, offset, ref value) => {
