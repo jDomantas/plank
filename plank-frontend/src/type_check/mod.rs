@@ -418,55 +418,7 @@ impl<'a> Inferer<'a> {
             r::Expr::Error => (t::Expr::Error, t::Type::Error),
             r::Expr::Field(ref expr, ref field) => {
                 let expr = self.infer_expr(expr);
-                let expr_type = self.unifier.shallow_normalize(&expr.typ);
-                match expr_type {
-                    Type::Concrete(sym, ref params) => {
-                        let res = self.fields.get(&sym).and_then(|f| f.get(&**field));
-                        match res {
-                            Some(&(index, ref scheme)) => {
-                                debug_assert_eq!(scheme.vars.len(), params.len());
-                                let typ = scheme.instantiate(params);
-                                let expr = t::Expr::Field(expr, Spanned::map_ref(field, |_| index));
-                                (expr, typ)
-                            }
-                            None => {
-                                let msg = format!(
-                                    "{} does not have field `{}`",
-                                    self.type_name(&expr_type),
-                                    **field,
-                                );
-                                self.ctx
-                                    .reporter
-                                    .error(msg, Spanned::span(field))
-                                    .span(Spanned::span(field))
-                                    .build();
-                                (t::Expr::Error, Type::Error)
-                            }
-                        }
-                    }
-                    Type::Error => (t::Expr::Error, Type::Error),
-                    Type::Var(_) => {
-                        self.ctx
-                            .reporter
-                            .error("cannot infer the type before field access", expr.span)
-                            .span(expr.span)
-                            .build();
-                        (t::Expr::Error, Type::Error)
-                    }
-                    typ => {
-                        let msg = format!(
-                            "no field `{}` on {}",
-                            **field,
-                            self.type_name(&typ)
-                        );
-                        self.ctx
-                            .reporter
-                            .error(msg, expr.span)
-                            .span(expr.span)
-                            .build();
-                        (t::Expr::Error, Type::Error)
-                    }
-                }
+                self.check_field(expr, field)
             }
             r::Expr::Literal(ref literal) => {
                 let typ = self.infer_literal(literal);
@@ -506,6 +458,68 @@ impl<'a> Inferer<'a> {
             expr: Box::new(typed),
             typ,
             span: Spanned::span(expr),
+        }
+    }
+
+    fn check_field(&mut self, expr: t::TypedExpr, field: &Spanned<String>) -> (t::Expr, Type) {
+        let expr_type = self.unifier.shallow_normalize(&expr.typ);
+        match expr_type {
+            Type::Concrete(sym, ref params) => {
+                let res = self.fields.get(&sym).and_then(|f| f.get(&**field));
+                match res {
+                    Some(&(index, ref scheme)) => {
+                        debug_assert_eq!(scheme.vars.len(), params.len());
+                        let typ = scheme.instantiate(params);
+                        let expr = t::Expr::Field(expr, Spanned::map_ref(field, |_| index));
+                        (expr, typ)
+                    }
+                    None => {
+                        let msg = format!(
+                            "{} does not have field `{}`",
+                            self.type_name(&expr_type),
+                            **field,
+                        );
+                        self.ctx
+                            .reporter
+                            .error(msg, Spanned::span(&field))
+                            .span(Spanned::span(&field))
+                            .build();
+                        (t::Expr::Error, Type::Error)
+                    }
+                }
+            }
+            Type::Error => (t::Expr::Error, Type::Error),
+            Type::Var(_) => {
+                self.ctx
+                    .reporter
+                    .error("cannot infer the type before field access", expr.span)
+                    .span(expr.span)
+                    .build();
+                (t::Expr::Error, Type::Error)
+            }
+            Type::Pointer(ref typ) => {
+                let span = expr.span;
+                let op = Spanned::new(t::UnaryOp::Deref, span);
+                let deref = t::TypedExpr {
+                    expr: Box::new(t::Expr::Unary(op, expr)),
+                    span,
+                    typ: (**typ).clone(),
+                };
+                self.check_field(deref, field)
+            }
+            typ => {
+                let msg = format!(
+                    "no field `{}` on {}",
+                    **field,
+                    self.type_name(&typ)
+                );
+                self.ctx
+                    .reporter
+                    .error(msg, expr.span)
+                    .span(expr.span)
+                    .build();
+                (t::Expr::Error, Type::Error)
+            }
         }
     }
 
