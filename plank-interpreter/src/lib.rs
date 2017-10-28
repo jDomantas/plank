@@ -49,6 +49,7 @@ struct Vm<'a, R, W> {
     memory: Vec<u8>,
     frames: Vec<StackFrame<'a>>,
     current_frame: StackFrame<'a>,
+    strings: HashMap<Vec<u8>, u32>,
 }
 
 impl<'a, R: Read, W: Write> Vm<'a, R, W> {
@@ -70,13 +71,23 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             current_op: 0,
             return_address: Some(0),
         };
+        let mut strings = HashMap::new();
+        let mut memory = vec![0, 0, 0, 0];
+        for f in program.functions.values() {
+            for block in f.blocks.values() {
+                for op in &block.ops {
+                    collect_strings(op, &mut strings, &mut memory);
+                }
+            }
+        }
         let mut vm = Vm {
             input,
             output,
             program,
-            memory: vec![0, 0, 0, 0],
+            memory,
             frames: Vec::new(),
             current_frame: main_frame,
+            strings,
         };
         let regs = vm.allocate_registers(&vm.current_frame.function.registers);
         vm.current_frame.registers = regs;
@@ -148,7 +159,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     panic!("register out of bounds")
                 }
             }
-            ir::Value::Bytes(_) => unimplemented!("string literals"),
+            ir::Value::Bytes(ref s) => self.strings[s],
             ir::Value::Symbol(_) => unimplemented!("virtual calls"),
             _ => panic!("bad 32 bit value"),
         }
@@ -156,7 +167,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
 
     fn read_value(&self, val: &ir::Value) -> Value {
         match *val {
-            ir::Value::Bytes(_) => unimplemented!("string literals"),
+            ir::Value::Bytes(ref s) => Value::DoubleWord(self.strings[s]),
             ir::Value::Int(i, ir::Size::Bit8) => Value::Byte(i as u8),
             ir::Value::Int(i, ir::Size::Bit16) => Value::Word(i as u16),
             ir::Value::Int(i, ir::Size::Bit32) => Value::DoubleWord(i as u32),
@@ -727,5 +738,70 @@ fn bit_op_8(op: ir::BitOp, a: u8, b: u8) -> Value {
         ir::BitOp::And => Value::Byte(a & b),
         ir::BitOp::Or => Value::Byte(a | b),
         ir::BitOp::Xor => Value::Byte(a ^ b),
+    }
+}
+
+fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem: &mut Vec<u8>) {
+    match *i {
+        ir::Instruction::Assign(_, ir::Value::Bytes(ref s)) |
+        ir::Instruction::CastAssign(_, ir::Value::Bytes(ref s)) |
+        ir::Instruction::DerefLoad(_, ir::Value::Bytes(ref s), _) |
+        ir::Instruction::Store(_, _, ir::Value::Bytes(ref s)) |
+        ir::Instruction::UnaryOp(_, _, ir::Value::Bytes(ref s)) => {
+            if !strings.contains_key(s) {
+                let at = mem.len() as u32;
+                mem.extend(s.iter().cloned());
+                strings.insert(s.clone(), at);
+            }
+        }
+        ir::Instruction::Call(_, _, ref params) |
+        ir::Instruction::CallProc(_, ref params) => {
+            for param in params {
+                if let ir::Value::Bytes(ref s) = *param {
+                    if !strings.contains_key(s) {
+                        let at = mem.len() as u32;
+                        mem.extend(s.iter().cloned());
+                        strings.insert(s.clone(), at);
+                    }
+                }
+            }
+        }
+        ir::Instruction::CallVirt(_, ref val, ref params) |
+        ir::Instruction::CallProcVirt(ref val, ref params) => {
+            if let ir::Value::Bytes(ref s) = *val {
+                    if !strings.contains_key(s) {
+                    let at = mem.len() as u32;
+                    mem.extend(s.iter().cloned());
+                    strings.insert(s.clone(), at);
+                }
+            }
+            for param in params {
+                if let ir::Value::Bytes(ref s) = *param {
+                    if !strings.contains_key(s) {
+                        let at = mem.len() as u32;
+                        mem.extend(s.iter().cloned());
+                        strings.insert(s.clone(), at);
+                    }
+                }
+            }
+        }
+        ir::Instruction::BinaryOp(_, _, ref a, ref b) |
+        ir::Instruction::DerefStore(ref a, _, ref b) => {
+            if let ir::Value::Bytes(ref s) = *a {
+                    if !strings.contains_key(s) {
+                    let at = mem.len() as u32;
+                    mem.extend(s.iter().cloned());
+                    strings.insert(s.clone(), at);
+                }
+            }
+            if let ir::Value::Bytes(ref s) = *b {
+                    if !strings.contains_key(s) {
+                    let at = mem.len() as u32;
+                    mem.extend(s.iter().cloned());
+                    strings.insert(s.clone(), at);
+                }
+            }
+        }
+        _ => {}
     }
 }
