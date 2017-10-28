@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use plank_syntax::position::Spanned;
-use ast::cfg::{Program, Function, Reg, Block, BlockEnd, BlockLink, BlockId, Value, Instruction};
+use ast::cfg::{Block, BlockEnd, BlockId, BlockLink, Function, Instruction, Program, Reg, Value};
 use ast::typed::{self as t, Struct};
 
 
@@ -20,11 +20,14 @@ fn generate_constructor(s: &Struct) -> Function {
         .into_iter()
         .map(|i| (Reg(i as u32), s.fields[i - 1].typ.clone()))
         .collect::<HashMap<_, _>>();
-    let complete_type = t::Type::Concrete(s.name, s.type_params
-        .iter()
-        .map(|&s| t::Type::Concrete(s, Vec::new().into()))
-        .collect::<Vec<_>>()
-        .into());
+    let complete_type = t::Type::Concrete(
+        s.name,
+        s.type_params
+            .iter()
+            .map(|&s| t::Type::Concrete(s, Vec::new().into()))
+            .collect::<Vec<_>>()
+            .into(),
+    );
     registers.insert(Reg(0), complete_type.clone());
     let block = Block {
         ops,

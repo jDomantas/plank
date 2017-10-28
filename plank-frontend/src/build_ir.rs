@@ -77,19 +77,25 @@ impl<'a> Builder<'a> {
             debug_assert_eq!(self.type_params.len(), 1);
             let param = self.type_params.values().next().unwrap();
             let size = self.layouts.size_of(param).unwrap() as u64;
-            blocks.insert(ir::BlockId(0), ir::Block {
-                ops: Vec::new(),
-                end: ir::BlockEnd::Return(ir::Value::Int(size, ir::Size::Bit32)),
-            });
+            blocks.insert(
+                ir::BlockId(0),
+                ir::Block {
+                    ops: Vec::new(),
+                    end: ir::BlockEnd::Return(ir::Value::Int(size, ir::Size::Bit32)),
+                },
+            );
             Some(ir::BlockId(0))
         } else if self.function_name == ::builtins::ALIGN_OF {
             debug_assert_eq!(self.type_params.len(), 1);
             let param = self.type_params.values().next().unwrap();
             let align = self.layouts.size_of(param).unwrap() as u64;
-            blocks.insert(ir::BlockId(0), ir::Block {
-                ops: Vec::new(),
-                end: ir::BlockEnd::Return(ir::Value::Int(align, ir::Size::Bit32)),
-            });
+            blocks.insert(
+                ir::BlockId(0),
+                ir::Block {
+                    ops: Vec::new(),
+                    end: ir::BlockEnd::Return(ir::Value::Int(align, ir::Size::Bit32)),
+                },
+            );
             Some(ir::BlockId(0))
         } else {
             self.function.start_block.map(|b| ir::BlockId(b.0))
@@ -112,47 +118,36 @@ impl<'a> Builder<'a> {
         }
         let end = match block.end {
             cfg::BlockEnd::Branch(ref val, a, b) => {
-                ir::BlockEnd::Branch(
-                    self.convert_value(val),
-                    ir::BlockId(a.0),
-                    ir::BlockId(b.0),
-                )
+                ir::BlockEnd::Branch(self.convert_value(val), ir::BlockId(a.0), ir::BlockId(b.0))
             }
             cfg::BlockEnd::Error => panic!("cannot build ir with errors"),
-            cfg::BlockEnd::Jump(id) => {
-                ir::BlockEnd::Jump(ir::BlockId(id.0))
-            }
-            cfg::BlockEnd::Return(ref val) => {
-                if self.is_zero_sized_value(val) {
-                    ir::BlockEnd::ReturnProc
-                } else {
-                    ir::BlockEnd::Return(self.convert_value(val))
-                }
-            }
+            cfg::BlockEnd::Jump(id) => ir::BlockEnd::Jump(ir::BlockId(id.0)),
+            cfg::BlockEnd::Return(ref val) => if self.is_zero_sized_value(val) {
+                ir::BlockEnd::ReturnProc
+            } else {
+                ir::BlockEnd::Return(self.convert_value(val))
+            },
         };
-        ir::Block {
-            ops,
-            end,
-        }
+        ir::Block { ops, end }
     }
 
     fn build_instruction(&mut self, i: &cfg::Instruction) -> Option<ir::Instruction> {
         match *i {
-            cfg::Instruction::Assign(to, ref val) => {
-                if self.is_zero_sized(to) {
-                    None
-                } else {
-                    let val = self.convert_value(val);
-                    Some(ir::Instruction::Assign(ir::Reg(to.0), val))
-                }
-            }
+            cfg::Instruction::Assign(to, ref val) => if self.is_zero_sized(to) {
+                None
+            } else {
+                let val = self.convert_value(val);
+                Some(ir::Instruction::Assign(ir::Reg(to.0), val))
+            },
             cfg::Instruction::BinaryOp(dest, cfg::BinaryOp::Eq, ref a, _)
-            if self.is_zero_sized_value(a) => {
+                if self.is_zero_sized_value(a) =>
+            {
                 let value = ir::Value::Int(1, ir::Size::Bit8);
                 Some(ir::Instruction::Assign(ir::Reg(dest.0), value))
             }
             cfg::Instruction::BinaryOp(dest, cfg::BinaryOp::Neq, ref a, _)
-            if self.is_zero_sized_value(a) => {
+                if self.is_zero_sized_value(a) =>
+            {
                 let value = ir::Value::Int(0, ir::Size::Bit8);
                 Some(ir::Instruction::Assign(ir::Reg(dest.0), value))
             }
@@ -209,13 +204,11 @@ impl<'a> Builder<'a> {
                     Some(ir::Instruction::DerefStore(address, offset, value))
                 }
             }
-            cfg::Instruction::Drop(reg) => {
-                if self.is_zero_sized(reg) {
-                    None
-                } else {
-                    Some(ir::Instruction::Drop(ir::Reg(reg.0)))
-                }
-            }
+            cfg::Instruction::Drop(reg) => if self.is_zero_sized(reg) {
+                None
+            } else {
+                Some(ir::Instruction::Drop(ir::Reg(reg.0)))
+            },
             cfg::Instruction::FieldStore(dest, ref fields, ref value) => {
                 if self.is_zero_sized_value(value) {
                     None
@@ -258,7 +251,11 @@ impl<'a> Builder<'a> {
                     cfg::Size::Bit16 => ir::Size::Bit16,
                     cfg::Size::Bit32 => ir::Size::Bit32,
                 };
-                Some(ir::Instruction::UnaryOp(dest, ir::UnaryOp::Negate(sign, size), val))
+                Some(ir::Instruction::UnaryOp(
+                    dest,
+                    ir::UnaryOp::Negate(sign, size),
+                    val,
+                ))
             }
             cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::DerefLoad, ref val) => {
                 if self.is_zero_sized(dest) {
@@ -269,19 +266,21 @@ impl<'a> Builder<'a> {
                     Some(ir::Instruction::DerefLoad(dest, val, 0))
                 }
             }
-            cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::FieldLoad(ref typ, ref fields), ref val) => {
-                if self.is_zero_sized(dest) {
-                    None
-                } else {
-                    let dest = ir::Reg(dest.0);
-                    let offset = self.find_offset(typ, fields);
-                    let val = match self.convert_value(val) {
-                        ir::Value::Reg(reg) => reg,
-                        _ => panic!("cannot load field from non-reg"),
-                    };
-                    Some(ir::Instruction::Load(dest, val, offset))
-                }
-            }
+            cfg::Instruction::UnaryOp(
+                dest,
+                cfg::UnaryOp::FieldLoad(ref typ, ref fields),
+                ref val,
+            ) => if self.is_zero_sized(dest) {
+                None
+            } else {
+                let dest = ir::Reg(dest.0);
+                let offset = self.find_offset(typ, fields);
+                let val = match self.convert_value(val) {
+                    ir::Value::Reg(reg) => reg,
+                    _ => panic!("cannot load field from non-reg"),
+                };
+                Some(ir::Instruction::Load(dest, val, offset))
+            },
             cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::Not, ref val) => {
                 debug_assert!(!self.is_zero_sized(dest));
                 let dest = ir::Reg(dest.0);
@@ -290,7 +289,11 @@ impl<'a> Builder<'a> {
                 let arg = ir::Value::Int(1, ir::Size::Bit8);
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
-            cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::OffsetAddress(ref typ, ref fields), ref val) => {
+            cfg::Instruction::UnaryOp(
+                dest,
+                cfg::UnaryOp::OffsetAddress(ref typ, ref fields),
+                ref val,
+            ) => {
                 let dest = ir::Reg(dest.0);
                 let typ = match *typ {
                     cfg::Type::Pointer(ref t) => t,
@@ -298,7 +301,8 @@ impl<'a> Builder<'a> {
                 };
                 let offset = self.find_offset(typ, fields);
                 let val = self.convert_value(val);
-                let op = ir::BinaryOp::IntOp(ir::IntOp::Add, ir::Signedness::Unsigned, ir::Size::Bit32);
+                let op =
+                    ir::BinaryOp::IntOp(ir::IntOp::Add, ir::Signedness::Unsigned, ir::Size::Bit32);
                 let arg = ir::Value::Int(offset as u64, ir::Size::Bit32);
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
@@ -330,7 +334,9 @@ impl<'a> Builder<'a> {
             symbol.push_str("::<");
             let mut first = true;
             for param in type_params.iter() {
-                if !first { symbol.push(','); }
+                if !first {
+                    symbol.push(',');
+                }
                 first = false;
                 self.write_type(&mut symbol, param);
             }
@@ -356,7 +362,9 @@ impl<'a> Builder<'a> {
                     to.push('<');
                     let mut first = true;
                     for param in params.iter() {
-                        if !first { to.push(','); }
+                        if !first {
+                            to.push(',');
+                        }
                         first = false;
                         self.write_type(to, param);
                     }
@@ -367,7 +375,9 @@ impl<'a> Builder<'a> {
                 to.push_str("fn(");
                 let mut first = true;
                 for param in params.iter() {
-                    if !first { to.push(','); }
+                    if !first {
+                        to.push(',');
+                    }
                     first = false;
                     self.write_type(to, param);
                 }
@@ -382,7 +392,7 @@ impl<'a> Builder<'a> {
             cfg::Type::Int(cfg::Signedness::Signed, cfg::Size::Bit32) => to.push_str("i32"),
         }
     }
-    
+
     fn convert_value(&mut self, value: &cfg::Value) -> ir::Value {
         match *value {
             cfg::Value::Bytes(ref bytes) => ir::Value::Bytes(bytes.clone()),
@@ -395,9 +405,7 @@ impl<'a> Builder<'a> {
                 ir::Value::Int(value, size)
             }
             cfg::Value::Reg(reg) => ir::Value::Reg(ir::Reg(reg.0)),
-            cfg::Value::Symbol(sym, ref types) => {
-                ir::Value::Symbol(self.make_symbol(sym, types))
-            }
+            cfg::Value::Symbol(sym, ref types) => ir::Value::Symbol(self.make_symbol(sym, types)),
             cfg::Value::Error => panic!("cannot build ir with errors"),
         }
     }
@@ -495,7 +503,5 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
         functions.insert(symbol, function);
     }
 
-    ir::Program {
-        functions
-    }
+    ir::Program { functions }
 }

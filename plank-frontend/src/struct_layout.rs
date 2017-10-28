@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ast::cfg::{Symbol, Type, Size};
+use ast::cfg::{Size, Symbol, Type};
 use ast::typed::Struct;
 
 
@@ -12,9 +12,7 @@ pub struct LayoutEngine<'a> {
 
 impl<'a> LayoutEngine<'a> {
     pub fn new(structs: &'a HashMap<Symbol, Struct>) -> Self {
-        LayoutEngine {
-            structs
-        }
+        LayoutEngine { structs }
     }
 
     #[allow(dead_code)]
@@ -40,8 +38,7 @@ impl<'a> LayoutEngine<'a> {
             Type::Concrete(sym, ref params) => {
                 let s = &self.structs[&sym];
                 debug_assert_eq!(params.len(), s.type_params.len());
-                let mapping = s
-                    .type_params
+                let mapping = s.type_params
                     .iter()
                     .cloned()
                     .zip(params.iter().cloned())
@@ -50,16 +47,14 @@ impl<'a> LayoutEngine<'a> {
                     .iter()
                     .map(|field| field.typ.replace(&mapping))
                     .fold(Some((0, 1)), |a, b| match (a, b) {
-                        (Some((s, a)), ty) => {
-                            match self.size_align(&ty) {
-                                Some((s2, a2)) => {
-                                    let s = (s + a2 - 1) / a2 * a2 + s2;
-                                    let a = lcm(a, a2);
-                                    Some((s, a))
-                                }
-                                _ => None,
+                        (Some((s, a)), ty) => match self.size_align(&ty) {
+                            Some((s2, a2)) => {
+                                let s = (s + a2 - 1) / a2 * a2 + s2;
+                                let a = lcm(a, a2);
+                                Some((s, a))
                             }
-                        }
+                            _ => None,
+                        },
                         _ => None,
                     })
                     .map(|(s, a)| {
@@ -81,8 +76,7 @@ impl<'a> LayoutEngine<'a> {
             Type::Concrete(sym, ref params) => {
                 let s = &self.structs[&sym];
                 debug_assert_eq!(params.len(), s.type_params.len());
-                let mapping = s
-                    .type_params
+                let mapping = s.type_params
                     .iter()
                     .cloned()
                     .zip(params.iter().cloned())

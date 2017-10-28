@@ -149,9 +149,7 @@ impl UnifyTable {
     fn occurs(&mut self, var: TypeVar, typ: &Type) -> bool {
         let typ = self.shallow_normalize(typ);
         match typ {
-            Type::Bool |
-            Type::Error |
-            Type::Int(_, _) => false,
+            Type::Bool | Type::Error | Type::Int(_, _) => false,
             Type::Concrete(_, ref params) => {
                 for param in params.iter() {
                     if self.occurs(var, param) {

@@ -1,6 +1,6 @@
 extern crate plank_errors;
-extern crate plank_syntax;
 extern crate plank_ir;
+extern crate plank_syntax;
 
 mod ast {
     pub mod resolved;

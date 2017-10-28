@@ -57,22 +57,17 @@ pub enum Type {
 impl Type {
     pub fn replace(&self, mapping: &HashMap<Symbol, Type>) -> Type {
         match *self {
-            Type::Bool |
-            Type::Error |
-            Type::Int(_, _) |
-            Type::Var(_) => self.clone(),
-            Type::Concrete(sym, ref params) => {
-                if let Some(typ) = mapping.get(&sym).cloned() {
-                    typ
-                } else {
-                    let params = params
-                        .iter()
-                        .map(|ty| ty.replace(mapping))
-                        .collect::<Vec<_>>()
-                        .into();
-                    Type::Concrete(sym, params)
-                }
-            }
+            Type::Bool | Type::Error | Type::Int(_, _) | Type::Var(_) => self.clone(),
+            Type::Concrete(sym, ref params) => if let Some(typ) = mapping.get(&sym).cloned() {
+                typ
+            } else {
+                let params = params
+                    .iter()
+                    .map(|ty| ty.replace(mapping))
+                    .collect::<Vec<_>>()
+                    .into();
+                Type::Concrete(sym, params)
+            },
             Type::Function(ref params, ref out) => {
                 let params = params
                     .iter()

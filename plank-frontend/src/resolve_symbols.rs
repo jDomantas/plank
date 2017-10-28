@@ -171,32 +171,48 @@ impl<'a> Resolver<'a> {
             start: Position { line: 0, column: 0 },
             end: Position { line: 0, column: 0 },
         };
-        self.global_functions.insert("size_of".into(), Function {
-            name: ::builtins::SIZE_OF,
-            name_span: dummy_span,
-            param_names: Vec::new(),
-        });
-        self.global_functions.insert("align_of".into(), Function {
-            name: ::builtins::ALIGN_OF,
-            name_span: dummy_span,
-            param_names: Vec::new(),
-        });
-        self.global_functions.insert("putc".into(), Function {
-            name: ::builtins::PUTC,
-            name_span: dummy_span,
-            param_names: vec!["ch".into()],
-        });
-        self.global_functions.insert("getc".into(), Function {
-            name: ::builtins::GETC,
-            name_span: dummy_span,
-            param_names: Vec::new(),
-        });
+        self.global_functions.insert(
+            "size_of".into(),
+            Function {
+                name: ::builtins::SIZE_OF,
+                name_span: dummy_span,
+                param_names: Vec::new(),
+            },
+        );
+        self.global_functions.insert(
+            "align_of".into(),
+            Function {
+                name: ::builtins::ALIGN_OF,
+                name_span: dummy_span,
+                param_names: Vec::new(),
+            },
+        );
+        self.global_functions.insert(
+            "putc".into(),
+            Function {
+                name: ::builtins::PUTC,
+                name_span: dummy_span,
+                param_names: vec!["ch".into()],
+            },
+        );
+        self.global_functions.insert(
+            "getc".into(),
+            Function {
+                name: ::builtins::GETC,
+                name_span: dummy_span,
+                param_names: Vec::new(),
+            },
+        );
     }
 
     fn resolve_struct(&mut self, struct_: &p::Struct) -> r::Struct {
         let name = self.resolve_item_name(&struct_.name);
         let fields = self.resolve_var_list(&struct_.fields, "field");
-        r::Struct { name, fields, complete_span: struct_.complete_span }
+        r::Struct {
+            name,
+            fields,
+            complete_span: struct_.complete_span,
+        }
     }
 
     fn resolve_item_name(&mut self, name: &p::ItemName) -> r::ItemName {
@@ -586,9 +602,7 @@ fn make_builtin_size_of() -> r::Function {
         complete_span: dummy_span,
         name: r::ItemName {
             name: Spanned::new(::builtins::SIZE_OF, dummy_span),
-            type_params: vec![
-                Spanned::new(::builtins::SIZE_OF_TYPE_PARAM, dummy_span),
-            ],
+            type_params: vec![Spanned::new(::builtins::SIZE_OF_TYPE_PARAM, dummy_span)],
         },
         params: Vec::new(),
         return_type: Spanned::new(r::Type::U32, dummy_span),
@@ -606,9 +620,7 @@ fn make_builtin_align_of() -> r::Function {
         complete_span: dummy_span,
         name: r::ItemName {
             name: Spanned::new(::builtins::ALIGN_OF, dummy_span),
-            type_params: vec![
-                Spanned::new(::builtins::ALIGN_OF_TYPE_PARAM, dummy_span),
-            ],
+            type_params: vec![Spanned::new(::builtins::ALIGN_OF_TYPE_PARAM, dummy_span)],
         },
         params: Vec::new(),
         return_type: Spanned::new(r::Type::U32, dummy_span),
@@ -650,7 +662,7 @@ fn make_builtin_putc() -> r::Function {
             r::Var {
                 name: Spanned::new(::builtins::PUTC_PARAM, dummy_span),
                 typ: Spanned::new(r::Type::U8, dummy_span),
-            }
+            },
         ],
         return_type: Spanned::new(r::Type::U32, dummy_span),
         body: None,

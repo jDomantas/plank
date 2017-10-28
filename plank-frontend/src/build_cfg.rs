@@ -20,7 +20,9 @@ enum LValue {
 impl LValue {
     fn add_field(&mut self, index: usize) {
         match *self {
-            LValue::Reg(_, ref mut fields) | LValue::Deref(_, _, ref mut fields) => fields.push(index),
+            LValue::Reg(_, ref mut fields) | LValue::Deref(_, _, ref mut fields) => {
+                fields.push(index)
+            }
             LValue::Error | LValue::Invalid => {}
         }
     }
@@ -118,10 +120,7 @@ impl<'a> Builder<'a> {
                 self.drop_value(&val, target_span);
             }
             LValue::Reg(reg, ref fields) if fields.is_empty() => {
-                self.emit_instruction(
-                    cfg::Instruction::Assign(reg, value),
-                    target_span
-                );
+                self.emit_instruction(cfg::Instruction::Assign(reg, value), target_span);
             }
             LValue::Reg(reg, fields) => {
                 self.emit_instruction(
@@ -143,13 +142,7 @@ impl<'a> Builder<'a> {
             }
             LValue::Error => {}
             LValue::Deref(ref val, _, ref fields) if fields.is_empty() => {
-                self.emit_instruction(
-                    cfg::Instruction::Assign(
-                        target,
-                        val.as_value(),
-                    ),
-                    value_span,
-                );
+                self.emit_instruction(cfg::Instruction::Assign(target, val.as_value()), value_span);
                 self.drop_value(val, value_span);
             }
             LValue::Deref(val, typ, fields) => {
@@ -492,17 +485,32 @@ impl<'a> Builder<'a> {
         let after_block = self.new_block();
         let result = self.new_register(t::Type::Bool);
         let link = cfg::BlockLink::Strong(rhs_block);
-        self.end_block(cfg::BlockEnd::Branch(built_lhs.as_value(), rhs_block, reset_block), link);
+        self.end_block(
+            cfg::BlockEnd::Branch(built_lhs.as_value(), rhs_block, reset_block),
+            link,
+        );
         self.start_block(rhs_block);
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
-        self.emit_instruction(cfg::Instruction::Assign(result, built_rhs.as_value()), rhs.span);
+        self.emit_instruction(
+            cfg::Instruction::Assign(result, built_rhs.as_value()),
+            rhs.span,
+        );
         self.drop_value(&built_rhs, rhs.span);
-        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
+        self.end_block(
+            cfg::BlockEnd::Jump(after_block),
+            cfg::BlockLink::Weak(reset_block),
+        );
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
-        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(0, cfg::Size::Bit8)), lhs.span);
-        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
+        self.emit_instruction(
+            cfg::Instruction::Assign(result, cfg::Value::Int(0, cfg::Size::Bit8)),
+            lhs.span,
+        );
+        self.end_block(
+            cfg::BlockEnd::Jump(after_block),
+            cfg::BlockLink::Weak(after_block),
+        );
         self.start_block(after_block);
         RValue::Temp(cfg::Value::Reg(result))
     }
@@ -514,17 +522,32 @@ impl<'a> Builder<'a> {
         let after_block = self.new_block();
         let result = self.new_register(t::Type::Bool);
         let link = cfg::BlockLink::Strong(rhs_block);
-        self.end_block(cfg::BlockEnd::Branch(built_lhs.as_value(), reset_block, rhs_block), link);
+        self.end_block(
+            cfg::BlockEnd::Branch(built_lhs.as_value(), reset_block, rhs_block),
+            link,
+        );
         self.start_block(rhs_block);
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
-        self.emit_instruction(cfg::Instruction::Assign(result, built_rhs.as_value()), rhs.span);
+        self.emit_instruction(
+            cfg::Instruction::Assign(result, built_rhs.as_value()),
+            rhs.span,
+        );
         self.drop_value(&built_rhs, rhs.span);
-        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(reset_block));
+        self.end_block(
+            cfg::BlockEnd::Jump(after_block),
+            cfg::BlockLink::Weak(reset_block),
+        );
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
-        self.emit_instruction(cfg::Instruction::Assign(result, cfg::Value::Int(1, cfg::Size::Bit8)), lhs.span);
-        self.end_block(cfg::BlockEnd::Jump(after_block), cfg::BlockLink::Weak(after_block));
+        self.emit_instruction(
+            cfg::Instruction::Assign(result, cfg::Value::Int(1, cfg::Size::Bit8)),
+            lhs.span,
+        );
+        self.end_block(
+            cfg::BlockEnd::Jump(after_block),
+            cfg::BlockLink::Weak(after_block),
+        );
         self.start_block(after_block);
         RValue::Temp(cfg::Value::Reg(result))
     }

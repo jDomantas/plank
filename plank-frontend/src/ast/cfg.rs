@@ -139,12 +139,8 @@ pub(crate) mod printer {
                 write_type_list(f, params, ctx)
             }
             Type::Error => write!(f, "?"),
-            Type::Function(ref _params, ref _out) => {
-                unimplemented!()
-            }
-            Type::Int(sign, size) => {
-                write_int(f, sign, size)
-            }
+            Type::Function(ref _params, ref _out) => unimplemented!(),
+            Type::Int(sign, size) => write_int(f, sign, size),
             Type::Pointer(ref to) => {
                 write!(f, "*")?;
                 write_type(f, to, ctx)
@@ -164,7 +160,9 @@ pub(crate) mod printer {
             write!(f, "<")?;
             let mut first = true;
             for ty in types {
-                if !first { write!(f, ",")?; }
+                if !first {
+                    write!(f, ",")?;
+                }
                 first = false;
                 write_type(f, ty, ctx)?;
             }
@@ -176,7 +174,7 @@ pub(crate) mod printer {
         value: &'a Value,
         ctx: &'a CompileCtx,
     }
-            
+
     impl<'a> ::std::fmt::Display for ValueDisplay<'a> {
         fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
             match *self.value {
@@ -211,9 +209,7 @@ pub(crate) mod printer {
                     write!(f, "div_")?;
                     write_int(f, sign, size)
                 }
-                BinaryOp::Eq => {
-                    write!(f, "eq")
-                }
+                BinaryOp::Eq => write!(f, "eq"),
                 BinaryOp::Greater(sign, size) => {
                     write!(f, "gt_")?;
                     write_int(f, sign, size)
@@ -238,9 +234,7 @@ pub(crate) mod printer {
                     write!(f, "mul_")?;
                     write_int(f, sign, size)
                 }
-                BinaryOp::Neq => {
-                    write!(f, "neq")
-                }
+                BinaryOp::Neq => write!(f, "neq"),
                 BinaryOp::Sub(sign, size) => {
                     write!(f, "sub_")?;
                     write_int(f, sign, size)
@@ -260,9 +254,7 @@ pub(crate) mod printer {
     impl<'a> ::std::fmt::Display for UnaryOpDisplay<'a> {
         fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
             match *self.op {
-                UnaryOp::DerefLoad => {
-                    write!(f, "deref")
-                }
+                UnaryOp::DerefLoad => write!(f, "deref"),
                 UnaryOp::FieldLoad(_, ref fields) => {
                     write!(f, "load_field ")?;
                     for field in fields {
@@ -274,9 +266,7 @@ pub(crate) mod printer {
                     write!(f, "neg_")?;
                     write_int(f, sign, size)
                 }
-                UnaryOp::Not => {
-                    write!(f, "not")
-                }
+                UnaryOp::Not => write!(f, "not"),
                 UnaryOp::OffsetAddress(_, ref fields) => {
                     write!(f, "field_offset ")?;
                     for field in fields {
@@ -331,7 +321,9 @@ pub(crate) mod printer {
                 print!("(");
                 let mut first = true;
                 for param in params {
-                    if !first { print!(",") }
+                    if !first {
+                        print!(",")
+                    }
                     first = false;
                     print!("{}", d(param, ctx));
                 }
@@ -342,7 +334,9 @@ pub(crate) mod printer {
                 for field in fields {
                     print!(".{}", field);
                 }
-                if fields.len() > 0 { print!(" ") }
+                if fields.len() > 0 {
+                    print!(" ")
+                }
                 println!("{}", d(value, ctx));
             }
             Instruction::Drop(reg) => {
@@ -353,7 +347,9 @@ pub(crate) mod printer {
                 for field in fields {
                     print!(".{}", field);
                 }
-                if fields.len() > 0 { print!(" ") }
+                if fields.len() > 0 {
+                    print!(" ")
+                }
                 println!("{}", d(value, ctx));
             }
             Instruction::StartStatement => {
@@ -371,7 +367,7 @@ pub(crate) mod printer {
             }
         }
     }
-    
+
     fn print_block_end(end: &BlockEnd, ctx: &CompileCtx) {
         match *end {
             BlockEnd::Branch(ref val, a, b) => {

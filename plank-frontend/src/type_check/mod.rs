@@ -508,11 +508,7 @@ impl<'a> Inferer<'a> {
                 self.check_field(deref, field)
             }
             typ => {
-                let msg = format!(
-                    "no field `{}` on {}",
-                    **field,
-                    self.type_name(&typ)
-                );
+                let msg = format!("no field `{}` on {}", **field, self.type_name(&typ));
                 self.ctx
                     .reporter
                     .error(msg, expr.span)
