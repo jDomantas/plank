@@ -458,7 +458,12 @@ impl<'a> Resolver<'a> {
         let name_and_pos = match *callee {
             r::Expr::Name(name, _) => {
                 let name = Spanned::into_value(name);
-                let name_str = self.ctx.symbols.get_name(name);
+                // TODO: fix this, this is horrible hack
+                let name_str = match self.ctx.symbols.get_name(name) {
+                    "@plank_putc" => "putc",
+                    "@plank_getc" => "getc",
+                    s => s,
+                };
                 if let Some(f) = self.global_functions.get(name_str) {
                     let positions = f.param_names
                         .iter()
