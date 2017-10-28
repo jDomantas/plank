@@ -9,6 +9,7 @@ extern crate simple_logging;
 extern crate url;
 extern crate plank_syntax;
 extern crate plank_errors;
+extern crate plank_frontend;
 
 mod transport;
 mod jsonrpc;
@@ -121,7 +122,8 @@ fn publish_diagnostics<R, W>(source: &str, doc: Url, transport: &mut Transport<R
 fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {
     let reporter = plank_errors::Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
-    let _ = plank_syntax::parse(tokens, reporter.clone());
+    let ast = plank_syntax::parse(tokens, reporter.clone());
+    let _ = plank_frontend::compile(&ast, reporter.clone());
     reporter
         .get_diagnostics()
         .into_iter()

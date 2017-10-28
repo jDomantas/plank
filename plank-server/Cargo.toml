@@ -13,3 +13,4 @@ simple-logging = "1.0.1"
 url = "1.5.1"
 plank-errors = { path = "../plank-errors" }
 plank-syntax = { path = "../plank-syntax" }
+plank-frontend = { path = "../plank-frontend" }

@@ -150,6 +150,7 @@ dependencies = [
  "languageserver-types 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "plank-errors 0.1.0",
+ "plank-frontend 0.1.0",
  "plank-syntax 0.1.0",
  "serde 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
