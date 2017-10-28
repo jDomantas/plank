@@ -50,6 +50,8 @@ struct Vm<'a, R, W> {
     frames: Vec<StackFrame<'a>>,
     current_frame: StackFrame<'a>,
     strings: HashMap<Vec<u8>, u32>,
+    symbol_ids: HashMap<ir::Symbol, u32>,
+    symbols_by_id: HashMap<u32, ir::Symbol>,
 }
 
 impl<'a, R: Read, W: Write> Vm<'a, R, W> {
@@ -80,6 +82,12 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 }
             }
         }
+        let mut symbol_ids = HashMap::new();
+        let mut symbols_by_id = HashMap::new();
+        for (index, symbol) in program.functions.keys().enumerate() {
+            symbol_ids.insert(symbol.clone(), index as u32);
+            symbols_by_id.insert(index as u32, symbol.clone());
+        }
         let mut vm = Vm {
             input,
             output,
@@ -88,6 +96,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             frames: Vec::new(),
             current_frame: main_frame,
             strings,
+            symbol_ids,
+            symbols_by_id,
         };
         let regs = vm.allocate_registers(&vm.current_frame.function.registers);
         vm.current_frame.registers = regs;
@@ -138,8 +148,6 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     panic!("register out of bounds")
                 }
             }
-            ir::Value::Bytes(_) => unimplemented!("string literals"),
-            ir::Value::Symbol(_) => unimplemented!("virtual calls"),
             _ => panic!("bad 16 bit value"),
         }
     }
@@ -160,7 +168,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 }
             }
             ir::Value::Bytes(ref s) => self.strings[s],
-            ir::Value::Symbol(_) => unimplemented!("virtual calls"),
+            ir::Value::Symbol(ref sym) => self.symbol_ids[sym],
             _ => panic!("bad 32 bit value"),
         }
     }
@@ -175,7 +183,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 let (at, size) = self.register_address(reg);
                 Value::AddressRange(at, size)
             }
-            ir::Value::Symbol(_) => unimplemented!("virtual calls")
+            ir::Value::Symbol(ref sym) => Value::DoubleWord(self.symbol_ids[sym]),
         }
     }
 
@@ -429,9 +437,70 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
                 Ok(())
             }
-            ir::Instruction::CallVirt(_, _, _) |
-            ir::Instruction::CallProcVirt(_, _) => {
-                unimplemented!("virtual calls")
+            ir::Instruction::CallVirt(dest, ref val, ref params) => {
+                let sym = &self.symbols_by_id[&self.load_32bit(val)].clone();
+                if "@plank_getc" == &*sym.0 {
+                    assert_eq!(params.len(), 0);
+                    let mut buf = [0];
+                    let result = match self.input.read(&mut buf)? {
+                        0 => !0u32,
+                        1 => buf[0] as u32,
+                        _ => panic!("wut"),
+                    };
+                    let (ret, _) = self.register_address(dest);
+                    self.write_value(ret, Some(4), Value::DoubleWord(result));
+                    return Ok(());
+                }
+                let f = &self.program.functions[sym];
+                let (ret, _) = self.register_address(dest);
+                let stack_start = self.memory.len();
+                let registers = self.allocate_registers(&f.registers);
+                assert_eq!(f.parameters.len(), params.len());
+                for (param, val) in f.parameters.iter().zip(params.iter()) {
+                    let at = registers[param];
+                    let len = f.registers[param].size;
+                    let val = self.read_value(val);
+                    self.write_value(at, Some(len), val);
+                }
+                let frame = StackFrame {
+                    stack_start,
+                    function: f,
+                    registers,
+                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_op: 0,
+                    return_address: Some(ret),
+                };
+                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                Ok(())
+            }
+            ir::Instruction::CallProcVirt(ref val, ref params) => {
+                let sym = &self.symbols_by_id[&self.load_32bit(val)].clone();
+                if "@plank_putc" == &*sym.0 {
+                    assert_eq!(params.len(), 1);
+                    let val = self.load_8bit(&params[0]);
+                    self.output.write_all(&[val])?;
+                    return Ok(());
+                }
+                let f = &self.program.functions[sym];
+                let stack_start = self.memory.len();
+                let registers = self.allocate_registers(&f.registers);
+                assert_eq!(f.parameters.len(), params.len());
+                for (param, val) in f.parameters.iter().zip(params.iter()) {
+                    let at = registers[param];
+                    let len = f.registers[param].size;
+                    let val = self.read_value(val);
+                    self.write_value(at, Some(len), val);
+                }
+                let frame = StackFrame {
+                    stack_start,
+                    function: f,
+                    registers,
+                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_op: 0,
+                    return_address: None,
+                };
+                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                Ok(())
             }
             ir::Instruction::DerefLoad(dest, ref address, offset) => {
                 let address = self.load_32bit(address) + offset;
