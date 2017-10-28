@@ -14,7 +14,9 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
     write!(out, "(")?;
     let mut first = true;
     for param in &func.parameters {
-        if !first { write!(out, ", ")?; }
+        if !first {
+            write!(out, ", ")?;
+        }
         first = false;
         write!(out, "%{}", param.0)?;
     }
@@ -25,7 +27,13 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
         writeln!(out)?;
     }
     for (reg, layout) in &func.registers {
-        writeln!(out, "    register %{}: size {}, align {}", reg.0, layout.size, layout.align)?;
+        writeln!(
+            out,
+            "    register %{}: size {}, align {}",
+            reg.0,
+            layout.size,
+            layout.align
+        )?;
     }
     if func.start_block.is_none() {
         return Ok(());
@@ -109,9 +117,7 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             emit_value(value, out)?;
             writeln!(out)
         }
-        ir::Instruction::Drop(reg) => {
-            writeln!(out, "    drop %{}", reg.0)
-        }
+        ir::Instruction::Drop(reg) => writeln!(out, "    drop %{}", reg.0),
         ir::Instruction::Load(dest, reg, offset) => {
             writeln!(out, "    %{} = %{}[{}]", dest.0, reg.0, offset)
         }
@@ -149,19 +155,13 @@ fn emit_value<W: Write>(val: &ir::Value, out: &mut W) -> io::Result<()> {
             }
             write!(out, "\"")
         }
-        ir::Value::Int(value, size) => {
-            match size {
-                ir::Size::Bit8 => write!(out, "{}_b8", value),
-                ir::Size::Bit16 => write!(out, "{}_b16", value),
-                ir::Size::Bit32 => write!(out, "{}_b32", value),
-            }
-        }
-        ir::Value::Reg(reg) => {
-            write!(out, "%{}", reg.0)
-        }
-        ir::Value::Symbol(ref sym) => {
-            write!(out, "{}", sym.0)
-        }
+        ir::Value::Int(value, size) => match size {
+            ir::Size::Bit8 => write!(out, "{}_b8", value),
+            ir::Size::Bit16 => write!(out, "{}_b16", value),
+            ir::Size::Bit32 => write!(out, "{}_b32", value),
+        },
+        ir::Value::Reg(reg) => write!(out, "%{}", reg.0),
+        ir::Value::Symbol(ref sym) => write!(out, "{}", sym.0),
     }
 }
 
@@ -179,12 +179,8 @@ fn emit_binop<W: Write>(op: ir::BinaryOp, out: &mut W) -> io::Result<()> {
             write!(out, "xor_")?;
             emit_size(s, out)
         }
-        ir::BinaryOp::Eq => {
-            write!(out, "eq")
-        }
-        ir::BinaryOp::Neq => {
-            write!(out, "neq")
-        }
+        ir::BinaryOp::Eq => write!(out, "eq"),
+        ir::BinaryOp::Neq => write!(out, "neq"),
         ir::BinaryOp::IntOp(ir::IntOp::Add, sign, size) => {
             write!(out, "add_")?;
             emit_sign(sign, out)?;
@@ -252,7 +248,9 @@ fn emit_params<W: Write>(params: &[ir::Value], out: &mut W) -> io::Result<()> {
     write!(out, "(")?;
     let mut first = true;
     for param in params {
-        if !first { write!(out, ", ")?; }
+        if !first {
+            write!(out, ", ")?;
+        }
         first = false;
         emit_value(param, out)?;
     }

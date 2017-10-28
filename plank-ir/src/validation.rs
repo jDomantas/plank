@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use ir::{Program, Function, Symbol, Block, Instruction, BlockEnd, Value, Size, Reg, BinaryOp, UnaryOp};
+use ir::{BinaryOp, Block, BlockEnd, Function, Instruction, Program, Reg, Size, Symbol, UnaryOp,
+         Value};
 
 
 struct Context<'a> {
