@@ -40,6 +40,16 @@ fn report_unreachable(block: &Block, ctx: &mut CompileCtx) {
         .build();
 }
 
+fn can_be_dead(block: &Block) -> bool {
+    for op in &block.ops {
+        match **op {
+            Instruction::Drop(_) => {}
+            _ => return true,
+        }
+    }
+    false
+}
+
 fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
     let mut blocks = function_block_chain(f);
     debug_assert_eq!(blocks.len(), f.blocks.len());
@@ -77,7 +87,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
         }
         follow_strong = true;
         while let Some(block) = blocks.pop_front() {
-            if !reachable.contains(&block) && !f.blocks[&block].ops.is_empty() {
+            if !reachable.contains(&block) && can_be_dead(&f.blocks[&block]) {
                 report_unreachable(&f.blocks[&block], ctx);
                 queue.push_back(block);
                 break;
