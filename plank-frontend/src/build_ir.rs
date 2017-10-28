@@ -8,6 +8,7 @@ use CompileCtx;
 struct Builder<'a> {
     layouts: &'a LayoutEngine<'a>,
     ctx: &'a CompileCtx,
+    function_name: cfg::Symbol,
     function: &'a cfg::Function,
     type_params: HashMap<cfg::Symbol, cfg::Type>,
     dependencies: HashMap<ir::Symbol, (cfg::Symbol, Vec<cfg::Type>)>,
@@ -16,6 +17,7 @@ struct Builder<'a> {
 
 impl<'a> Builder<'a> {
     fn new(
+        function_name: cfg::Symbol,
         function: &'a cfg::Function,
         type_params: HashMap<cfg::Symbol, cfg::Type>,
         ctx: &'a CompileCtx,
@@ -36,6 +38,7 @@ impl<'a> Builder<'a> {
             ctx,
             type_params,
             layouts,
+            function_name,
             function,
             dependencies: HashMap::new(),
             registers,
@@ -69,7 +72,28 @@ impl<'a> Builder<'a> {
             Some(ir::Layout { size: s, align: a })
         };
         self.registers.retain(|_, layout| layout.size > 0);
-        let start_block = self.function.start_block.map(|b| ir::BlockId(b.0));
+        // cheat with size_of and align_of - insert an appropriate implementation
+        let start_block = if self.function_name == ::builtins::SIZE_OF {
+            debug_assert_eq!(self.type_params.len(), 1);
+            let param = self.type_params.values().next().unwrap();
+            let size = self.layouts.size_of(param).unwrap() as u64;
+            blocks.insert(ir::BlockId(0), ir::Block {
+                ops: Vec::new(),
+                end: ir::BlockEnd::Return(ir::Value::Int(size, ir::Size::Bit32)),
+            });
+            Some(ir::BlockId(0))
+        } else if self.function_name == ::builtins::ALIGN_OF {
+            debug_assert_eq!(self.type_params.len(), 1);
+            let param = self.type_params.values().next().unwrap();
+            let align = self.layouts.size_of(param).unwrap() as u64;
+            blocks.insert(ir::BlockId(0), ir::Block {
+                ops: Vec::new(),
+                end: ir::BlockEnd::Return(ir::Value::Int(align, ir::Size::Bit32)),
+            });
+            Some(ir::BlockId(0))
+        } else {
+            self.function.start_block.map(|b| ir::BlockId(b.0))
+        };
         ir::Function {
             blocks,
             output_layout,
@@ -465,7 +489,7 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
             .cloned()
             .zip(types.into_iter())
             .collect();
-        let mut builder = Builder::new(function, type_params, ctx, &layout);
+        let mut builder = Builder::new(sym, function, type_params, ctx, &layout);
         let function = builder.build();
         queue.extend(builder.dependencies);
         functions.insert(symbol, function);

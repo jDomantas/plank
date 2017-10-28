@@ -19,12 +19,23 @@ mod gen_constructors;
 mod struct_layout;
 mod build_ir;
 
+mod builtins {
+    use ast::resolved::Symbol;
+    pub const SIZE_OF: Symbol = Symbol(0);
+    pub const ALIGN_OF: Symbol = Symbol(1);
+    pub const GETC: Symbol = Symbol(2);
+    pub const PUTC: Symbol = Symbol(3);
+
+    pub const SIZE_OF_TYPE_PARAM: Symbol = Symbol(4);
+    pub const ALIGN_OF_TYPE_PARAM: Symbol = Symbol(5);
+    pub const PUTC_PARAM: Symbol = Symbol(6);
+}
+
 use plank_errors::Reporter;
 use plank_syntax::ast::Program;
 use symbols::Symbols;
 
 
-#[derive(Default)]
 struct CompileCtx {
     symbols: Symbols,
     reporter: Reporter,
@@ -32,7 +43,7 @@ struct CompileCtx {
 
 pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Program, ()> {
     let mut ctx = CompileCtx {
-        symbols: Default::default(),
+        symbols: Symbols::new(),
         reporter,
     };
 

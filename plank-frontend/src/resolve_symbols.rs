@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use plank_syntax::ast as p;
-use plank_syntax::position::{Span, Spanned};
+use plank_syntax::position::{Position, Span, Spanned};
 use ast::resolved::{self as r, Symbol};
 use CompileCtx;
 
@@ -32,6 +32,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_program(&mut self, program: &p::Program) -> r::Program {
         self.collect_globals(program);
+        self.add_builtins();
 
         let structs = program
             .structs
@@ -39,11 +40,16 @@ impl<'a> Resolver<'a> {
             .map(|s| self.resolve_struct(s))
             .collect();
 
-        let functions = program
+        let mut functions = program
             .functions
             .iter()
             .map(|f| self.resolve_function(f))
-            .collect();
+            .collect::<Vec<_>>();
+
+        functions.push(make_builtin_size_of());
+        functions.push(make_builtin_align_of());
+        functions.push(make_builtin_getc());
+        functions.push(make_builtin_putc());
 
         r::Program { structs, functions }
     }
@@ -99,6 +105,35 @@ impl<'a> Resolver<'a> {
     where
         I: Iterator<Item = String>,
     {
+        if name == "size_of" {
+            self.ctx
+                .reporter
+                .error("`size_of` is a built-in function", span)
+                .span(span)
+                .build();
+            return;
+        } else if name == "align_of" {
+            self.ctx
+                .reporter
+                .error("`align_of` is a built-in function", span)
+                .span(span)
+                .build();
+            return;
+        } else if name == "putc" {
+            self.ctx
+                .reporter
+                .error("`putc` is a built-in function", span)
+                .span(span)
+                .build();
+            return;
+        } else if name == "getc" {
+            self.ctx
+                .reporter
+                .error("`getc` is a built-in function", span)
+                .span(span)
+                .build();
+            return;
+        }
         match self.global_functions.entry(name.into()) {
             Entry::Vacant(entry) => {
                 // symbol might have already be defined for struct,
@@ -129,6 +164,33 @@ impl<'a> Resolver<'a> {
                     .build();
             }
         }
+    }
+
+    fn add_builtins(&mut self) {
+        let dummy_span = Span {
+            start: Position { line: 0, column: 0 },
+            end: Position { line: 0, column: 0 },
+        };
+        self.global_functions.insert("size_of".into(), Function {
+            name: ::builtins::SIZE_OF,
+            name_span: dummy_span,
+            param_names: Vec::new(),
+        });
+        self.global_functions.insert("align_of".into(), Function {
+            name: ::builtins::ALIGN_OF,
+            name_span: dummy_span,
+            param_names: Vec::new(),
+        });
+        self.global_functions.insert("putc".into(), Function {
+            name: ::builtins::PUTC,
+            name_span: dummy_span,
+            param_names: vec!["ch".into()],
+        });
+        self.global_functions.insert("getc".into(), Function {
+            name: ::builtins::GETC,
+            name_span: dummy_span,
+            param_names: Vec::new(),
+        });
     }
 
     fn resolve_struct(&mut self, struct_: &p::Struct) -> r::Struct {
@@ -512,6 +574,87 @@ impl<'a> Resolver<'a> {
     fn add_local(&mut self, name: &str, symbol: Symbol) {
         let scope = self.scopes.last_mut().expect("missing scope");
         scope.insert(name.into(), symbol);
+    }
+}
+
+fn make_builtin_size_of() -> r::Function {
+    let dummy_span = Span {
+        start: Position { line: 0, column: 0 },
+        end: Position { line: 0, column: 0 },
+    };
+    r::Function {
+        complete_span: dummy_span,
+        name: r::ItemName {
+            name: Spanned::new(::builtins::SIZE_OF, dummy_span),
+            type_params: vec![
+                Spanned::new(::builtins::SIZE_OF_TYPE_PARAM, dummy_span),
+            ],
+        },
+        params: Vec::new(),
+        return_type: Spanned::new(r::Type::U32, dummy_span),
+        body: None,
+        fn_type: r::FunctionType::Normal,
+    }
+}
+
+fn make_builtin_align_of() -> r::Function {
+    let dummy_span = Span {
+        start: Position { line: 0, column: 0 },
+        end: Position { line: 0, column: 0 },
+    };
+    r::Function {
+        complete_span: dummy_span,
+        name: r::ItemName {
+            name: Spanned::new(::builtins::ALIGN_OF, dummy_span),
+            type_params: vec![
+                Spanned::new(::builtins::ALIGN_OF_TYPE_PARAM, dummy_span),
+            ],
+        },
+        params: Vec::new(),
+        return_type: Spanned::new(r::Type::U32, dummy_span),
+        body: None,
+        fn_type: r::FunctionType::Normal,
+    }
+}
+
+fn make_builtin_getc() -> r::Function {
+    let dummy_span = Span {
+        start: Position { line: 0, column: 0 },
+        end: Position { line: 0, column: 0 },
+    };
+    r::Function {
+        complete_span: dummy_span,
+        name: r::ItemName {
+            name: Spanned::new(::builtins::GETC, dummy_span),
+            type_params: Vec::new(),
+        },
+        params: Vec::new(),
+        return_type: Spanned::new(r::Type::I32, dummy_span),
+        body: None,
+        fn_type: r::FunctionType::Normal,
+    }
+}
+
+fn make_builtin_putc() -> r::Function {
+    let dummy_span = Span {
+        start: Position { line: 0, column: 0 },
+        end: Position { line: 0, column: 0 },
+    };
+    r::Function {
+        complete_span: dummy_span,
+        name: r::ItemName {
+            name: Spanned::new(::builtins::PUTC, dummy_span),
+            type_params: Vec::new(),
+        },
+        params: vec![
+            r::Var {
+                name: Spanned::new(::builtins::PUTC_PARAM, dummy_span),
+                typ: Spanned::new(r::Type::U8, dummy_span),
+            }
+        ],
+        return_type: Spanned::new(r::Type::U32, dummy_span),
+        body: None,
+        fn_type: r::FunctionType::Normal,
     }
 }
 

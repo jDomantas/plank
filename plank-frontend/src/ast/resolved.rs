@@ -3,13 +3,7 @@ use plank_syntax::position::{Span, Spanned};
 
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
-pub struct Symbol(u32);
-
-impl Symbol {
-    pub fn new(id: u32) -> Symbol {
-        Symbol(id)
-    }
-}
+pub struct Symbol(pub u32);
 
 #[derive(Debug, Clone)]
 pub enum Expr {
