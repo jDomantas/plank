@@ -55,7 +55,7 @@ pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Progra
     cast_check::check_casts(&mut typed, &mut ctx);
     let mut cfg = build_cfg::build_cfg(&typed, &mut ctx);
     dead_code::remove_dead_code(&mut cfg, &mut ctx);
-    return_check::check_returns(&cfg, &mut ctx);
+    return_check::check_returns(&mut cfg, &mut ctx);
     gen_constructors::add_constructors(&mut cfg);
     if ctx.reporter.has_errors() {
         Err(())

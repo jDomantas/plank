@@ -1,5 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-use ast::cfg::{Block, BlockEnd, Function, Instruction, Program};
+use ast::cfg::{Block, BlockEnd, Function, Instruction, Program, Type, Value};
 use CompileCtx;
 
 
@@ -13,23 +13,30 @@ fn has_error_statement(block: &Block) -> bool {
     false
 }
 
-fn check_function(f: &Function, ctx: &mut CompileCtx) {
+fn check_function(f: &mut Function, ctx: &mut CompileCtx) {
     let mut queue = VecDeque::new();
     let mut visited = HashSet::new();
     if let Some(start_block) = f.start_block {
         queue.push_back(start_block);
     }
+    let allow_no_return = match f.out_type {
+        Type::Unit => true,
+        _ => false,
+    };
 
     while let Some(block) = queue.pop_front() {
         if visited.contains(&block) {
             continue;
         }
         visited.insert(block);
-        let block = &f.blocks[&block];
+        let block = f.blocks.get_mut(&block).unwrap();
         if has_error_statement(block) {
             continue;
         }
         match block.end {
+            BlockEnd::Error if allow_no_return => {
+                block.end = BlockEnd::Return(Value::Unit);
+            }
             BlockEnd::Error => {
                 let span = f.complete_span;
                 ctx.reporter
@@ -51,8 +58,8 @@ fn check_function(f: &Function, ctx: &mut CompileCtx) {
 }
 
 
-pub(crate) fn check_returns(program: &Program, ctx: &mut CompileCtx) {
-    for (_, f) in &program.functions {
+pub(crate) fn check_returns(program: &mut Program, ctx: &mut CompileCtx) {
+    for f in program.functions.values_mut() {
         check_function(f, ctx);
     }
 }
