@@ -386,6 +386,7 @@ impl<'a> Resolver<'a> {
                 let body = self.resolve_statement(body);
                 r::Statement::While(cond, Box::new(body))
             }
+            p::Statement::Error => r::Statement::Error,
         };
         Spanned::new(statement, span)
     }

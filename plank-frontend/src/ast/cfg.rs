@@ -58,6 +58,7 @@ pub enum Instruction {
     /// reg = &reg.field1.field2...
     TakeAddress(Reg, Reg, Vec<usize>),
     Assign(Reg, Value),
+    Error,
 }
 
 #[derive(Debug, Clone)]
@@ -364,6 +365,9 @@ pub(crate) mod printer {
             }
             Instruction::UnaryOp(dest, ref op, ref value) => {
                 println!("    r{} = {} {}", dest.0, du(op), d(value, ctx));
+            }
+            Instruction::Error => {
+                println!("    error");
             }
         }
     }

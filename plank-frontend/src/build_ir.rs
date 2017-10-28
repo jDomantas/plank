@@ -306,6 +306,7 @@ impl<'a> Builder<'a> {
                 let arg = ir::Value::Int(offset as u64, ir::Size::Bit32);
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
+            cfg::Instruction::Error => panic!("cannot build ir with errors"),
         }
     }
 

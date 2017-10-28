@@ -618,9 +618,14 @@ impl<'a> Parser<'a> {
         let start = self.previous_span();
         let mut statements = Vec::new();
         while !self.check(Token::RightBrace) {
+            let statement_start = self.previous_span();
             match self.parse_statement() {
                 Ok(stmt) => statements.push(stmt),
-                Err(()) => self.synchronize_statement()?,
+                Err(()) => {
+                    let span = statement_start.merge(self.previous_span());
+                    statements.push(Spanned::new(Statement::Error, span));
+                    self.synchronize_statement()?;
+                }
             }
         }
         let span = start.merge(self.previous_span());

@@ -221,6 +221,7 @@ impl<'a> Builder<'a> {
                     self.start_block(new);
                 }
                 None => {
+                    self.emit_instruction(cfg::Instruction::Error, span);
                     self.ctx
                         .reporter
                         .error("cannot use `break` outside loop", span)
@@ -236,6 +237,7 @@ impl<'a> Builder<'a> {
                     self.start_block(new);
                 }
                 None => {
+                    self.emit_instruction(cfg::Instruction::Error, span);
                     self.ctx
                         .reporter
                         .error("cannot use `continue` outside loop", span)
@@ -331,6 +333,9 @@ impl<'a> Builder<'a> {
                 self.current_loop = outer_loop;
                 self.start_block(after);
                 self.drop_value(&c, cond.span);
+            }
+            t::Statement::Error => {
+                self.emit_instruction(cfg::Instruction::Error, span);
             }
         }
     }

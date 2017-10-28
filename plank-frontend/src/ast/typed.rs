@@ -38,6 +38,7 @@ pub enum Statement {
     Let(Spanned<Symbol>, Spanned<Type>, TypedExpr),
     Block(Vec<Spanned<Statement>>),
     Expr(TypedExpr),
+    Error,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]

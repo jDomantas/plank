@@ -567,6 +567,7 @@ impl<'a> Inferer<'a> {
                 self.unify(&cond.typ, &Type::Bool, Reason::WhileCondition(cond.span));
                 t::Statement::While(cond, Box::new(body))
             }
+            r::Statement::Error => t::Statement::Error,
         }
     }
 
@@ -613,7 +614,7 @@ impl<'a> Inferer<'a> {
                     self.normalize_statement(stmt);
                 }
             }
-            t::Statement::Break | t::Statement::Continue => {}
+            t::Statement::Break | t::Statement::Continue | t::Statement::Error => {}
             t::Statement::Return(ref mut expr) | t::Statement::Expr(ref mut expr) => {
                 self.normalize_expr(expr);
             }

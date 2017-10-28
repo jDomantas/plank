@@ -279,6 +279,9 @@ impl Formatter {
                 self.format_statement(body);
                 self.fmt.end_list();
             }
+            Statement::Error => {
+                self.fmt.write_symbol("error");
+            }
         }
     }
 

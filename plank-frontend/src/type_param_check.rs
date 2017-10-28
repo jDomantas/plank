@@ -128,7 +128,7 @@ impl<'a> Context<'a> {
             Statement::Block(ref mut stmts) => for stmt in stmts {
                 self.check_statement(stmt);
             },
-            Statement::Break | Statement::Continue => {}
+            Statement::Break | Statement::Continue | Statement::Error => {}
             Statement::Expr(ref mut expr) | Statement::Return(ref mut expr) => {
                 self.check_expr(expr)
             }
