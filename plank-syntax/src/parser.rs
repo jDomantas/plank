@@ -424,8 +424,11 @@ impl<'a> Parser<'a> {
             }
             self.expect_closing(Token::Comma, open_span)?;
         }
-        self.expect(Token::Arrow)?;
-        let return_type = self.parse_type()?;
+        let return_type = if self.check(Token::Arrow) {
+            self.parse_type()?
+        } else {
+            Spanned::new(Type::Unit, self.previous_span())
+        };
         let complete_span;
         let body = if self.check(Token::LeftBrace) {
             let body = self.parse_block()?;
@@ -488,8 +491,11 @@ impl<'a> Parser<'a> {
                 }
                 self.expect_closing(Token::Comma, open_span)?;
             }
-            self.expect(Token::Arrow)?;
-            let return_type = self.parse_type()?;
+            let return_type = if self.check(Token::Arrow) {
+                self.parse_type()?
+            } else {
+                Spanned::new(Type::Unit, self.previous_span())
+            };
             let span = start.merge(Spanned::span(&return_type));
             let typ = Type::Function(param_types, Box::new(return_type));
             Ok(Spanned::new(typ, span))
@@ -571,8 +577,13 @@ impl<'a> Parser<'a> {
             Ok(Spanned::new(Statement::Continue, span))
         } else if self.check(Token::Keyword(Keyword::Return)) {
             let start = self.previous_span();
-            let value = self.parse_expr()?;
-            self.expect_semicolon()?;
+            let value = if self.check(Token::Semicolon) {
+                Spanned::new(Expr::Literal(Literal::Unit), start)
+            } else {
+                let value = self.parse_expr()?;
+                self.expect_semicolon()?;
+                value
+            };
             let span = start.merge(self.previous_span());
             Ok(Spanned::new(Statement::Return(value), span))
         } else if self.check(Token::Keyword(Keyword::Let)) {
