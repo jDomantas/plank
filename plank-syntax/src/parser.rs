@@ -677,8 +677,8 @@ enum Precedence {
     Comparision,
     Addition,
     Multiplication,
-    Prefix,
     Cast,
+    Prefix,
     CallOrField,
 }
 
