@@ -10,15 +10,15 @@
 <function-type>     ::= "extern" | ""
 <function>          ::= <function-type> <function-header> <function-body>
 <function-body>     ::= <block> | ";"
-<function-header>   ::= "fn" <item-name> "(" <param-list> ")" "->" <type>
+<function-header>   ::= "fn" <item-name> "(" <param-list> ")" "->" <type> | "fn" <item-name> "(" <param-list> ")"
 <param-list>        ::= "" | <param> | <param> "," <param-list>
 <param>             ::= <ident> ":" <type>
 
 <type>              ::= "_" | "*" <type> | <fn-type> | <type-name> | <builtin-type>
-<fn-type>           ::= "fn" "(" <type-list> ")" "->" <type>
+<fn-type>           ::= "fn" "(" <type-list> ")" "->" <type> | "fn" "(" <type-list> ")"
 <type-list>         ::= "" | <type> | <type> "," <type-list>
 <type-name>         ::= <ident> | <ident> "<" <type-param-list> ">"
-<builtin-type>      ::= "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "bool"
+<builtin-type>      ::= "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "bool" | "unit"
 <type-param-list>   ::= <type> | <type> "," <type-param-list>
 
 <block>             ::= "{" <statement-list> "}"
@@ -30,7 +30,7 @@
 <while>             ::= "while" <expr> <block>
 <break>             ::= "break" ";"
 <cont>              ::= "continue" ";"
-<return>            ::= "return" <expr> ";"
+<return>            ::= "return" <expr> ";" | "return" ";"
 <expr-statement>    ::= <expr> ";"
 
 <let>               ::= "let" <ident> <opt-type> "=" <expr> ";"
@@ -43,7 +43,8 @@
 <equation>          ::= <comparision> | <equation> <equation-op> <comparision>
 <comparision>       ::= <sum> | <comparision> <compare-op> <sum>
 <sum>               ::= <product> | <sum> <add-op> <product>
-<product>           ::= <unary> | <product> <mul-op> <unary>
+<product>           ::= <cast> | <product> <mul-op> <cast>
+<cast>              ::= <unary> | <cast> "as" <type>
 <unary>             ::= <call> | <unary-op> <unary>
 <call>              ::= <term> | <call> "." <ident> | <call> "(" <call-param-list> ")"
 <term>              ::= <literal> | <name> | "(" <expr> ")"
