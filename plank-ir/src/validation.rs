@@ -59,7 +59,8 @@ impl<'a> Context<'a> {
 
     fn validate_instruction(&self, i: &Instruction) {
         match *i {
-            Instruction::Assign(reg, ref val) => {
+            Instruction::Assign(reg, ref val) |
+            Instruction::CastAssign(reg, ref val) => {
                 assert_eq!(self.register_size(reg), self.value_size(val));
             }
             Instruction::BinaryOp(dest, BinaryOp::BitOp(_, size), ref a, ref b) |

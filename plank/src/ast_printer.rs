@@ -334,6 +334,13 @@ impl Formatter {
                 self.fmt.end_list();
                 self.fmt.end_list();
             }
+            Expr::Cast(ref value, ref typ) => {
+                self.fmt.start_list();
+                self.fmt.write_symbol("cast");
+                self.format_expr(value);
+                self.format_type(typ);
+                self.fmt.end_list();
+            }
         }
     }
 

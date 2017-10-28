@@ -58,6 +58,7 @@ pub enum Expr {
     Field(Box<Spanned<Expr>>, Spanned<Ident>),
     Name(Spanned<Ident>, Vec<Spanned<Type>>),
     Literal(Literal),
+    Cast(Box<Spanned<Expr>>, Spanned<Type>),
 }
 
 #[derive(Debug, Clone)]

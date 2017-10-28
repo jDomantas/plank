@@ -68,6 +68,8 @@ pub enum Instruction {
     TakeAddress(Reg, Reg, u32),
     /// `reg = value`
     Assign(Reg, Value),
+    /// `reg = cast value`
+    CastAssign(Reg, Value),
 }
 
 #[derive(Debug, Clone)]

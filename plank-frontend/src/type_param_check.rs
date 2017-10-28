@@ -195,6 +195,11 @@ impl<'a> Context<'a> {
                     return;
                 }
             }
+            Expr::Cast(ref mut expr, ref mut typ) => {
+                self.check_expr(expr);
+                self.check_type(typ);
+                return;
+            }
         }
         **expr = Expr::Error;
     }

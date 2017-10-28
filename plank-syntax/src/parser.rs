@@ -39,6 +39,7 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
 
     parser.infix(TokenKind::Token(Token::LeftParen), &CallParser);
     parser.infix(TokenKind::Token(Token::Dot), &FieldParser);
+    parser.infix(TokenKind::Token(Token::Keyword(Keyword::As)), &CastParser);
 
     parse_infix!(parser, And, And, And, true);
     parse_infix!(parser, Or, Or, Or, true);
@@ -677,6 +678,7 @@ enum Precedence {
     Addition,
     Multiplication,
     Prefix,
+    Cast,
     CallOrField,
 }
 
@@ -692,7 +694,8 @@ impl Precedence {
             Addition => Comparision,
             Multiplication => Addition,
             Prefix => Multiplication,
-            CallOrField => Prefix,
+            Cast => Prefix,
+            CallOrField => Cast,
         }
     }
 }
@@ -784,6 +787,22 @@ impl InfixParser for FieldParser {
         let field = parser.consume_ident()?;
         let span = Spanned::span(&value).merge(Spanned::span(&field));
         let expr = Expr::Field(Box::new(value), field);
+        Ok(Spanned::new(expr, span))
+    }
+}
+
+struct CastParser;
+
+impl InfixParser for CastParser {
+    fn precedence(&self) -> Precedence {
+        Precedence::Cast
+    }
+
+    fn parse(&self, parser: &mut Parser, value: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
+        parser.expect(Token::Keyword(Keyword::As)).expect("expected `as`");
+        let typ = parser.parse_type()?;
+        let span = Spanned::span(&value).merge(Spanned::span(&typ));
+        let expr = Expr::Cast(Box::new(value), typ);
         Ok(Spanned::new(expr, span))
     }
 }

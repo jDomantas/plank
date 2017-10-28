@@ -58,6 +58,7 @@ pub enum Instruction {
     /// reg = &reg.field1.field2...
     TakeAddress(Reg, Reg, Vec<usize>),
     Assign(Reg, Value),
+    CastAssign(Reg, Value),
     Error,
 }
 
@@ -329,6 +330,9 @@ pub(crate) mod printer {
                     print!("{}", d(param, ctx));
                 }
                 println!(")");
+            }
+            Instruction::CastAssign(reg, ref value) => {
+                println!("    r{} = cast {}", reg.0, d(value, ctx));
             }
             Instruction::DerefStore(ref dest, _, ref fields, ref value) => {
                 print!("    deref_store {} ", d(dest, ctx));

@@ -74,6 +74,11 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             emit_value(val, out)?;
             writeln!(out)
         }
+        ir::Instruction::CastAssign(reg, ref val) => {
+            write!(out, "    %{} = cast ", reg.0)?;
+            emit_value(val, out)?;
+            writeln!(out)
+        }
         ir::Instruction::BinaryOp(dest, op, ref a, ref b) => {
             write!(out, "    %{} = ", dest.0)?;
             emit_binop(op, out)?;

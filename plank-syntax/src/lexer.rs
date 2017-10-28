@@ -393,6 +393,7 @@ fn keyword(s: &str) -> Option<Token> {
         "break" => Some(Token::Keyword(Keyword::Break)),
         "let" => Some(Token::Keyword(Keyword::Let)),
         "return" => Some(Token::Keyword(Keyword::Return)),
+        "as" => Some(Token::Keyword(Keyword::As)),
         "true" => Some(Token::Bool(true)),
         "false" => Some(Token::Bool(false)),
         "_" => Some(Token::Underscore),

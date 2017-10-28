@@ -13,6 +13,7 @@ pub enum Expr {
     Field(TypedExpr, Spanned<usize>),
     Name(Spanned<Symbol>, Vec<Spanned<Type>>),
     Literal(Literal),
+    Cast(TypedExpr, Spanned<Type>),
     Error,
 }
 
@@ -113,6 +114,6 @@ pub struct Struct {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub structs: Vec<Struct>,
+    pub structs: HashMap<Symbol, Struct>,
     pub functions: Vec<Function>,
 }

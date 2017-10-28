@@ -453,6 +453,13 @@ impl<'a> Inferer<'a> {
                 self.unify(&expr.typ, &param_type, Reason::UnaryOperand(expr.span));
                 (t::Expr::Unary(op, expr), out_type)
             }
+            r::Expr::Cast(ref expr, ref typ) => {
+                let expr = self.infer_expr(expr);
+                let typ_span = Spanned::span(typ);
+                let typ = self.convert_resolved_type(typ);
+                let cast_typ = Spanned::new(typ.clone(), typ_span);
+                (t::Expr::Cast(expr, cast_typ), typ)
+            }
         };
         t::TypedExpr {
             expr: Box::new(typed),
@@ -680,6 +687,21 @@ impl<'a> Inferer<'a> {
                     }
                 }
             },
+            t::Expr::Cast(ref mut expr, ref mut typ) => {
+                self.normalize_expr(expr);
+                match self.unifier.normalize(typ) {
+                    Ok(t) => **typ = t,
+                    Err(()) => {
+                        let span = Spanned::span(typ);
+                        self.ctx
+                            .reporter
+                            .error("could not completely infer type", span)
+                            .span(span)
+                            .build();
+                        **typ = Type::Error;
+                    }
+                }
+            }
         }
         match self.unifier.normalize(&expr.typ) {
             Ok(typ) => expr.typ = typ,
@@ -696,9 +718,9 @@ impl<'a> Inferer<'a> {
 
     fn infer_program(&mut self, program: &r::Program) -> t::Program {
         let mut functions = Vec::new();
-        let mut structs = Vec::new();
+        let mut structs = HashMap::new();
         for s in &program.structs {
-            structs.push(self.convert_struct(s));
+            structs.insert(*s.name.name, self.convert_struct(s));
         }
         for f in &program.functions {
             self.add_function_to_env(f);

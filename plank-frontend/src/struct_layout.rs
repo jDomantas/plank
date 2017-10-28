@@ -6,6 +6,30 @@ use ast::typed::Struct;
 const POINTER_SIZE: u32 = ::plank_ir::ir::POINTER_SIZE;
 const FUNCTION_SIZE: u32 = ::plank_ir::ir::FUNCTION_SIZE;
 
+#[derive(Debug, Copy, Clone)]
+pub enum LayoutResult<T> {
+    Ok(T),
+    Error,
+    HasTypeParam,
+}
+
+impl<T> LayoutResult<T> {
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> LayoutResult<U> {
+        match self {
+            LayoutResult::Ok(x) => LayoutResult::Ok(f(x)),
+            LayoutResult::Error => LayoutResult::Error,
+            LayoutResult::HasTypeParam => LayoutResult::HasTypeParam,
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        match self {
+            LayoutResult::Ok(t) => t,
+            _ => panic!("unwrapping unsuccessful layout result"),
+        }
+    }
+}
+
 pub struct LayoutEngine<'a> {
     structs: &'a HashMap<Symbol, Struct>,
 }
@@ -16,27 +40,30 @@ impl<'a> LayoutEngine<'a> {
     }
 
     #[allow(dead_code)]
-    pub fn size_of(&self, ty: &Type) -> Option<u32> {
+    pub fn size_of(&self, ty: &Type) -> LayoutResult<u32> {
         self.size_align(ty).map(|(size, _)| size)
     }
 
     #[allow(dead_code)]
-    pub fn align_of(&self, ty: &Type) -> Option<u32> {
+    pub fn align_of(&self, ty: &Type) -> LayoutResult<u32> {
         self.size_align(ty).map(|(_, align)| align)
     }
 
-    pub fn size_align(&self, ty: &Type) -> Option<(u32, u32)> {
+    pub fn size_align(&self, ty: &Type) -> LayoutResult<(u32, u32)> {
         match *ty {
-            Type::Bool => Some((1, 1)),
-            Type::Error => None,
-            Type::Pointer(_) => Some((POINTER_SIZE, POINTER_SIZE)),
-            Type::Function(_, _) => Some((FUNCTION_SIZE, FUNCTION_SIZE)),
-            Type::Int(_, Size::Bit8) => Some((1, 1)),
-            Type::Int(_, Size::Bit16) => Some((2, 2)),
-            Type::Int(_, Size::Bit32) => Some((4, 4)),
-            Type::Var(_) => None,
+            Type::Bool => LayoutResult::Ok((1, 1)),
+            Type::Error => LayoutResult::Error,
+            Type::Pointer(_) => LayoutResult::Ok((POINTER_SIZE, POINTER_SIZE)),
+            Type::Function(_, _) => LayoutResult::Ok((FUNCTION_SIZE, FUNCTION_SIZE)),
+            Type::Int(_, Size::Bit8) => LayoutResult::Ok((1, 1)),
+            Type::Int(_, Size::Bit16) => LayoutResult::Ok((2, 2)),
+            Type::Int(_, Size::Bit32) => LayoutResult::Ok((4, 4)),
+            Type::Var(_) => LayoutResult::Error,
             Type::Concrete(sym, ref params) => {
-                let s = &self.structs[&sym];
+                let s = match self.structs.get(&sym) {
+                    Some(s) => s,
+                    None => return LayoutResult::HasTypeParam,
+                };
                 debug_assert_eq!(params.len(), s.type_params.len());
                 let mapping = s.type_params
                     .iter()
@@ -46,16 +73,20 @@ impl<'a> LayoutEngine<'a> {
                 s.fields
                     .iter()
                     .map(|field| field.typ.replace(&mapping))
-                    .fold(Some((0, 1)), |a, b| match (a, b) {
-                        (Some((s, a)), ty) => match self.size_align(&ty) {
-                            Some((s2, a2)) => {
+                    .fold(LayoutResult::Ok((0, 1)), |a, b| {
+                        match (a, self.size_align(&b)) {
+                            (LayoutResult::Ok((s, a)), LayoutResult::Ok((s2, a2))) => {
                                 let s = (s + a2 - 1) / a2 * a2 + s2;
                                 let a = lcm(a, a2);
-                                Some((s, a))
+                                LayoutResult::Ok((s, a))
                             }
-                            _ => None,
-                        },
-                        _ => None,
+                            (LayoutResult::Error, _) | (_, LayoutResult::Error) => {
+                                LayoutResult::Error
+                            }
+                            (LayoutResult::HasTypeParam, _) | (_, LayoutResult::HasTypeParam) => {
+                                LayoutResult::HasTypeParam
+                            }
+                        }
                     })
                     .map(|(s, a)| {
                         let s = (s + a - 1) / a * a;

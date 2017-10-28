@@ -28,7 +28,7 @@ impl<'a> Builder<'a> {
             .iter()
             .map(|(&reg, ty)| {
                 let ty = ty.replace(&type_params);
-                let (s, a) = layouts.size_align(&ty).expect("no layout");
+                let (s, a) = layouts.size_align(&ty).unwrap();
                 let layout = ir::Layout { size: s, align: a };
                 let reg = ir::Reg(reg.0);
                 (reg, layout)
@@ -307,6 +307,12 @@ impl<'a> Builder<'a> {
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
             cfg::Instruction::Error => panic!("cannot build ir with errors"),
+            cfg::Instruction::CastAssign(to, ref val) => if self.is_zero_sized(to) {
+                None
+            } else {
+                let val = self.convert_value(val);
+                Some(ir::Instruction::CastAssign(ir::Reg(to.0), val))
+            },
         }
     }
 

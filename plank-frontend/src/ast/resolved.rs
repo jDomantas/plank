@@ -13,6 +13,7 @@ pub enum Expr {
     Field(Box<Spanned<Expr>>, Spanned<String>),
     Name(Spanned<Symbol>, Vec<Spanned<Type>>),
     Literal(Literal),
+    Cast(Box<Spanned<Expr>>, Spanned<Type>),
     Error,
 }
 

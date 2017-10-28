@@ -454,12 +454,24 @@ impl<'a> Builder<'a> {
                     }
                 }
             }
+            t::Expr::Cast(ref expr, ref typ) => {
+                let value = self.build_expr(expr);
+                let result = self.new_register((**typ).clone());
+                self.emit_instruction(
+                    cfg::Instruction::CastAssign(result, value.as_value()),
+                    expr.span,
+                );
+                RValue::Temp(cfg::Value::Reg(result))
+            }
         }
     }
 
     fn build_expr_lvalue(&mut self, e: &t::TypedExpr) -> LValue {
         match *e.expr {
-            t::Expr::Binary(_, _, _) | t::Expr::Call(_, _) | t::Expr::Literal(_) => LValue::Invalid,
+            t::Expr::Binary(_, _, _) |
+            t::Expr::Call(_, _) |
+            t::Expr::Literal(_) |
+            t::Expr::Cast(_, _) => LValue::Invalid,
             t::Expr::Error => LValue::Error,
             t::Expr::Field(ref expr, index) => {
                 let mut lvalue = self.build_expr_lvalue(expr);
@@ -616,11 +628,7 @@ pub(crate) fn build_cfg(program: &t::Program, ctx: &mut CompileCtx) -> cfg::Prog
         .map(|f| (f.name, compile_fn(f, ctx)))
         .collect();
 
-    let structs = program
-        .structs
-        .iter()
-        .map(|s| (s.name, s.clone()))
-        .collect();
+    let structs = program.structs.clone();
 
     cfg::Program { structs, functions }
 }

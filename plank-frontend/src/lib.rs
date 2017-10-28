@@ -12,6 +12,7 @@ mod resolve_symbols;
 mod type_param_check;
 mod wildcard_check;
 mod type_check;
+mod cast_check;
 mod build_cfg;
 mod dead_code;
 mod return_check;
@@ -50,7 +51,8 @@ pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Progra
     let mut resolved = resolve_symbols::resolve_program(program, &mut ctx);
     type_param_check::check_type_params(&mut resolved, &mut ctx);
     wildcard_check::check_for_wildcards(&resolved, &mut ctx);
-    let typed = type_check::type_check(&resolved, &mut ctx);
+    let mut typed = type_check::type_check(&resolved, &mut ctx);
+    cast_check::check_casts(&mut typed, &mut ctx);
     let mut cfg = build_cfg::build_cfg(&typed, &mut ctx);
     dead_code::remove_dead_code(&mut cfg, &mut ctx);
     return_check::check_returns(&cfg, &mut ctx);

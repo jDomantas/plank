@@ -428,6 +428,11 @@ impl<'a> Resolver<'a> {
                 let expr = self.resolve_expr(expr);
                 r::Expr::Unary(op, Box::new(expr))
             }
+            p::Expr::Cast(ref expr, ref typ) => {
+                let expr = self.resolve_expr(expr);
+                let typ = self.resolve_type(typ);
+                r::Expr::Cast(Box::new(expr), typ)
+            }
         };
         Spanned::new(expr, span)
     }
