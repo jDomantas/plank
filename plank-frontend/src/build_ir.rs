@@ -175,6 +175,10 @@ impl<'a> Builder<'a> {
                 if self.is_zero_sized_value(value) {
                     None
                 } else {
+                    let typ = match *typ {
+                        cfg::Type::Pointer(ref t) => t,
+                        _ => panic!("cannot deref non-pointer"),
+                    };
                     let offset = self.find_offset(typ, fields);
                     let address = self.convert_value(address);
                     let value = self.convert_value(value);
@@ -264,6 +268,10 @@ impl<'a> Builder<'a> {
             }
             cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::OffsetAddress(ref typ, ref fields), ref val) => {
                 let dest = ir::Reg(dest.0);
+                let typ = match *typ {
+                    cfg::Type::Pointer(ref t) => t,
+                    _ => panic!("cannot deref non-pointer"),
+                };
                 let offset = self.find_offset(typ, fields);
                 let val = self.convert_value(val);
                 let op = ir::BinaryOp::IntOp(ir::IntOp::Add, ir::Signedness::Unsigned, ir::Size::Bit32);
