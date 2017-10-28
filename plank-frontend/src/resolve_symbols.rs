@@ -329,6 +329,31 @@ impl<'a> Resolver<'a> {
         let body = f.body.as_ref().map(|s| self.resolve_statement(s));
         self.scopes.clear();
 
+        if f.name.name.0 == "main" {
+            let span = Spanned::span(&f.name.name);
+            if !f.name.type_params.is_empty() {
+                self.ctx
+                    .reporter
+                    .error("`main` cannot have type parameters", span)
+                    .span(span)
+                    .build();
+            }
+            if !f.params.is_empty() {
+                self.ctx
+                    .reporter
+                    .error("`main` cannot take parameters", span)
+                    .span(span)
+                    .build();
+            }
+            if let p::Type::I32 = *f.return_type {} else {
+                self.ctx
+                    .reporter
+                    .error("`main` must return `i32`", span)
+                    .span(span)
+                    .build();
+            }
+        }
+
         r::Function {
             complete_span: f.complete_span,
             name,
