@@ -671,7 +671,7 @@ fn make_builtin_putc() -> r::Function {
                 typ: Spanned::new(r::Type::U8, dummy_span),
             },
         ],
-        return_type: Spanned::new(r::Type::U32, dummy_span),
+        return_type: Spanned::new(r::Type::Unit, dummy_span),
         body: None,
         fn_type: r::FunctionType::Normal,
     }

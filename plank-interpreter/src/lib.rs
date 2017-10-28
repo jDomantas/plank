@@ -356,13 +356,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 }
             }
             ir::Instruction::Call(dest, ref sym, ref params) => {
-                if "@plank_putc" == &*sym.0 {
-                    // TODO: this should be proc
-                    assert_eq!(params.len(), 1);
-                    let val = self.load_8bit(&params[0]);
-                    self.output.write_all(&[val])?;
-                    return Ok(());
-                } else if "@plank_getc" == &*sym.0 {
+                if "@plank_getc" == &*sym.0 {
                     assert_eq!(params.len(), 0);
                     let mut buf = [0];
                     let result = match self.input.read(&mut buf)? {
@@ -397,6 +391,12 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 Ok(())
             }
             ir::Instruction::CallProc(ref sym, ref params) => {
+                if "@plank_putc" == &*sym.0 {
+                    assert_eq!(params.len(), 1);
+                    let val = self.load_8bit(&params[0]);
+                    self.output.write_all(&[val])?;
+                    return Ok(());
+                }
                 let f = &self.program.functions[sym];
                 let stack_start = self.memory.len();
                 let registers = self.allocate_registers(&f.registers);
