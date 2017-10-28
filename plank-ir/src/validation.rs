@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use ir::{BinaryOp, Block, BlockEnd, Function, Instruction, Program, Reg, Size, Symbol, UnaryOp,
-         Value};
+use ir::{BinaryOp, Block, BlockEnd, Function, Instruction, IntOp, Program, Reg, Size, Symbol,
+         UnaryOp, Value};
 
 
 struct Context<'a> {
@@ -62,6 +62,14 @@ impl<'a> Context<'a> {
             Instruction::Assign(reg, ref val) |
             Instruction::CastAssign(reg, ref val) => {
                 assert_eq!(self.register_size(reg), self.value_size(val));
+            }
+            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Greater, _, size), ref a, ref b) |
+            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::GreaterEq, _, size), ref a, ref b) |
+            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Less, _, size), ref a, ref b) |
+            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::LessEq, _, size), ref a, ref b) => {
+                assert_eq!(self.register_size(dest), 1);
+                assert_eq!(self.value_size(a), in_bytes(size));
+                assert_eq!(self.value_size(b), in_bytes(size));
             }
             Instruction::BinaryOp(dest, BinaryOp::BitOp(_, size), ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::IntOp(_, _, size), ref a, ref b) => {
