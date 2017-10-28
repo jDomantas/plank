@@ -99,7 +99,7 @@ fn analyze_function(f: &mut Function, ctx: &mut CompileCtx) {
 }
 
 pub(crate) fn remove_dead_code(program: &mut Program, ctx: &mut CompileCtx) {
-    for (_, f) in &mut program.functions {
+    for f in program.functions.values_mut() {
         analyze_function(f, ctx);
     }
 }

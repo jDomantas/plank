@@ -71,7 +71,7 @@ impl Scheme {
             }
         }
         debug_assert_eq!(self.vars.len(), params.len());
-        if self.vars.len() == 0 {
+        if self.vars.is_empty() {
             return self.typ.clone();
         }
         let mut out_type = self.typ.clone();
@@ -492,8 +492,8 @@ impl<'a> Inferer<'a> {
                         );
                         self.ctx
                             .reporter
-                            .error(msg, Spanned::span(&field))
-                            .span(Spanned::span(&field))
+                            .error(msg, Spanned::span(field))
+                            .span(Spanned::span(field))
                             .build();
                         (t::Expr::Error, Type::Error)
                     }

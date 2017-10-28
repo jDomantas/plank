@@ -5,9 +5,8 @@ use CompileCtx;
 
 fn has_error_statement(block: &Block) -> bool {
     for op in &block.ops {
-        match **op {
-            Instruction::Error => return true,
-            _ => {}
+        if let Instruction::Error = **op {
+            return true;
         }
     }
     false

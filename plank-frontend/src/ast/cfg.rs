@@ -158,7 +158,7 @@ pub(crate) mod printer {
         types: &[Type],
         ctx: &CompileCtx,
     ) -> ::std::fmt::Result {
-        if types.len() == 0 {
+        if types.is_empty() {
             Ok(())
         } else {
             write!(f, "<")?;
@@ -248,7 +248,7 @@ pub(crate) mod printer {
         }
     }
 
-    fn db<'a>(op: &'a BinaryOp) -> BinaryOpDisplay<'a> {
+    fn db(op: &BinaryOp) -> BinaryOpDisplay {
         BinaryOpDisplay { op }
     }
 
@@ -283,7 +283,7 @@ pub(crate) mod printer {
         }
     }
 
-    fn du<'a>(op: &'a UnaryOp) -> UnaryOpDisplay<'a> {
+    fn du(op: &UnaryOp) -> UnaryOpDisplay {
         UnaryOpDisplay { op }
     }
 
@@ -342,7 +342,7 @@ pub(crate) mod printer {
                 for field in fields {
                     print!(".{}", field);
                 }
-                if fields.len() > 0 {
+                if !fields.is_empty() {
                     print!(" ")
                 }
                 println!("{}", d(value, ctx));
@@ -355,7 +355,7 @@ pub(crate) mod printer {
                 for field in fields {
                     print!(".{}", field);
                 }
-                if fields.len() > 0 {
+                if !fields.is_empty() {
                     print!(" ")
                 }
                 println!("{}", d(value, ctx));

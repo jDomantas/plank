@@ -178,7 +178,7 @@ impl<'a> Context<'a> {
                     self.check_type(param);
                 }
                 let params_expected = self.params_taken(name);
-                if params.len() == 0 {
+                if params.is_empty() {
                     for _ in 0..params_expected {
                         params.push(Spanned::new(Type::Wildcard, name_span));
                     }

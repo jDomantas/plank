@@ -76,7 +76,7 @@ impl<'a> Builder<'a> {
         let start_block = if self.function_name == ::builtins::SIZE_OF {
             debug_assert_eq!(self.type_params.len(), 1);
             let param = self.type_params.values().next().unwrap();
-            let size = self.layouts.size_of(param).unwrap() as u64;
+            let size = u64::from(self.layouts.size_of(param).unwrap());
             blocks.insert(
                 ir::BlockId(0),
                 ir::Block {
@@ -88,7 +88,7 @@ impl<'a> Builder<'a> {
         } else if self.function_name == ::builtins::ALIGN_OF {
             debug_assert_eq!(self.type_params.len(), 1);
             let param = self.type_params.values().next().unwrap();
-            let align = self.layouts.size_of(param).unwrap() as u64;
+            let align = u64::from(self.layouts.size_of(param).unwrap());
             blocks.insert(
                 ir::BlockId(0),
                 ir::Block {
@@ -303,7 +303,7 @@ impl<'a> Builder<'a> {
                 let val = self.convert_value(val);
                 let op =
                     ir::BinaryOp::IntOp(ir::IntOp::Add, ir::Signedness::Unsigned, ir::Size::Bit32);
-                let arg = ir::Value::Int(offset as u64, ir::Size::Bit32);
+                let arg = ir::Value::Int(u64::from(offset), ir::Size::Bit32);
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
             cfg::Instruction::Error => panic!("cannot build ir with errors"),

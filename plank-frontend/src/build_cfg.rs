@@ -404,7 +404,7 @@ impl<'a> Builder<'a> {
                 } else {
                     cfg::Value::Int(0, cfg::Size::Bit8)
                 },
-                t::Literal::Char(c) => cfg::Value::Int(c as u64, cfg::Size::Bit8),
+                t::Literal::Char(c) => cfg::Value::Int(u64::from(c), cfg::Size::Bit8),
                 t::Literal::Number(n) => {
                     let size = match e.typ {
                         t::Type::Int(_, size) => size,
@@ -428,7 +428,7 @@ impl<'a> Builder<'a> {
                     let type_params = type_params
                         .iter()
                         .map(Spanned::value)
-                        .map(Clone::clone)
+                        .cloned()
                         .collect();
                     RValue::Temp(cfg::Value::Symbol(name, type_params))
                 }
@@ -440,19 +440,17 @@ impl<'a> Builder<'a> {
                     let result = self.new_register(e.typ.clone());
                     self.emit_take_address(result, expr.span, value);
                     RValue::Temp(cfg::Value::Reg(result))
+                } else if let Some(op) = unop_to_instruction(op, &expr.typ) {
+                    let expr = self.build_expr(expr);
+                    let result = self.new_register(e.typ.clone());
+                    self.emit_instruction(
+                        cfg::Instruction::UnaryOp(result, op, expr.as_value()),
+                        e.span,
+                    );
+                    self.drop_value(&expr, e.span);
+                    RValue::Temp(cfg::Value::Reg(result))
                 } else {
-                    if let Some(op) = unop_to_instruction(op, &expr.typ) {
-                        let expr = self.build_expr(expr);
-                        let result = self.new_register(e.typ.clone());
-                        self.emit_instruction(
-                            cfg::Instruction::UnaryOp(result, op, expr.as_value()),
-                            e.span,
-                        );
-                        self.drop_value(&expr, e.span);
-                        RValue::Temp(cfg::Value::Reg(result))
-                    } else {
-                        RValue::Temp(cfg::Value::Error)
-                    }
+                    RValue::Temp(cfg::Value::Error)
                 }
             }
             t::Expr::Cast(ref expr, ref typ) => {

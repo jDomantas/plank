@@ -58,7 +58,7 @@ impl UnifyTable {
         let b = self.shallow_normalize(b);
         match (a, b) {
             (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => if a == b {
-                assert!(ap.len() == bp.len());
+                assert_eq!(ap.len(), bp.len());
                 for (a, b) in ap.iter().zip(bp.iter()) {
                     self.unify_raw(a, b)?;
                 }
@@ -85,8 +85,8 @@ impl UnifyTable {
             }
             (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
-            (Type::Bool, Type::Bool) => Ok(()),
-            (Type::Unit, Type::Unit) => Ok(()),
+            (Type::Bool, Type::Bool) |
+            (Type::Unit, Type::Unit) |
             (Type::Error, _) | (_, Type::Error) => Ok(()),
             (_, _) => Err(()),
         }

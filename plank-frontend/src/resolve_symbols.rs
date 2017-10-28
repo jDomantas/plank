@@ -392,7 +392,7 @@ impl<'a> Resolver<'a> {
                 let name_span = Spanned::span(name);
                 let typ = typ.as_ref()
                     .map(|t| self.resolve_type(t))
-                    .unwrap_or(Spanned::new(r::Type::Wildcard, name_span));
+                    .unwrap_or_else(|| Spanned::new(r::Type::Wildcard, name_span));
                 let value = self.resolve_expr(value);
                 let symbol = self.ctx.symbols.new_symbol(name.0.clone());
                 self.add_local(&name.0, symbol);
