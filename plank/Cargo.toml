@@ -8,4 +8,5 @@ plank-errors = { path = "../plank-errors" }
 plank-syntax = { path = "../plank-syntax" }
 plank-frontend = { path = "../plank-frontend" }
 plank-ir = { path = "../plank-ir" }
+plank-interpreter = { path = "../plank-interpreter" }
 clap = "2.26.2"

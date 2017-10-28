@@ -3,6 +3,7 @@ extern crate plank_errors;
 extern crate plank_syntax;
 extern crate plank_frontend;
 extern crate plank_ir;
+extern crate plank_interpreter;
 
 mod ast_printer;
 
@@ -98,8 +99,12 @@ fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Resul
         }
         Command::EmitIr => {
             let ir = emit_ir(input)?;
-            plank_ir::emit_program(&ir, output)?;
-            plank_ir::validate_ir(&ir);
+            plank_ir::emit_program(&ir, &mut output)?;
+            //plank_ir::validate_ir(&ir);
+            let input = io::empty();
+            writeln!(output, "running")?;
+            plank_interpreter::run_program(&ir, input, &mut output).unwrap();
+            writeln!(output, "done")?;
             Ok(())
         }
     }

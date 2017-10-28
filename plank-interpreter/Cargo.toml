@@ -1,0 +1,7 @@
+[package]
+name = "plank-interpreter"
+version = "0.1.0"
+authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
+
+[dependencies]
+plank-ir = { path = "../plank-ir" }

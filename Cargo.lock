@@ -122,6 +122,7 @@ dependencies = [
  "clap 2.26.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "plank-errors 0.1.0",
  "plank-frontend 0.1.0",
+ "plank-interpreter 0.1.0",
  "plank-ir 0.1.0",
  "plank-syntax 0.1.0",
 ]
@@ -137,6 +138,13 @@ dependencies = [
  "plank-errors 0.1.0",
  "plank-ir 0.1.0",
  "plank-syntax 0.1.0",
+]
+
+[[package]]
+name = "plank-interpreter"
+version = "0.1.0"
+dependencies = [
+ "plank-ir 0.1.0",
 ]
 
 [[package]]
