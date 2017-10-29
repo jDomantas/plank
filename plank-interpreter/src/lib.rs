@@ -9,7 +9,7 @@ use plank_ir::{ir, Program};
 pub enum Error {
     BadDeref,
     DivisionByZero,
-    MissingSymbol(String),
+    MissingSymbol(ir::Symbol),
     Io(io::Error),
 }
 
@@ -19,7 +19,7 @@ impl ::std::convert::From<io::Error> for Error {
     }
 }
 
-pub fn run_program<R: Read, W: Write>(program: &Program, input: R, output: W) -> Result<(), Error> {
+pub fn run_program<R: Read, W: Write>(program: &Program, input: R, output: W) -> Result<i32, Error> {
     plank_ir::validate_ir(program);
     Vm::new(program, input, output)?.run()
 }
@@ -59,11 +59,11 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         let main_symbol = ir::Symbol("main".into());
         let main = match program.functions.get(&main_symbol) {
             Some(f) => f,
-            None => return Err(Error::MissingSymbol("main".into())),
+            None => return Err(Error::MissingSymbol(main_symbol)),
         };
         let block = match main.start_block {
             Some(block) => block,
-            None => return Err(Error::MissingSymbol("main".into())),
+            None => return Err(Error::MissingSymbol(main_symbol)),
         };
         let main_frame = StackFrame {
             stack_start: 4,
@@ -73,20 +73,24 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             current_op: 0,
             return_address: Some(0),
         };
+        let mut symbol_ids = HashMap::new();
+        let mut symbols_by_id = HashMap::new();
+        for (index, (symbol, f)) in program.functions.iter().enumerate() {
+            if f.start_block.is_some() {
+                symbol_ids.insert(symbol.clone(), index as u32);
+                symbols_by_id.insert(index as u32, symbol.clone());
+            }
+        }
+        println!("symbols: {:?}", symbol_ids);
         let mut strings = HashMap::new();
         let mut memory = vec![0, 0, 0, 0];
         for f in program.functions.values() {
             for block in f.blocks.values() {
                 for op in &block.ops {
                     collect_strings(op, &mut strings, &mut memory);
+                    validate_symbol_refs(op, &symbol_ids)?;
                 }
             }
-        }
-        let mut symbol_ids = HashMap::new();
-        let mut symbols_by_id = HashMap::new();
-        for (index, symbol) in program.functions.keys().enumerate() {
-            symbol_ids.insert(symbol.clone(), index as u32);
-            symbols_by_id.insert(index as u32, symbol.clone());
         }
         let mut vm = Vm {
             input,
@@ -402,7 +406,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     stack_start,
                     function: f,
                     registers,
-                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_block: f.start_block.unwrap(),
                     current_op: 0,
                     return_address: Some(ret),
                 };
@@ -430,7 +434,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     stack_start,
                     function: f,
                     registers,
-                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_block: f.start_block.unwrap(),
                     current_op: 0,
                     return_address: None,
                 };
@@ -466,7 +470,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     stack_start,
                     function: f,
                     registers,
-                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_block: f.start_block.ok_or(Error::BadDeref)?,
                     current_op: 0,
                     return_address: Some(ret),
                 };
@@ -495,7 +499,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     stack_start,
                     function: f,
                     registers,
-                    current_block: f.start_block.ok_or(Error::MissingSymbol((*sym.0).into()))?,
+                    current_block: f.start_block.ok_or(Error::BadDeref)?,
                     current_op: 0,
                     return_address: None,
                 };
@@ -558,7 +562,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         }
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<i32, Error> {
         loop {
             let block = self.current_block();
             if self.current_frame.current_op == block.ops.len() {
@@ -582,7 +586,13 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                         self.write_value(to, Some(len), val);
                         match self.frames.pop() {
                             Some(frame) => self.current_frame = frame,
-                            None => return Ok(()),
+                            None => return Ok({
+                                let b1 = (self.memory[0] as u32) << 0;
+                                let b2 = (self.memory[1] as u32) << 8;
+                                let b3 = (self.memory[2] as u32) << 16;
+                                let b4 = (self.memory[3] as u32) << 24;
+                                (b1 | b2 | b3 | b4) as i32
+                            }),
                         }
                     }
                     ir::BlockEnd::ReturnProc => {
@@ -590,7 +600,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                         self.memory.truncate(self.current_frame.stack_start);
                         match self.frames.pop() {
                             Some(frame) => self.current_frame = frame,
-                            None => return Ok(()),
+                            None => panic!("main did not return a value"),
                         }
                     }
                 }
@@ -838,7 +848,7 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
         ir::Instruction::CallVirt(_, ref val, ref params) |
         ir::Instruction::CallProcVirt(ref val, ref params) => {
             if let ir::Value::Bytes(ref s) = *val {
-                    if !strings.contains_key(s) {
+                if !strings.contains_key(s) {
                     let at = mem.len() as u32;
                     mem.extend(s.iter().cloned());
                     strings.insert(s.clone(), at);
@@ -857,14 +867,14 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
         ir::Instruction::BinaryOp(_, _, ref a, ref b) |
         ir::Instruction::DerefStore(ref a, _, ref b) => {
             if let ir::Value::Bytes(ref s) = *a {
-                    if !strings.contains_key(s) {
+                if !strings.contains_key(s) {
                     let at = mem.len() as u32;
                     mem.extend(s.iter().cloned());
                     strings.insert(s.clone(), at);
                 }
             }
             if let ir::Value::Bytes(ref s) = *b {
-                    if !strings.contains_key(s) {
+                if !strings.contains_key(s) {
                     let at = mem.len() as u32;
                     mem.extend(s.iter().cloned());
                     strings.insert(s.clone(), at);
@@ -873,4 +883,61 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
         }
         _ => {}
     }
+}
+
+fn validate_symbol_refs(i: &ir::Instruction, symbol_ids: &HashMap<ir::Symbol, u32>) -> Result<(), Error> {
+    match *i {
+        ir::Instruction::Assign(_, ir::Value::Symbol(ref s)) |
+        ir::Instruction::CastAssign(_, ir::Value::Symbol(ref s)) |
+        ir::Instruction::DerefLoad(_, ir::Value::Symbol(ref s), _) |
+        ir::Instruction::Store(_, _, ir::Value::Symbol(ref s)) |
+        ir::Instruction::UnaryOp(_, _, ir::Value::Symbol(ref s)) => {
+            if !symbol_ids.contains_key(s) {
+                return Err(Error::MissingSymbol(s.clone()));
+            }
+        }
+        ir::Instruction::Call(_, ref s, ref params) |
+        ir::Instruction::CallProc(ref s, ref params) => {
+            if !symbol_ids.contains_key(s) {
+                return Err(Error::MissingSymbol(s.clone()));
+            }
+            for param in params {
+                if let ir::Value::Symbol(ref s) = *param {
+                    if !symbol_ids.contains_key(s) {
+                        return Err(Error::MissingSymbol(s.clone()));
+                    }
+                }
+            }
+        }
+        ir::Instruction::CallVirt(_, ref val, ref params) |
+        ir::Instruction::CallProcVirt(ref val, ref params) => {
+            if let ir::Value::Symbol(ref s) = *val {
+                if !symbol_ids.contains_key(s) {
+                    return Err(Error::MissingSymbol(s.clone()));
+                }
+            }
+            for param in params {
+                if let ir::Value::Symbol(ref s) = *param {
+                    if !symbol_ids.contains_key(s) {
+                        return Err(Error::MissingSymbol(s.clone()));
+                    }
+                }
+            }
+        }
+        ir::Instruction::BinaryOp(_, _, ref a, ref b) |
+        ir::Instruction::DerefStore(ref a, _, ref b) => {
+            if let ir::Value::Symbol(ref s) = *a {
+                if !symbol_ids.contains_key(s) {
+                    return Err(Error::MissingSymbol(s.clone()));
+                }
+            }
+            if let ir::Value::Symbol(ref s) = *b {
+                if !symbol_ids.contains_key(s) {
+                    return Err(Error::MissingSymbol(s.clone()));
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
