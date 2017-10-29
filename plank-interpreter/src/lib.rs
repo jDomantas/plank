@@ -19,6 +19,21 @@ impl ::std::convert::From<io::Error> for Error {
     }
 }
 
+impl ::std::fmt::Display for Error {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            Error::BadDeref => write!(f, "dereferenced invalid pointer"),
+            Error::DivisionByZero => write!(f, "division by zero"),
+            Error::MissingSymbol(ref sym) => {
+                write!(f, "missing definition for symbol `{}`", sym.0)
+            }
+            Error::Io(ref err) => {
+                write!(f, "io error: {}", err)
+            }
+        }
+    }
+}
+
 pub fn run_program<R: Read, W: Write>(program: &Program, input: R, output: W) -> Result<i32, Error> {
     plank_ir::validate_ir(program);
     Vm::new(program, input, output)?.run()
@@ -76,12 +91,14 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         let mut symbol_ids = HashMap::new();
         let mut symbols_by_id = HashMap::new();
         for (index, (symbol, f)) in program.functions.iter().enumerate() {
-            if f.start_block.is_some() {
+            if f.start_block.is_some() ||
+                &*symbol.0 == "@plank_getc" ||
+                &*symbol.0 == "@plank_putc"
+            {
                 symbol_ids.insert(symbol.clone(), index as u32);
                 symbols_by_id.insert(index as u32, symbol.clone());
             }
         }
-        println!("symbols: {:?}", symbol_ids);
         let mut strings = HashMap::new();
         let mut memory = vec![0, 0, 0, 0];
         for f in program.functions.values() {

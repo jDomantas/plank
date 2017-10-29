@@ -11,13 +11,15 @@ use std::convert::From;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use plank_errors::reporter::Diagnostic;
+use plank_errors::Reporter;
 
 
 #[derive(Debug)]
 enum Error {
     Io(io::Error),
-    Build(Vec<Diagnostic>),
+    BuildFail,
+    Interpreter(plank_interpreter::Error),
+    InterpreterExit(i32),
 }
 
 impl From<io::Error> for Error {
@@ -26,11 +28,18 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<plank_interpreter::Error> for Error {
+    fn from(err: plank_interpreter::Error) -> Error {
+        Error::Interpreter(err)
+    }
+}
+
 #[derive(Debug)]
 enum Command {
     Lex,
     Parse,
     EmitIr,
+    Interpret,
 }
 
 #[derive(Debug)]
@@ -51,12 +60,21 @@ type Result<T> = ::std::result::Result<T, Error>;
 fn main() {
     match run() {
         Ok(()) => {}
-        Err(Error::Build(_)) => {
+        Err(Error::BuildFail) => {
+            eprintln!("error: build failed");
             ::std::process::exit(1);
         }
         Err(Error::Io(err)) => {
-            println!("IO error:\n{}", err);
+            eprintln!("IO error:\n{}", err);
             ::std::process::exit(1);
+        }
+        Err(Error::Interpreter(ref err)) => {
+            eprintln!("Interpreter failed:\n{}", err);
+            ::std::process::exit(1);
+        }
+        Err(Error::InterpreterExit(code)) => {
+            eprintln!("Interpreter exited with status code {}", code);
+            ::std::process::exit(code);
         }
     }
 }
@@ -64,7 +82,7 @@ fn main() {
 fn run() -> Result<()> {
     let params = parse_params()?;
     let input = read_input(&params.input)?;
-    let result = match params.output {
+    match params.output {
         Stream::Std => {
             let stdout = io::stdout();
             let stdout = stdout.lock();
@@ -74,39 +92,15 @@ fn run() -> Result<()> {
             let file = ::std::fs::File::create(name)?;
             run_command(&input, &params.command, file)
         }
-    };
-    if let Err(Error::Build(ref diagnostics)) = result {
-        plank_errors::print_diagnostics(&input, diagnostics);
     }
-    result
 }
 
-fn run_command<W: Write>(input: &str, command: &Command, mut output: W) -> Result<()> {
+fn run_command<W: Write>(input: &str, command: &Command, output: W) -> Result<()> {
     match *command {
-        Command::Lex => {
-            let tokens = lex(input)?;
-            for tok in &tokens {
-                output.write_fmt(format_args!("{:?}\n", tok))?;
-            }
-            Ok(())
-        }
-        Command::Parse => {
-            let program = parse(input)?;
-            let formatted = ast_printer::format_program(&program);
-            output.write_all(formatted.as_bytes())?;
-            output.write_all(b"\n")?;
-            Ok(())
-        }
-        Command::EmitIr => {
-            let ir = emit_ir(input)?;
-            plank_ir::emit_program(&ir, &mut output)?;
-            //plank_ir::validate_ir(&ir);
-            let input = io::empty();
-            writeln!(output, "running")?;
-            plank_interpreter::run_program(&ir, input, &mut output).unwrap();
-            writeln!(output, "done")?;
-            Ok(())
-        }
+        Command::Lex => lex(input, output),
+        Command::Parse => parse(input, output),
+        Command::EmitIr => emit_ir(input, output),
+        Command::Interpret => interpret(input, output),
     }
 }
 
@@ -117,15 +111,19 @@ fn parse_params() -> Result<Params> {
         .arg(Arg::with_name("lex")
             .long("lex")
             .help("List tokens in input")
-            .conflicts_with_all(&["parse", "emit-ir"]))
+            .conflicts_with_all(&["parse", "emit-ir", "interpret"]))
         .arg(Arg::with_name("parse")
             .long("parse")
             .help("Parse input")
-            .conflicts_with_all(&["lex", "emit-ir"]))
+            .conflicts_with_all(&["lex", "emit-ir", "interpret"]))
         .arg(Arg::with_name("emit-ir")
             .long("emit-ir")
             .help("Emit plank IR")
-            .conflicts_with_all(&["lex", "parse"]))
+            .conflicts_with_all(&["lex", "parse", "interpret"]))
+        .arg(Arg::with_name("interpret")
+            .long("interpret")
+            .help("Compile to IR and interpret")
+            .conflicts_with_all(&["lex", "parse", "emit-ir"]))
         .arg(Arg::with_name("input")
             .index(1)
             .help("Set input file, uses stdin if none provided"))
@@ -135,13 +133,15 @@ fn parse_params() -> Result<Params> {
             .takes_value(true)
             .help("Set output file, uses stdout if none provided"))
         .get_matches();
-    let default_command = Command::EmitIr;
+    let default_command = Command::Interpret;
     let command = if matches.is_present("lex") {
         Command::Lex
     } else if matches.is_present("parse") {
         Command::Parse
     } else if matches.is_present("emit-ir") {
         Command::EmitIr
+    } else if matches.is_present("interpret") {
+        Command::Interpret
     } else {
         default_command
     };
@@ -187,47 +187,62 @@ fn read_input(stream: &Stream) -> Result<String> {
     }
 }
 
-fn lex(source: &str) -> Result<Vec<plank_syntax::tokens::Token>> {
-    let reporter = plank_errors::Reporter::new();
-    let tokens = plank_syntax::lex(source, reporter.clone());
-    let diagnostics = reporter.get_diagnostics();
-    if diagnostics.is_empty() {
-        Ok(tokens
-            .into_iter()
-            .map(plank_syntax::position::Spanned::into_value)
-            .collect())
-    } else {
-        Err(Error::Build(diagnostics))
-    }
-}
-
-fn parse(source: &str) -> Result<plank_syntax::ast::Program> {
-    // don't reuse lex function, because we wan't to merge lex and parse errors
-    let reporter = plank_errors::Reporter::new();
-    let tokens = plank_syntax::lex(source, reporter.clone());
-    let program = plank_syntax::parse(tokens, reporter.clone());
+fn emit_diagnostics(input: &str, reporter: Reporter) -> Result<()> {
     let mut diagnostics = reporter.get_diagnostics();
-    if diagnostics.is_empty() {
-        Ok(program)
+    diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
+    plank_errors::print_diagnostics(&input, &diagnostics);
+    if reporter.has_errors() {
+        Err(Error::BuildFail)
     } else {
-        diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
-        Err(Error::Build(diagnostics))
+        Ok(())
     }
 }
 
-fn emit_ir(source: &str) -> Result<plank_ir::Program> {
-    let reporter = plank_errors::Reporter::new();
+fn lex<W: Write>(source: &str, mut output: W) -> Result<()> {
+    let reporter = Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    emit_diagnostics(source, reporter)?;
+    for tok in tokens {
+        output.write_fmt(format_args!("{:?}\n", *tok))?;
+    }
+    Ok(())
+}
+
+fn parse<W: Write>(source: &str, mut output: W) -> Result<()> {
+    let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
-    match plank_frontend::compile(&program, reporter.clone()) {
-        Ok(ir) => {
-            Ok(ir)
-        }
-        Err(()) => {
-            let mut diagnostics = reporter.get_diagnostics();
-            assert!(reporter.has_errors());
-            diagnostics.sort_by_key(|d| d.primary_span.map(|s| s.start));
-            Err(Error::Build(diagnostics))
-        }
+    emit_diagnostics(source, reporter)?;
+    let formatted = ast_printer::format_program(&program);
+    output.write_all(formatted.as_bytes())?;
+    output.write_all(b"\n")?;
+    Ok(())
+}
+
+fn emit_ir<W: Write>(source: &str, mut output: W) -> Result<()> {
+    let reporter = Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let program = plank_syntax::parse(tokens, reporter.clone());
+    let ir = plank_frontend::compile(&program, reporter.clone());
+    emit_diagnostics(source, reporter)?;
+    let ir = ir.expect("no errors but failed to produce IR");
+    plank_ir::emit_program(&ir, &mut output)?;
+    plank_ir::validate_ir(&ir);
+    Ok(())
+}
+
+fn interpret<W: Write>(source: &str, output: W) -> Result<()> {
+    let reporter = Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let program = plank_syntax::parse(tokens, reporter.clone());
+    let ir = plank_frontend::compile(&program, reporter.clone());
+    emit_diagnostics(source, reporter)?;
+    let ir = ir.expect("build succeeded but failed to produce IR");
+    let input = io::empty();
+    let exit_code = plank_interpreter::run_program(&ir, input, output)?;
+    if exit_code == 0 {
+        Ok(())
+    } else {
+        Err(Error::InterpreterExit(exit_code))
     }
 }
