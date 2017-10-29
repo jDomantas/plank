@@ -2,6 +2,8 @@
 
 This is an implementation of plank - a little programming language I am building for "Compiling methods" course.
 
+Currently there is a compiler frontend that can generate plank IR, and a simple interpreter that can execute generated IR.
+
 This repository currently consists of 7 crates:
 
 * `plank-errors` - defines `Position` and `Span` types, handles error reporting and formatting.
@@ -32,7 +34,7 @@ fn main() -> i32 {
 }
 ```
 
-You can find more in [/examples](./examples).
+You can find more in [examples](./examples).
 
 ## Installing
 
