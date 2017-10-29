@@ -39,7 +39,7 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
         return Ok(());
     }
     writeln!(out, "start:")?;
-    writeln!(out, "    goto label_{}:", func.start_block.unwrap().0)?;
+    writeln!(out, "    goto label_{}", func.start_block.unwrap().0)?;
     for (id, block) in &func.blocks {
         writeln!(out, "label_{}:", id.0)?;
         for op in &block.ops {
