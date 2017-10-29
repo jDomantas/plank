@@ -1,0 +1,38 @@
+fn print_byte(x: u8) {
+    if x >= 10 {
+        print_byte(x / 10);
+    }
+    putc('0' + x % 10);
+}
+
+fn modify(ptr: *u8) {
+    *ptr = *ptr * 10 + 2;
+}
+
+fn basic() {
+    let x = 3;
+    print_byte(x);
+    putc('\n');
+
+    modify(&x);
+    print_byte(x);
+    putc('\n');
+}
+
+fn arithmetic() {
+    // there is no builtin pointer arithmetic,
+    // but we can use casts! :D
+    let string: *u8 = "Test string!\n";
+    while *string != 0 {
+        putc(*string);
+        // pointers are currently 32 bits wide,
+        // so we can cast pointer to u32, add 1, and cast back
+        string = (string as u32 + 1) as *u8;
+    }
+}
+
+fn main() -> i32 {
+    basic();
+    arithmetic();
+    return 0;
+}

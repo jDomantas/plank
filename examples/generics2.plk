@@ -1,0 +1,25 @@
+// structs can be generic too!
+struct Pair<A, B> {
+    first: A,
+    second: B,
+}
+
+fn puts(string: *u8) {
+    while *string != 0 {
+        putc(*string);
+        // this doesn't look very nice :(
+        string = (string as u32 + 1) as *u8;
+    }
+    putc('\n');
+}
+
+fn main() -> i32 {
+    let a: Pair<*u8, i32> = Pair("foobar", 123);
+    let b: Pair<i32, _> = Pair(1, a.first);
+    //               ^
+    // we can ask the compiler to infer parts
+    // of the type too, just like in Rust
+    puts(a.first);
+    puts(b.second);
+    return 0;
+}

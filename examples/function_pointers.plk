@@ -1,0 +1,26 @@
+fn invoke(f: fn(u8)) {
+    f('!');
+}
+
+fn does_nothing<T>(x: T) {}
+
+fn apply<A, B>(f: fn(A) -> B, arg: A) -> B {
+    return f(arg);
+}
+
+fn main() -> i32 {
+    invoke(putc);
+    invoke(does_nothing);
+    putc('\n');
+
+    // putc is declared (internally) as:
+    //   fn putc(ch: u8);
+    // which is a shorthand for:
+    //   fn putc(ch: u8) -> unit;
+    // so we can use apply just fine!
+    // (explicit types are not necessary here, compiler infers them just fine)
+    apply::<u8, unit>(putc, '?');
+    putc('\n');
+
+    return 0;
+}

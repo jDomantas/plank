@@ -1,0 +1,53 @@
+fn next_letter(x: u8) -> u8 {
+    if x == 'z' {
+        return 'a';
+    } else {
+        return x + 1;
+    }
+}
+
+fn print_letters() {
+    let letter = 'a';
+    loop {
+        putc(letter);
+        letter = next_letter(letter);
+        if letter == 'a' {
+            // we looped around
+            break;
+        }
+    }
+    putc('\n');
+}
+
+fn print_byte(x: u8) {
+    if x >= 10 {
+        print_byte(x / 10);
+    }
+    putc('0' + x % 10);
+}
+
+fn show_math(x: u8, y: u8, z: u8) {
+    putc('(');
+    print_byte(x);
+    putc('+');
+    print_byte(y);
+    putc(')');
+    putc('*');
+    print_byte(z);
+    putc('=');
+    print_byte((x + y) * z);
+    putc('\n');
+}
+
+fn main() -> i32 {
+    print_letters();
+    show_math(1, 2, 3);
+
+    // we can also use named parameters
+    show_math(
+        y: 3,
+        x: 10,
+        z: 4,
+    );
+    return 0;
+}

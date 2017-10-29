@@ -1,0 +1,11 @@
+// try to look at this program using `plank --emit-ir generics.plk`
+
+fn identity<T>(x: T) -> T {
+    return x;
+}
+
+fn main() -> i32 {
+    let x: u32 = identity(12345u32);
+    let i: i8 = identity(123i8);
+    return 0;
+}

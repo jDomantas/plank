@@ -1,0 +1,39 @@
+struct Pair {
+    first: u8,
+    second: u8,
+}
+
+/* When you declare a struct compiler generates a constructor function:
+ * fn Pair(first: u8, second: u8) -> Pair;
+ */
+
+fn print_byte(x: u8) {
+    if x >= 10 {
+        print_byte(x / 10);
+    }
+    putc('0' + x % 10);
+}
+
+fn print_pair(pair: Pair) {
+    putc('(');
+    print_byte(pair.first);
+    putc(',');
+    putc(' ');
+    print_byte(pair.second);
+    putc(')');
+    putc('\n');
+}
+
+fn main() -> i32 {
+    let pair = Pair(1, 2);
+    print_pair(pair);
+
+    // we can use named parameters for more readable construction
+    let pair = Pair(
+        first: 255,
+        second: 8,
+    );
+    print_pair(pair);
+
+    return 0;
+}

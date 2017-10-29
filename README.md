@@ -14,7 +14,25 @@ This repository currently consists of 7 crates:
 
 ## Examples
 
-Coming soon™.
+Here's a hello world program:
+
+```rust
+fn puts(string: *u8) {
+    while *string != 0 {
+        putc(*string);
+        // this doesn't look very nice :(
+        string = (string as u32 + 1) as *u8;
+    }
+    putc('\n');
+}
+
+fn main() -> i32 {
+    puts("Hello, world!");
+    return 0;
+}
+```
+
+You can find more in [/examples](./examples).
 
 ## Installing
 
