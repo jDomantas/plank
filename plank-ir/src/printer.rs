@@ -94,7 +94,7 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             writeln!(out)
         }
         ir::Instruction::CallProc(ref sym, ref params) => {
-            write!(out, "    call {}", sym.0)?;
+            write!(out, "    callproc {}", sym.0)?;
             emit_params(params, out)?;
             writeln!(out)
         }
@@ -105,7 +105,7 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             writeln!(out)
         }
         ir::Instruction::CallProcVirt(ref val, ref params) => {
-            write!(out, "    callvirt ")?;
+            write!(out, "    callprocvirt ")?;
             emit_value(val, out)?;
             emit_params(params, out)?;
             writeln!(out)
