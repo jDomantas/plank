@@ -82,7 +82,7 @@ There are 14 kinds of instructions:
 * Call (written as `<register> = call <symbol>(<value-list>)`) - calls a function associated with given symbol, passing given values as parameters. Parameter sizes and alignments must match those in called function declaration. Register size and alignment must match those of called function return value. Stores return value in given register.
 * Call procedure (written as `callproc <symbol>(<value-list>)`) - same as call, but for functions that do not return a value. Note only functions that do not return a value cannot be called with `callproc`.
 * Virtual call (written as `<register> = callvirt <value>(<value-list>)`) - same as call, but calls not a concrete function, but a function that is pointed to by given value. Value must be function-pointer-sized.
-* Virtual procedure call (written as `callprocvirt`) - same as `callproc`, but virtual call.
+* Virtual procedure call (written as `callprocvirt <value>(<value-list>)`) - same as `callproc`, but virtual call.
 * Deref store (written as `store (<value> + <offset>) <value-2>`) - store `value-2` at address `value + offset`. `<value>` must be pointer-sized.
 * Deref load (written `<register> = deref (<value> + <offset>)`) - read value from address `value + offset`. `<value>` must be pointer-sized.
 * Store (written as `<register>[<offset>] = <value>`) - write `value` to register with given offset. Value must fit inside register after the shift.
