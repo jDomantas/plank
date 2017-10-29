@@ -53,10 +53,10 @@ label_2:
 Every function block has its own Id. Ids are unique in a function, but not necessarily unique between functions. Also block has a (possibly empty) list of instructions, and a special block end instruction.
 
 Possible block end instructions:
-* Jump (printed as `goto <block-id>`) - continue execution from given block.
-* Branch (printer as `branch <value> <then-block> <else-block>`) - if `value` is not zero, continue execution from block `then-block`, otherwise from `else-block`. Value must be 8 bits wide.
-* Return (printed as `return`) - return from current function. Cannot be used in functions that return a value.
-* Return value (printed as `return <value>`) - return a value from current function. Cannot be used in functions that do not return a value. Size and alignment of value must match those in function declaration.
+* Jump (written as `goto <block-id>`) - continue execution from given block.
+* Branch (written as `branch <value> <then-block> <else-block>`) - if `value` is not zero, continue execution from block `then-block`, otherwise from `else-block`. Value must be 8 bits wide.
+* Return (written as `return`) - return from current function. Cannot be used in functions that return a value.
+* Return value (written as `return <value>`) - return a value from current function. Cannot be used in functions that do not return a value. Size and alignment of value must match those in function declaration.
 
 ### Block examples
 
