@@ -36,7 +36,7 @@ function foo(%0): { 4, 4 }
     register %0: size 1, align 1
     register %1: size 1, align 1
 start:
-    goto label_0:
+    goto label_0
 label_0:
     %1 = xor_8 %0 1_b8
     branch %1 label_1 label_2
