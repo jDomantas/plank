@@ -489,16 +489,11 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
             queue.insert(symbol, (id, Vec::new()));
         }
     }
-    loop {
-        let (symbol, sym, types) = if let Some(symbol) = queue.keys().next().cloned() {
-            let (sym, t) = queue.remove(&symbol).unwrap();
-            if functions.contains_key(&symbol) {
-                continue;
-            }
-            (symbol, sym, t)
-        } else {
-            break;
-        };
+    while let Some(symbol) = queue.keys().next().cloned() {
+        let (sym, types) = queue.remove(&symbol).unwrap();
+        if functions.contains_key(&symbol) {
+            continue;
+        }
         let function = &program.functions[&sym];
         debug_assert_eq!(types.len(), function.type_params.len());
         let type_params = function
