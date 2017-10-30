@@ -1,0 +1,62 @@
+struct Pair<A, B> {
+    first: A,
+    second: B,
+}
+
+struct PairOfInts {
+    i: i32,
+    j: i32,
+}
+
+fn print_num(num: u32) {
+    if num >= 10 {
+        print_num(num / 10);
+    }
+    putc('0' + ((num % 10) as Pair<u8, u16>).first);
+}
+
+fn print(msg: *u8) {
+    while *msg != 0 {
+        putc(*msg);
+        msg = (msg as u32 + 1) as *u8;
+    }
+}
+
+fn print_size<T>(name: *u8) {
+    print("size_of::<");
+    print(name);
+    print(">() = ");
+    print_num(size_of::<T>());
+    putc('\n');
+}
+
+fn main() -> i32 {
+    // numeric types
+    print_size::<u8>("u8");
+    print_size::<i8>("i8");
+    print_size::<u16>("u16");
+    print_size::<i16>("i16");
+    print_size::<u32>("u32");
+    print_size::<i32>("i32");
+
+    // bool
+    print_size::<bool>("bool");
+
+    // unit - a zero sized type with value also called `unit`.
+    // functions that do not have a specified return type return unit
+    print_size::<unit>("unit");
+
+    // pointers and function pointers
+    print_size::<*u8>("*u8");
+    print_size::<*Pair<u8, u32>>("*Pair<u8, u32>");
+    print_size::<fn(u8) -> i32>("fn(u8) -> i32");
+
+    // structs
+    print_size::<PairOfInts>("PairOfInts");
+
+    // generic structs
+    print_size::<Pair<u8, u8>>("Pair<u8, u8>");
+    print_size::<Pair<i32, *u8>>("Pair<i32, *u8>");
+
+    return 0;
+}
