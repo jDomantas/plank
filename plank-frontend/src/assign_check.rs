@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use plank_syntax::position::{Span, Spanned};
+use plank_syntax::position::Spanned;
 use ast::cfg::{Program, Function, Block, Reg, Instruction, Value, BlockId, BlockEnd};
 use CompileCtx;
 
@@ -63,6 +63,7 @@ impl<'a> Context<'a> {
         let mut assigned = HashSet::new();
         for op in &block.ops {
             match **op {
+                Instruction::Init(reg) |
                 Instruction::Assign(reg, _) |
                 Instruction::BinaryOp(reg, _, _, _) |
                 Instruction::Call(reg, _, _) |
@@ -84,34 +85,35 @@ impl<'a> Context<'a> {
     fn check_block(&mut self, id: BlockId, block: &Block) {
         let mut assigned = HashSet::new();
         for op in &block.ops {
-            let span = Spanned::span(op);
             match **op {
                 Instruction::Assign(_, ref val) |
                 Instruction::UnaryOp(_, _, ref val) |
                 Instruction::FieldStore(_, _, ref val) |
                 Instruction::CastAssign(_, ref val) => {
-                    self.check_value(val, span, id, &assigned);
+                    self.check_value(val, id, &assigned);
                 }
                 Instruction::DerefStore(ref a, _, _, ref b) |
                 Instruction::BinaryOp(_, _, ref a, ref b) => {
-                    self.check_value(a, span, id, &assigned);
-                    self.check_value(b, span, id, &assigned);
+                    self.check_value(a, id, &assigned);
+                    self.check_value(b, id, &assigned);
                 }
                 Instruction::Call(_, ref value, ref params) => {
-                    self.check_value(value, span, id, &assigned);
+                    self.check_value(value, id, &assigned);
                     for param in params {
-                        self.check_value(param, span, id, &assigned);
+                        self.check_value(param, id, &assigned);
                     }
                 }
                 Instruction::Error |
                 Instruction::StartStatement |
-                Instruction::Drop(_) => {}
+                Instruction::Drop(_) |
+                Instruction::Init(_) => {}
                 Instruction::TakeAddress(_, reg, _) => {
-                    let val = Value::Reg(reg);
-                    self.check_value(&val, span, id, &assigned);
+                    let val = Spanned::map(reg, Value::Reg);
+                    self.check_value(&val, id, &assigned);
                 }
             }
             match **op {
+                Instruction::Init(reg) |
                 Instruction::Assign(reg, _) |
                 Instruction::BinaryOp(reg, _, _, _) |
                 Instruction::Call(reg, _, _) |
@@ -129,8 +131,8 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn check_value(&mut self, value: &Value, span: Span, block: BlockId, block_assigned: &HashSet<Reg>) {
-        match *value {
+    fn check_value(&mut self, value: &Spanned<Value>, block: BlockId, block_assigned: &HashSet<Reg>) {
+        match **value {
             Value::Int(_, _) |
             Value::Symbol(_, _) |
             Value::Bytes(_) |
@@ -141,6 +143,7 @@ impl<'a> Context<'a> {
             Value::Reg(reg) => {
                 let var_symbol = self.function.register_symbols[&reg];
                 let name = self.ctx.symbols.get_name(var_symbol);
+                println!("state of {:?}, block {:?}", reg, block);
                 let msg = match self.start_state[&(reg, block)] {
                     VarState::Assigned => return,
                     VarState::Unassigned(_) => format!(
@@ -152,6 +155,7 @@ impl<'a> Context<'a> {
                         name,
                     ),
                 };
+                let span = Spanned::span(value);
                 self.ctx
                     .reporter
                     .error(msg, span)
@@ -179,7 +183,8 @@ impl<'a> Context<'a> {
 
     fn count_entries(&self) -> HashMap<BlockId, u32> {
         let mut entries = HashMap::new();
-        for block in self.function.blocks.values() {
+        for (&id, block) in &self.function.blocks {
+            entries.entry(id).or_insert(0);
             match block.end {
                 BlockEnd::Jump(to) => {
                     *entries.entry(to).or_insert(0) += 1;

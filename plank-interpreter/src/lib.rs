@@ -535,7 +535,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 self.write_value(address, None, value);
                 Ok(())
             }
-            ir::Instruction::Drop(_) => Ok(()),
+            ir::Instruction::Drop(_) |
+            ir::Instruction::Init(_) => Ok(()),
             ir::Instruction::Load(dest, reg, offset) => {
                 let (to, len) = self.register_address(dest);
                 let (from, _) = self.register_address(reg);

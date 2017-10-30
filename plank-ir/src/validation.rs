@@ -112,7 +112,8 @@ impl<'a> Context<'a> {
                 assert_eq!(self.value_size(address), ::ir::POINTER_SIZE);
                 assert!(self.value_size(value) > 0);
             }
-            Instruction::Drop(reg) => {
+            Instruction::Drop(reg) |
+            Instruction::Init(reg) => {
                 assert!(self.function.registers.contains_key(&reg));
             }
             Instruction::Load(dest, reg, offset) => {

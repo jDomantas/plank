@@ -48,18 +48,19 @@ pub enum BlockLink {
 #[derive(Debug, Clone)]
 pub enum Instruction {
     StartStatement,
+    Init(Reg),
     Drop(Reg),
-    BinaryOp(Reg, BinaryOp, Value, Value),
-    UnaryOp(Reg, UnaryOp, Value),
-    Call(Reg, Value, Vec<Value>),
+    BinaryOp(Reg, BinaryOp, Spanned<Value>, Spanned<Value>),
+    UnaryOp(Reg, UnaryOp, Spanned<Value>),
+    Call(Reg, Spanned<Value>, Vec<Spanned<Value>>),
     /// (*value1).field1.field2... = value1
-    DerefStore(Value, Type, Vec<usize>, Value),
+    DerefStore(Spanned<Value>, Type, Vec<usize>, Spanned<Value>),
     /// reg.field1.field2... = value
-    FieldStore(Reg, Vec<usize>, Value),
+    FieldStore(Spanned<Reg>, Vec<usize>, Spanned<Value>),
     /// reg = &reg.field1.field2...
-    TakeAddress(Reg, Reg, Vec<usize>),
-    Assign(Reg, Value),
-    CastAssign(Reg, Value),
+    TakeAddress(Reg, Spanned<Reg>, Vec<usize>),
+    Assign(Reg, Spanned<Value>),
+    CastAssign(Reg, Spanned<Value>),
     Error,
 }
 
@@ -75,9 +76,9 @@ pub enum Value {
 
 #[derive(Debug, Clone)]
 pub enum BlockEnd {
-    Return(Value),
+    Return(Spanned<Value>),
     Jump(BlockId),
-    Branch(Value, BlockId, BlockId),
+    Branch(Spanned<Value>, BlockId, BlockId),
     Error,
 }
 
@@ -316,6 +317,9 @@ pub(crate) mod printer {
 
     fn print_instruction(i: &Instruction, ctx: &CompileCtx) {
         match *i {
+            Instruction::Init(reg) => {
+                println!("    init r{}", reg.0);
+            }
             Instruction::Assign(reg, ref value) => {
                 println!("    r{} = {}", reg.0, d(value, ctx));
             }

@@ -1,4 +1,5 @@
 use std::collections::{HashSet, VecDeque};
+use plank_syntax::position::Spanned;
 use ast::cfg::{Block, BlockEnd, Function, Instruction, Program, Type, Value};
 use CompileCtx;
 
@@ -34,7 +35,9 @@ fn check_function(f: &mut Function, ctx: &mut CompileCtx) {
         }
         match block.end {
             BlockEnd::Error if allow_no_return => {
-                block.end = BlockEnd::Return(Value::Unit);
+                // TODO: this is not a very good span for this
+                let spanned = Spanned::new(Value::Unit, f.complete_span);
+                block.end = BlockEnd::Return(spanned);
             }
             BlockEnd::Error => {
                 let span = f.complete_span;

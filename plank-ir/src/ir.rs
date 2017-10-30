@@ -42,6 +42,8 @@ pub struct Block {
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
+    /// `init reg`
+    Init(Reg),
     /// `drop reg`
     Drop(Reg),
     /// `reg = op a b`

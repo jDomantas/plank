@@ -105,8 +105,9 @@ impl<'a> Builder<'a> {
             .push(Spanned::new(op, span));
     }
 
-    fn emit_store(&mut self, target: LValue, target_span: Span, value: cfg::Value) {
-        match target {
+    fn emit_store(&mut self, target: Spanned<LValue>, value: Spanned<cfg::Value>, op_span: Span) {
+        let target_span = Spanned::span(&target);
+        match Spanned::into_value(target) {
             LValue::Invalid => {
                 self.ctx
                     .reporter
@@ -117,25 +118,35 @@ impl<'a> Builder<'a> {
             LValue::Error => {}
             LValue::Deref(val, typ, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::DerefStore(val.as_value(), typ, fields, value),
-                    target_span,
+                    cfg::Instruction::DerefStore(
+                        Spanned::new(val.as_value(), target_span),
+                        typ,
+                        fields,
+                        value,
+                    ),
+                    op_span,
                 );
                 self.drop_value(&val, target_span);
             }
             LValue::Reg(reg, ref fields) if fields.is_empty() => {
-                self.emit_instruction(cfg::Instruction::Assign(reg, value), target_span);
+                self.emit_instruction(cfg::Instruction::Assign(reg, value), op_span);
             }
             LValue::Reg(reg, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::FieldStore(reg, fields, value),
-                    target_span,
+                    cfg::Instruction::FieldStore(
+                        Spanned::new(reg, target_span),
+                        fields,
+                        value,
+                    ),
+                    op_span,
                 );
             }
         }
     }
 
-    fn emit_take_address(&mut self, target: cfg::Reg, value_span: Span, value: LValue) {
-        match value {
+    fn emit_take_address(&mut self, target: cfg::Reg, value: Spanned<LValue>, op_span: Span) {
+        let value_span = Spanned::span(&value);
+        match Spanned::into_value(value) {
             LValue::Invalid => {
                 self.ctx
                     .reporter
@@ -145,7 +156,13 @@ impl<'a> Builder<'a> {
             }
             LValue::Error => {}
             LValue::Deref(ref val, _, ref fields) if fields.is_empty() => {
-                self.emit_instruction(cfg::Instruction::Assign(target, val.as_value()), value_span);
+                self.emit_instruction(
+                    cfg::Instruction::Assign(
+                        target,
+                        Spanned::new(val.as_value(), value_span),
+                    ),
+                    op_span,
+                );
                 self.drop_value(val, value_span);
             }
             LValue::Deref(val, typ, fields) => {
@@ -153,16 +170,20 @@ impl<'a> Builder<'a> {
                     cfg::Instruction::UnaryOp(
                         target,
                         cfg::UnaryOp::OffsetAddress(typ, fields),
-                        val.as_value(),
+                        Spanned::new(val.as_value(), value_span),
                     ),
-                    value_span,
+                    op_span,
                 );
                 self.drop_value(&val, value_span);
             }
             LValue::Reg(reg, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::TakeAddress(target, reg, fields),
-                    value_span,
+                    cfg::Instruction::TakeAddress(
+                        target,
+                        Spanned::new(reg, value_span),
+                        fields,
+                    ),
+                    op_span,
                 );
             }
         }
@@ -258,7 +279,14 @@ impl<'a> Builder<'a> {
                 let else_body = self.new_block();
                 let after = self.new_block();
                 let link = cfg::BlockLink::Weak(body);
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, else_body), link);
+                self.end_block(
+                    cfg::BlockEnd::Branch(
+                        Spanned::new(c.as_value(), cond.span),
+                        body,
+                        else_body,
+                    ),
+                    link,
+                );
                 self.start_block(body);
                 self.drop_value(&c, cond.span);
                 self.build_statement(then);
@@ -276,7 +304,14 @@ impl<'a> Builder<'a> {
                 let body = self.new_block();
                 let after = self.new_block();
                 let link = cfg::BlockLink::Weak(body);
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body, after), link);
+                self.end_block(
+                    cfg::BlockEnd::Branch(
+                        Spanned::new(c.as_value(), cond.span),
+                        body,
+                        after,
+                    ),
+                    link,
+                );
                 self.start_block(body);
                 self.drop_value(&c, cond.span);
                 self.build_statement(then);
@@ -287,13 +322,16 @@ impl<'a> Builder<'a> {
             }
             t::Statement::Let(name, ref typ, Some(ref value)) => {
                 let typ = (**typ).clone();
-                let var_register = self.new_var_register(Spanned::into_value(name), typ);
-                let value = self.build_expr(value);
+                let var_register = self.new_var_register(*name, typ);
+                let built_value = self.build_expr(value);
                 self.emit_instruction(
-                    cfg::Instruction::Assign(var_register, value.as_value()),
+                    cfg::Instruction::Assign(
+                        var_register,
+                        Spanned::new(built_value.as_value(), value.span),
+                    ),
                     span,
                 );
-                self.drop_value(&value, span);
+                self.drop_value(&built_value, value.span);
             }
             t::Statement::Let(name, ref typ, None) => {
                 // give it a register, but don't initialize it
@@ -317,7 +355,12 @@ impl<'a> Builder<'a> {
                 let value = self.build_expr(e);
                 let new = self.new_block();
                 let link = cfg::BlockLink::Strong(new);
-                self.end_block(cfg::BlockEnd::Return(value.as_value()), link);
+                self.end_block(
+                    cfg::BlockEnd::Return(
+                        Spanned::new(value.as_value(), e.span),
+                    ),
+                    link,
+                );
                 self.start_block(new);
             }
             t::Statement::While(ref cond, ref body) => {
@@ -331,7 +374,14 @@ impl<'a> Builder<'a> {
                 self.start_block(start);
                 let c = self.build_expr(cond);
                 let link = cfg::BlockLink::Weak(body_start);
-                self.end_block(cfg::BlockEnd::Branch(c.as_value(), body_start, after), link);
+                self.end_block(
+                    cfg::BlockEnd::Branch(
+                        Spanned::new(c.as_value(), cond.span),
+                        body_start,
+                        after,
+                    ),
+                    link,
+                );
                 self.start_block(body_start);
                 self.drop_value(&c, cond.span);
                 self.build_statement(body);
@@ -353,21 +403,30 @@ impl<'a> Builder<'a> {
                 t::BinaryOp::Assign => {
                     let target = self.build_expr_lvalue(lhs);
                     let value = self.build_expr(rhs);
-                    self.emit_store(target, lhs.span, value.as_value());
+                    self.emit_store(
+                        Spanned::new(target, lhs.span),
+                        Spanned::new(value.as_value(), rhs.span),
+                        e.span,
+                    );
                     value
                 }
                 t::BinaryOp::And => self.build_and(lhs, rhs),
                 t::BinaryOp::Or => self.build_or(lhs, rhs),
                 op => if let Some(op) = binop_to_instruction(op, &lhs.typ) {
-                    let lhs = self.build_expr(lhs);
-                    let rhs = self.build_expr(rhs);
+                    let built_lhs = self.build_expr(lhs);
+                    let built_rhs = self.build_expr(rhs);
                     let result = self.new_register(e.typ.clone());
                     self.emit_instruction(
-                        cfg::Instruction::BinaryOp(result, op, lhs.as_value(), rhs.as_value()),
+                        cfg::Instruction::BinaryOp(
+                            result,
+                            op,
+                            Spanned::new(built_lhs.as_value(), lhs.span),
+                            Spanned::new(built_rhs.as_value(), rhs.span),
+                        ),
                         e.span,
                     );
-                    self.drop_value(&lhs, e.span);
-                    self.drop_value(&rhs, e.span);
+                    self.drop_value(&built_lhs, lhs.span);
+                    self.drop_value(&built_rhs, rhs.span);
                     RValue::Temp(cfg::Value::Reg(result))
                 } else {
                     RValue::Temp(cfg::Value::Error)
@@ -377,11 +436,18 @@ impl<'a> Builder<'a> {
                 let callee = self.build_expr(name);
                 let params = params
                     .iter()
-                    .map(|p| self.build_expr(p))
+                    .map(|p| Spanned::new(self.build_expr(p), p.span))
                     .collect::<Vec<_>>();
-                let param_values = params.iter().map(|p| p.as_value()).collect();
+                let param_values = params
+                    .iter()
+                    .map(|p| Spanned::new(p.as_value(), Spanned::span(p)))
+                    .collect();
                 let target = self.new_register(e.typ.clone());
-                let instr = cfg::Instruction::Call(target, callee.as_value(), param_values);
+                let instr = cfg::Instruction::Call(
+                    target,
+                    Spanned::new(callee.as_value(), name.span),
+                    param_values,
+                );
                 self.emit_instruction(instr, e.span);
                 self.drop_value(&callee, name.span);
                 for param in &params {
@@ -391,17 +457,17 @@ impl<'a> Builder<'a> {
             }
             t::Expr::Error => RValue::Temp(cfg::Value::Error),
             t::Expr::Field(ref expr, index) => {
-                let c_expr = self.build_expr(expr);
+                let built_expr = self.build_expr(expr);
                 let target = self.new_register(e.typ.clone());
                 self.emit_instruction(
                     cfg::Instruction::UnaryOp(
                         target,
                         cfg::UnaryOp::FieldLoad(expr.typ.clone(), vec![Spanned::into_value(index)]),
-                        c_expr.as_value(),
+                        Spanned::new(built_expr.as_value(), expr.span),
                     ),
                     e.span,
                 );
-                self.drop_value(&c_expr, e.span);
+                self.drop_value(&built_expr, expr.span);
                 RValue::Temp(cfg::Value::Reg(target))
             }
             t::Expr::Literal(ref literal) => RValue::Temp(match *literal {
@@ -445,16 +511,24 @@ impl<'a> Builder<'a> {
                 if op == t::UnaryOp::AddressOf {
                     let value = self.build_expr_lvalue(expr);
                     let result = self.new_register(e.typ.clone());
-                    self.emit_take_address(result, expr.span, value);
+                    self.emit_take_address(
+                        result,
+                        Spanned::new(value, expr.span),
+                        expr.span,
+                    );
                     RValue::Temp(cfg::Value::Reg(result))
                 } else if let Some(op) = unop_to_instruction(op, &expr.typ) {
-                    let expr = self.build_expr(expr);
+                    let built_expr = self.build_expr(expr);
                     let result = self.new_register(e.typ.clone());
                     self.emit_instruction(
-                        cfg::Instruction::UnaryOp(result, op, expr.as_value()),
+                        cfg::Instruction::UnaryOp(
+                            result,
+                            op,
+                            Spanned::new(built_expr.as_value(), expr.span),
+                        ),
                         e.span,
                     );
-                    self.drop_value(&expr, e.span);
+                    self.drop_value(&built_expr, e.span);
                     RValue::Temp(cfg::Value::Reg(result))
                 } else {
                     RValue::Temp(cfg::Value::Error)
@@ -464,7 +538,10 @@ impl<'a> Builder<'a> {
                 let value = self.build_expr(expr);
                 let result = self.new_register((**typ).clone());
                 self.emit_instruction(
-                    cfg::Instruction::CastAssign(result, value.as_value()),
+                    cfg::Instruction::CastAssign(
+                        result,
+                        Spanned::new(value.as_value(), expr.span),
+                    ),
                     expr.span,
                 );
                 RValue::Temp(cfg::Value::Reg(result))
@@ -509,14 +586,21 @@ impl<'a> Builder<'a> {
         let result = self.new_register(t::Type::Bool);
         let link = cfg::BlockLink::Strong(rhs_block);
         self.end_block(
-            cfg::BlockEnd::Branch(built_lhs.as_value(), rhs_block, reset_block),
+            cfg::BlockEnd::Branch(
+                Spanned::new(built_lhs.as_value(), lhs.span),
+                rhs_block,
+                reset_block,
+            ),
             link,
         );
         self.start_block(rhs_block);
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
         self.emit_instruction(
-            cfg::Instruction::Assign(result, built_rhs.as_value()),
+            cfg::Instruction::Assign(
+                result,
+                Spanned::new(built_rhs.as_value(), rhs.span),
+            ),
             rhs.span,
         );
         self.drop_value(&built_rhs, rhs.span);
@@ -527,7 +611,10 @@ impl<'a> Builder<'a> {
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
         self.emit_instruction(
-            cfg::Instruction::Assign(result, cfg::Value::Int(0, cfg::Size::Bit8)),
+            cfg::Instruction::Assign(
+                result,
+                Spanned::new(cfg::Value::Int(0, cfg::Size::Bit8), rhs.span),
+            ),
             lhs.span,
         );
         self.end_block(
@@ -546,14 +633,21 @@ impl<'a> Builder<'a> {
         let result = self.new_register(t::Type::Bool);
         let link = cfg::BlockLink::Strong(rhs_block);
         self.end_block(
-            cfg::BlockEnd::Branch(built_lhs.as_value(), reset_block, rhs_block),
+            cfg::BlockEnd::Branch(
+                Spanned::new(built_lhs.as_value(), lhs.span),
+                reset_block,
+                rhs_block,
+            ),
             link,
         );
         self.start_block(rhs_block);
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
         self.emit_instruction(
-            cfg::Instruction::Assign(result, built_rhs.as_value()),
+            cfg::Instruction::Assign(
+                result,
+                Spanned::new(built_rhs.as_value(), rhs.span),
+            ),
             rhs.span,
         );
         self.drop_value(&built_rhs, rhs.span);
@@ -564,7 +658,10 @@ impl<'a> Builder<'a> {
         self.start_block(reset_block);
         self.drop_value(&built_lhs, lhs.span);
         self.emit_instruction(
-            cfg::Instruction::Assign(result, cfg::Value::Int(1, cfg::Size::Bit8)),
+            cfg::Instruction::Assign(
+                result,
+                Spanned::new(cfg::Value::Int(1, cfg::Size::Bit8), rhs.span),
+            ),
             lhs.span,
         );
         self.end_block(

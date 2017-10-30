@@ -158,37 +158,41 @@ impl<'a> Builder<'a> {
                 let op = convert_binop(op);
                 Some(ir::Instruction::BinaryOp(ir::Reg(dest.0), op, a, b))
             }
-            cfg::Instruction::Call(dest, cfg::Value::Symbol(sym, ref types), ref params) => {
-                let f = self.make_symbol(sym, types);
-                let params = params
-                    .iter()
-                    .filter_map(|p| if !self.is_zero_sized_value(p) {
-                        Some(self.convert_value(p))
-                    } else {
-                        None
-                    })
-                    .collect();
-                Some(if self.is_zero_sized(dest) {
-                    ir::Instruction::CallProc(f, params)
-                } else {
-                    ir::Instruction::Call(ir::Reg(dest.0), f, params)
-                })
-            }
-            cfg::Instruction::Call(dest, ref val, ref params) => {
-                let f = self.convert_value(val);
-                let params = params
-                    .iter()
-                    .filter_map(|p| if !self.is_zero_sized_value(p) {
-                        Some(self.convert_value(p))
-                    } else {
-                        None
-                    })
-                    .collect();
-                Some(if self.is_zero_sized(dest) {
-                    ir::Instruction::CallProcVirt(f, params)
-                } else {
-                    ir::Instruction::CallVirt(ir::Reg(dest.0), f, params)
-                })
+            cfg::Instruction::Call(dest, ref callee, ref params) => {
+                match **callee {
+                    cfg::Value::Symbol(sym, ref types) => {
+                        let f = self.make_symbol(sym, types);
+                        let params = params
+                            .iter()
+                            .filter_map(|p| if !self.is_zero_sized_value(p) {
+                                Some(self.convert_value(p))
+                            } else {
+                                None
+                            })
+                            .collect();
+                        Some(if self.is_zero_sized(dest) {
+                            ir::Instruction::CallProc(f, params)
+                        } else {
+                            ir::Instruction::Call(ir::Reg(dest.0), f, params)
+                        })
+                    }
+                    ref val => {
+                        let f = self.convert_value(val);
+                        let params = params
+                            .iter()
+                            .filter_map(|p| if !self.is_zero_sized_value(p) {
+                                Some(self.convert_value(p))
+                            } else {
+                                None
+                            })
+                            .collect();
+                        Some(if self.is_zero_sized(dest) {
+                            ir::Instruction::CallProcVirt(f, params)
+                        } else {
+                            ir::Instruction::CallVirt(ir::Reg(dest.0), f, params)
+                        })
+                    }
+                }
             }
             cfg::Instruction::DerefStore(ref address, ref typ, ref fields, ref value) => {
                 if self.is_zero_sized_value(value) {
@@ -209,6 +213,11 @@ impl<'a> Builder<'a> {
             } else {
                 Some(ir::Instruction::Drop(ir::Reg(reg.0)))
             },
+            cfg::Instruction::Init(reg) => if self.is_zero_sized(reg) {
+                None
+            } else {
+                Some(ir::Instruction::Init(ir::Reg(reg.0)))
+            },
             cfg::Instruction::FieldStore(dest, ref fields, ref value) => {
                 if self.is_zero_sized_value(value) {
                     None
@@ -225,7 +234,7 @@ impl<'a> Builder<'a> {
             cfg::Instruction::StartStatement => None,
             cfg::Instruction::TakeAddress(dest, reg, ref fields) => {
                 let dest = ir::Reg(dest.0);
-                if self.is_zero_sized(reg) {
+                if self.is_zero_sized(*reg) {
                     let value = ir::Value::Int(0, ir::Size::Bit32);
                     Some(ir::Instruction::Assign(dest, value))
                 } else {

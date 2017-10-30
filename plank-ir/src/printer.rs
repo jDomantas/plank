@@ -123,6 +123,9 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             writeln!(out)
         }
         ir::Instruction::Drop(reg) => writeln!(out, "    drop %{}", reg.0),
+        ir::Instruction::Init(reg) => {
+            writeln!(out, "    init %{}", reg.0)
+        }
         ir::Instruction::Load(dest, reg, offset) => {
             writeln!(out, "    %{} = %{}[{}]", dest.0, reg.0, offset)
         }
