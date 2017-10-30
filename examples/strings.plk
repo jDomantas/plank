@@ -1,0 +1,56 @@
+// a short example of small, stack alocated strings
+
+struct Quad<A> { a: A, b: A, c: A, d: A }
+
+// use quads to make string 64 bytes sized
+struct String { data: Quad<Quad<Quad<u8>>> }
+
+fn from_u8_ptr(ptr: *u8) -> String {
+    let data = Quad(0, 0, 0, 0);
+    let data = Quad(data, data, data, data);
+    let data = Quad(data, data, data, data);
+    let str = String(data);
+    strcpy(
+        from: ptr,
+        to: &str as _,
+    );
+    return str;
+}
+
+fn strcpy(to: *u8, from: *u8) {
+    while *from != 0 {
+        *to = *from;
+        to = (to as _ + 1) as _;
+        from = (from as _ + 1) as _;
+    }
+    *to = 0;
+}
+
+fn append(to: *String, str: String) {
+    let ptr = to as *u8;
+    while *ptr != 0 {
+        ptr = (ptr as _ + 1) as _;
+    }
+    strcpy(
+        from: &str as _,
+        to: ptr,
+    );
+}
+
+fn print(str: String) {
+    let ptr = &str as _;
+    while *ptr != 0 {
+        putc(*ptr);
+        ptr = (ptr as _ + 1) as _;
+    }
+}
+
+fn main() -> i32 {
+    let a = from_u8_ptr("Stack ");
+    let b = from_u8_ptr("allocated ");
+    let c = from_u8_ptr("strings!\n");
+    append(&a, b);
+    append(&a, c);
+    print(a);
+    return 0;
+}
