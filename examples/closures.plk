@@ -1,0 +1,45 @@
+// we can abuse pointers, generics, and function
+// pointers to create hacky closures
+
+// because env is behind a pointer we can erase the
+// concrete type to unit to remove env type parameter
+struct Fn<T, O> {
+    env: *unit,
+    function: fn(*unit, T) -> O,
+}
+
+fn invoke<T, O>(f: Fn<T, O>, arg: T) -> O {
+    return f.function(f.env, arg);
+}
+
+fn closure<E, T, O>(env: *E, function: fn(*E, T) -> O) -> Fn<T, O> {
+    return Fn(env as _, function as _);
+}
+
+fn print_num(num: u8) {
+    if num >= 10 {
+        print_num(num / 10);
+    }
+    putc('0' + num % 10);
+}
+
+fn for_each(start: u8, end: u8, f: Fn<u8, unit>) {
+    while start <= end {
+        invoke(f, start);
+        start = start + 1;
+    }
+}
+
+fn print_offset(offset: *u8, val: u8) {
+    print_num(*offset + val);
+    *offset = *offset * 2;
+    putc(' ');
+}
+
+fn main() -> i32 {
+    let delta = 1;
+    let f = closure(&delta, print_offset);
+    for_each(3, 8, f);
+    putc('\n');
+    return 0;
+}
