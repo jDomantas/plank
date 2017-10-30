@@ -46,7 +46,8 @@ struct Context<'a> {
     ctx: &'a mut CompileCtx,
     function: &'a Function,
     reported_regs: HashSet<Reg>,
-    start_state: HashMap<(Reg, BlockId), VarState>,
+    assign_position: HashMap<(Reg, BlockId), usize>,
+    reachable_labels: HashSet<(Reg, BlockId)>,
 }
 
 impl<'a> Context<'a> {
@@ -55,13 +56,13 @@ impl<'a> Context<'a> {
             ctx,
             function,
             reported_regs: HashSet::new(),
-            start_state: HashMap::new(),
+            assign_position: HashMap::new(),
+            reachable_labels: HashSet::new(),
         }
     }
 
-    fn collect_assigned(&self, block: &Block) -> HashSet<Reg> {
-        let mut assigned = HashSet::new();
-        for op in &block.ops {
+    fn store_assigns(&mut self, id: BlockId, block: &Block) {
+        for (index, op) in block.ops.iter().enumerate() {
             match **op {
                 Instruction::Init(reg) |
                 Instruction::Assign(reg, _) |
@@ -70,7 +71,7 @@ impl<'a> Context<'a> {
                 Instruction::UnaryOp(reg, _, _) |
                 Instruction::TakeAddress(reg, _, _) |
                 Instruction::CastAssign(reg, _) => {
-                    assigned.insert(reg);
+                    self.assign_position.entry((reg, id)).or_insert(index);
                 }
                 Instruction::Error |
                 Instruction::Drop(_) |
@@ -79,59 +80,41 @@ impl<'a> Context<'a> {
                 Instruction::StartStatement => {}
             }
         }
-        assigned
     }
 
     fn check_block(&mut self, id: BlockId, block: &Block) {
-        let mut assigned = HashSet::new();
-        for op in &block.ops {
+        for (index, op) in block.ops.iter().enumerate() {
             match **op {
                 Instruction::Assign(_, ref val) |
                 Instruction::UnaryOp(_, _, ref val) |
                 Instruction::FieldStore(_, _, ref val) |
                 Instruction::CastAssign(_, ref val) => {
-                    self.check_value(val, id, &assigned);
+                    self.check_value(val, id, index);
                 }
                 Instruction::DerefStore(ref a, _, _, ref b) |
                 Instruction::BinaryOp(_, _, ref a, ref b) => {
-                    self.check_value(a, id, &assigned);
-                    self.check_value(b, id, &assigned);
+                    self.check_value(a, id, index);
+                    self.check_value(b, id, index);
                 }
                 Instruction::Call(_, ref value, ref params) => {
-                    self.check_value(value, id, &assigned);
+                    self.check_value(value, id, index);
                     for param in params {
-                        self.check_value(param, id, &assigned);
+                        self.check_value(param, id, index);
                     }
+                }
+                Instruction::TakeAddress(_, reg, _) => {
+                    let val = Spanned::map(reg, Value::Reg);
+                    self.check_value(&val, id, index);
                 }
                 Instruction::Error |
                 Instruction::StartStatement |
                 Instruction::Drop(_) |
                 Instruction::Init(_) => {}
-                Instruction::TakeAddress(_, reg, _) => {
-                    let val = Spanned::map(reg, Value::Reg);
-                    self.check_value(&val, id, &assigned);
-                }
-            }
-            match **op {
-                Instruction::Init(reg) |
-                Instruction::Assign(reg, _) |
-                Instruction::BinaryOp(reg, _, _, _) |
-                Instruction::Call(reg, _, _) |
-                Instruction::UnaryOp(reg, _, _) |
-                Instruction::TakeAddress(reg, _, _) |
-                Instruction::CastAssign(reg, _) => {
-                    assigned.insert(reg);
-                }
-                Instruction::Error |
-                Instruction::Drop(_) |
-                Instruction::DerefStore(_, _, _, _) |
-                Instruction::FieldStore(_, _, _) |
-                Instruction::StartStatement => {}
             }
         }
     }
 
-    fn check_value(&mut self, value: &Spanned<Value>, block: BlockId, block_assigned: &HashSet<Reg>) {
+    fn check_value(&mut self, value: &Spanned<Value>, block: BlockId, pos: usize) {
         match **value {
             Value::Int(_, _) |
             Value::Symbol(_, _) |
@@ -139,22 +122,17 @@ impl<'a> Context<'a> {
             Value::Unit |
             Value::Error => {}
             Value::Reg(reg) if self.reported_regs.contains(&reg) => {}
-            Value::Reg(reg) if block_assigned.contains(&reg) => {}
             Value::Reg(reg) => {
+                let assign_pos = self.assign_position.get(&(reg, block)).cloned();
+                if assign_pos.map(|p| p < pos) == Some(true) {
+                    return;
+                }
+                if !self.reachable_labels.contains(&(reg, block)) {
+                    return;
+                }
                 let var_symbol = self.function.register_symbols[&reg];
                 let name = self.ctx.symbols.get_name(var_symbol);
-                println!("state of {:?}, block {:?}", reg, block);
-                let msg = match self.start_state[&(reg, block)] {
-                    VarState::Assigned => return,
-                    VarState::Unassigned(_) => format!(
-                        "var `{}` is not initialized before usage",
-                        name,
-                    ),
-                    VarState::MaybeAssigned(_) => format!(
-                        "var `{}` might be uninitialized here",
-                        name,
-                    ),
-                };
+                let msg = format!("var `{}` might be uninitialized here", name);
                 let span = Spanned::span(value);
                 self.ctx
                     .reporter
@@ -166,62 +144,34 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn visit_start(&mut self, block: BlockId, reg: Reg) {
-        if self.start_state.get_mut(&(reg, block)).unwrap().reduce() {
+    fn visit_label(&mut self, reg: Reg, block: BlockId) {
+        if !self.reachable_labels.contains(&(reg, block)) {
+            self.reachable_labels.insert((reg, block));
+            if self.assign_position.contains_key(&(reg, block)) {
+                return;
+            }
             match self.function.blocks[&block].end {
                 BlockEnd::Jump(to) => {
-                    self.visit_start(to, reg);
+                    self.visit_label(reg, to);
                 }
                 BlockEnd::Branch(_, a, b) => {
-                    self.visit_start(a, reg);
-                    self.visit_start(b, reg);
+                    self.visit_label(reg, a);
+                    self.visit_label(reg, b);
                 }
                 BlockEnd::Return(_) | BlockEnd::Error => {}
             }
         }
-    }
-
-    fn count_entries(&self) -> HashMap<BlockId, u32> {
-        let mut entries = HashMap::new();
-        for (&id, block) in &self.function.blocks {
-            entries.entry(id).or_insert(0);
-            match block.end {
-                BlockEnd::Jump(to) => {
-                    *entries.entry(to).or_insert(0) += 1;
-                }
-                BlockEnd::Branch(_, a, b) => {
-                    *entries.entry(a).or_insert(0) += 1;
-                    *entries.entry(b).or_insert(0) += 1;
-                }
-                BlockEnd::Return(_) | BlockEnd::Error => {}
-            }
-        }
-        entries
     }
 
     fn check_function(&mut self) {
-        for (block, entries) in self.count_entries() {
-            for &reg in self.function.registers.keys() {
-                self.start_state.insert((reg, block), VarState::from_entries(entries));
-            }
+        for (&id, block) in &self.function.blocks {
+            self.store_assigns(id, block);
         }
+        let parameters = self.function.parameters.iter().cloned().collect::<HashSet<_>>();
         if let Some(block) = self.function.start_block {
-            for &reg in &self.function.parameters {
-                self.start_state.insert((reg, block), VarState::Unassigned(1));
-                self.visit_start(block, reg);
-            }
-        }
-        for block in self.function.blocks.values() {
-            for reg in self.collect_assigned(block) {
-                match block.end {
-                    BlockEnd::Jump(to) => {
-                        self.visit_start(to, reg);
-                    }
-                    BlockEnd::Branch(_, a, b) => {
-                        self.visit_start(a, reg);
-                        self.visit_start(b, reg);
-                    }
-                    BlockEnd::Return(_) | BlockEnd::Error => {}
+            for &reg in self.function.registers.keys() {
+                if !parameters.contains(&reg) {
+                    self.visit_label(reg, block);
                 }
             }
         }
