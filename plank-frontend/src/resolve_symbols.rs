@@ -250,14 +250,14 @@ impl<'a> Resolver<'a> {
         for var in vars {
             let name = &var.name.0;
             let span = Spanned::span(&var.name);
-            if let Some(&span) = var_spans.get(name) {
+            if let Some(&prev_span) = var_spans.get(name) {
                 let msg = format!("{} `{}` is listed multiple times", kind, name);
                 let short_msg = format!("`{}` is defined here", name);
                 self.ctx
                     .reporter
                     .error(msg, span)
                     .span_note("and again here", span)
-                    .span_note(short_msg, span)
+                    .span_note(short_msg, prev_span)
                     .build();
             } else {
                 var_spans.insert(name, span);
