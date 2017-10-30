@@ -4,11 +4,49 @@ use ast::cfg::{Program, Function, Block, Reg, Instruction, Value, BlockId, Block
 use CompileCtx;
 
 
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+enum VarState {
+    Unassigned(u32),
+    MaybeAssigned(u32),
+    Assigned,
+}
+
+impl VarState {
+    fn from_entries(entries: u32) -> VarState {
+        if entries > 0 {
+            VarState::Unassigned(entries)
+        } else {
+            VarState::Assigned
+        }
+    }
+
+    fn reduce(&mut self) -> bool {
+        match *self {
+            VarState::Assigned => false,
+            VarState::MaybeAssigned(1) |
+            VarState::Unassigned(1) => {
+                *self = VarState::Assigned;
+                true
+            }
+            VarState::MaybeAssigned(ref mut x) => {
+                debug_assert!(*x > 1);
+                *x -= 1;
+                false
+            }
+            VarState::Unassigned(x) => {
+                debug_assert!(x > 1);
+                *self = VarState::MaybeAssigned(x - 1);
+                false
+            }
+        }
+    }
+}
+
 struct Context<'a> {
     ctx: &'a mut CompileCtx,
     function: &'a Function,
     reported_regs: HashSet<Reg>,
-    live_starts: HashMap<Reg, HashSet<BlockId>>,
+    start_state: HashMap<(Reg, BlockId), VarState>,
 }
 
 impl<'a> Context<'a> {
@@ -17,7 +55,7 @@ impl<'a> Context<'a> {
             ctx,
             function,
             reported_regs: HashSet::new(),
-            live_starts: HashMap::new(),
+            start_state: HashMap::new(),
         }
     }
 
@@ -101,57 +139,82 @@ impl<'a> Context<'a> {
             Value::Reg(reg) if self.reported_regs.contains(&reg) => {}
             Value::Reg(reg) if block_assigned.contains(&reg) => {}
             Value::Reg(reg) => {
-                let live_start = self.live_starts
-                    .get(&reg)
-                    .map(|set| set.contains(&block))
-                    .unwrap_or(false);
-                if !live_start {
-                    self.ctx
-                        .reporter
-                        .error("variable used before being assigned", span)
-                        .span(span)
-                        .build();
-                    self.reported_regs.insert(reg);
-                }
+                let var_symbol = self.function.register_symbols[&reg];
+                let name = self.ctx.symbols.get_name(var_symbol);
+                let msg = match self.start_state[&(reg, block)] {
+                    VarState::Assigned => return,
+                    VarState::Unassigned(_) => format!(
+                        "var `{}` is not assigned yet",
+                        name,
+                    ),
+                    VarState::MaybeAssigned(_) => format!(
+                        "var `{}` might be unassigned here",
+                        name,
+                    ),
+                };
+                self.ctx
+                    .reporter
+                    .error(msg, span)
+                    .span(span)
+                    .build();
+                self.reported_regs.insert(reg);
             }
         }
     }
 
-    fn add_start(&mut self, block: BlockId, reg: Reg) {
-        {
-            let starts = self.live_starts.entry(reg).or_insert_with(HashSet::new);
-            if starts.contains(&block) {
-                return;
+    fn visit_start(&mut self, block: BlockId, reg: Reg) {
+        if self.start_state.get_mut(&(reg, block)).unwrap().reduce() {
+            match self.function.blocks[&block].end {
+                BlockEnd::Jump(to) => {
+                    self.visit_start(to, reg);
+                }
+                BlockEnd::Branch(_, a, b) => {
+                    self.visit_start(a, reg);
+                    self.visit_start(b, reg);
+                }
+                BlockEnd::Return(_) | BlockEnd::Error => {}
             }
-            starts.insert(block);
         }
-        match self.function.blocks[&block].end {
-            BlockEnd::Jump(to) => {
-                self.add_start(to, reg);
+    }
+
+    fn count_entries(&self) -> HashMap<BlockId, u32> {
+        let mut entries = HashMap::new();
+        for block in self.function.blocks.values() {
+            match block.end {
+                BlockEnd::Jump(to) => {
+                    *entries.entry(to).or_insert(0) += 1;
+                }
+                BlockEnd::Branch(_, a, b) => {
+                    *entries.entry(a).or_insert(0) += 1;
+                    *entries.entry(b).or_insert(0) += 1;
+                }
+                BlockEnd::Return(_) | BlockEnd::Error => {}
             }
-            BlockEnd::Branch(_, a, b) => {
-                self.add_start(a, reg);
-                self.add_start(b, reg);
-            }
-            BlockEnd::Return(_) | BlockEnd::Error => {}
         }
+        entries
     }
 
     fn check_function(&mut self) {
+        for (block, entries) in self.count_entries() {
+            for &reg in self.function.registers.keys() {
+                self.start_state.insert((reg, block), VarState::from_entries(entries));
+            }
+        }
         if let Some(block) = self.function.start_block {
-            for &param in &self.function.parameters {
-                self.add_start(block, param);
+            for &reg in &self.function.parameters {
+                self.start_state.insert((reg, block), VarState::Unassigned(1));
+                self.visit_start(block, reg);
             }
         }
         for block in self.function.blocks.values() {
             for reg in self.collect_assigned(block) {
                 match block.end {
                     BlockEnd::Jump(to) => {
-                        self.add_start(to, reg);
+                        self.visit_start(to, reg);
                     }
                     BlockEnd::Branch(_, a, b) => {
-                        self.add_start(a, reg);
-                        self.add_start(b, reg);
+                        self.visit_start(a, reg);
+                        self.visit_start(b, reg);
                     }
                     BlockEnd::Return(_) | BlockEnd::Error => {}
                 }

@@ -40,6 +40,7 @@ fn generate_constructor(s: &Struct) -> Function {
         complete_span: s.complete_span,
         parameters,
         registers,
+        register_symbols: HashMap::new(),
         type_params: s.type_params.clone(),
         out_type: complete_type,
         start_block: Some(BlockId(0)),

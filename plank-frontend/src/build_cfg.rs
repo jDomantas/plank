@@ -51,6 +51,7 @@ struct Builder<'a> {
     next_block_id: u32,
     next_reg: u32,
     var_registers: HashMap<t::Symbol, cfg::Reg>,
+    register_vars: HashMap<cfg::Reg, t::Symbol>,
     current_block: Option<(cfg::BlockId, Vec<Spanned<cfg::Instruction>>)>,
 }
 
@@ -65,6 +66,7 @@ impl<'a> Builder<'a> {
             next_block_id: 0,
             next_reg: 0,
             var_registers: HashMap::new(),
+            register_vars: HashMap::new(),
             current_block: None,
         }
     }
@@ -79,6 +81,7 @@ impl<'a> Builder<'a> {
     fn new_var_register(&mut self, symbol: t::Symbol, typ: t::Type) -> cfg::Reg {
         let reg = self.new_register(typ);
         self.var_registers.insert(symbol, reg);
+        self.register_vars.insert(reg, symbol);
         reg
     }
 
@@ -618,6 +621,7 @@ fn compile_fn(f: &t::Function, ctx: &mut CompileCtx) -> cfg::Function {
         complete_span: f.complete_span,
         type_params: f.type_params.clone(),
         registers: builder.registers,
+        register_symbols: builder.register_vars,
         out_type: f.return_type.clone(),
         blocks: builder.blocks,
         start_block,
