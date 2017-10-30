@@ -19,7 +19,6 @@ mod return_check;
 mod gen_constructors;
 mod struct_layout;
 mod build_ir;
-#[allow(dead_code)]
 mod assign_check;
 
 mod builtins {

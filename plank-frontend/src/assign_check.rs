@@ -4,44 +4,6 @@ use ast::cfg::{Program, Function, Block, Reg, Instruction, Value, BlockId, Block
 use CompileCtx;
 
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum VarState {
-    Unassigned(u32),
-    MaybeAssigned(u32),
-    Assigned,
-}
-
-impl VarState {
-    fn from_entries(entries: u32) -> VarState {
-        if entries > 0 {
-            VarState::Unassigned(entries)
-        } else {
-            VarState::Assigned
-        }
-    }
-
-    fn reduce(&mut self) -> bool {
-        match *self {
-            VarState::Assigned => false,
-            VarState::MaybeAssigned(1) |
-            VarState::Unassigned(1) => {
-                *self = VarState::Assigned;
-                true
-            }
-            VarState::MaybeAssigned(ref mut x) => {
-                debug_assert!(*x > 1);
-                *x -= 1;
-                false
-            }
-            VarState::Unassigned(x) => {
-                debug_assert!(x > 1);
-                *self = VarState::MaybeAssigned(x - 1);
-                false
-            }
-        }
-    }
-}
-
 struct Context<'a> {
     ctx: &'a mut CompileCtx,
     function: &'a Function,
