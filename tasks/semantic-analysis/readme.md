@@ -75,7 +75,8 @@ label_2:
 
 ## Instructions
 
-There are 14 kinds of instructions:
+There are 15 kinds of instructions:
+* Init (written as `init <register>`) - initializes register to some value. Makes the register available for usage, but initial value has no guarantees.
 * Drop (written as `drop <register>`) - forgets the value stored in the register. Value in the register cannot be used before the next time it is assigned.
 * Binary operation (written as `<register> = <op> <value-1> <value-2>`) - performs the operation on two given values, and stores result in the register. Available binary operations are listed below.
 * Unary operation (written as `<register> = <op> <value>`) - performs the operation on given value, and stores result in the register. Available unary operations are listed below.
