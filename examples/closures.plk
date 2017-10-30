@@ -13,6 +13,8 @@ fn invoke<T, O>(f: Fn<T, O>, arg: T) -> O {
 }
 
 fn closure<E, T, O>(env: *E, function: fn(*E, T) -> O) -> Fn<T, O> {
+    // erase concrete type E to unit,
+    // compiler can infer these types for us
     return Fn(env as _, function as _);
 }
 
