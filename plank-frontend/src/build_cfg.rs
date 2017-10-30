@@ -292,7 +292,10 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&value, span);
             }
-            t::Statement::Let(_, _, None) => {}
+            t::Statement::Let(name, ref typ, None) => {
+                // give it a register, but don't initialize it
+                self.new_var_register(Spanned::into_value(name), (**typ).clone());
+            }
             t::Statement::Loop(ref body) => {
                 let start = self.new_block();
                 let after = self.new_block();
