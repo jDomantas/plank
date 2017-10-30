@@ -158,7 +158,7 @@ impl<'a> Context<'a> {
                 let span = Spanned::span(value);
                 self.ctx
                     .reporter
-                    .error(msg, span)
+                    .warning(msg, span)
                     .span(span)
                     .build();
                 self.reported_regs.insert(reg);
