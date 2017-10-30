@@ -33,8 +33,9 @@
 <return>            ::= "return" <expr> ";" | "return" ";"
 <expr-statement>    ::= <expr> ";"
 
-<let>               ::= "let" <ident> <opt-type> "=" <expr> ";"
+<let>               ::= "let" <ident> <opt-type> <opt-initializer> ";"
 <opt-type>          ::= "" | ":" <type>
+<opt-initializer>   ::= "" | "=" <expr>
 
 <expr>              ::= <assign>
 <assign>            ::= <or> | <or> "=" <assign>
