@@ -147,11 +147,11 @@ impl<'a> Context<'a> {
                 let msg = match self.start_state[&(reg, block)] {
                     VarState::Assigned => return,
                     VarState::Unassigned(_) => format!(
-                        "var `{}` is not assigned yet",
+                        "var `{}` is not initialized before usage",
                         name,
                     ),
                     VarState::MaybeAssigned(_) => format!(
-                        "var `{}` might be unassigned here",
+                        "var `{}` might be uninitialized here",
                         name,
                     ),
                 };
