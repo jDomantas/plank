@@ -36,7 +36,7 @@ pub enum Statement {
     Break,
     Continue,
     Return(TypedExpr),
-    Let(Spanned<Symbol>, Spanned<Type>, TypedExpr),
+    Let(Spanned<Symbol>, Spanned<Type>, Option<TypedExpr>),
     Block(Vec<Spanned<Statement>>),
     Expr(TypedExpr),
     Error,

@@ -44,9 +44,10 @@ impl<'a> Context<'a> {
                     self.check_statement(else_);
                 }
             }
-            Statement::Let(_, _, ref mut value) => {
+            Statement::Let(_, _, Some(ref mut value)) => {
                 self.check_expr(value);
             }
+            Statement::Let(_, _, None) => {}
             Statement::Loop(ref mut body) => self.check_statement(body),
             Statement::While(ref mut cond, ref mut body) => {
                 self.check_expr(cond);

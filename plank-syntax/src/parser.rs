@@ -594,9 +594,14 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            self.expect(Token::Assign)?;
-            let value = self.parse_expr()?;
-            self.expect_semicolon()?;
+            let value = if self.check(Token::Semicolon) {
+                self.expect(Token::Assign)?;
+                let value = self.parse_expr()?;
+                self.expect_semicolon()?;
+                Some(value)
+            } else {
+                None
+            };
             let span = start.merge(self.previous_span());
             let stmt = Statement::Let(name, typ, value);
             Ok(Spanned::new(stmt, span))

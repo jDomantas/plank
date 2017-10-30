@@ -107,7 +107,7 @@ pub enum Statement {
     Break,
     Continue,
     Return(Spanned<Expr>),
-    Let(Spanned<Ident>, Option<Spanned<Type>>, Spanned<Expr>),
+    Let(Spanned<Ident>, Option<Spanned<Type>>, Option<Spanned<Expr>>),
     Block(Vec<Spanned<Statement>>),
     Expr(Spanned<Expr>),
     Error,

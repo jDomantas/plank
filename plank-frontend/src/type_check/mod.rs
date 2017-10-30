@@ -551,14 +551,22 @@ impl<'a> Inferer<'a> {
                 t::Statement::If(cond, Box::new(then), else_.map(Box::new))
             }
             r::Statement::Let(sym, ref typ, ref value) => {
-                let value = self.infer_expr(value);
+                let value = value.as_ref().map(|value| self.infer_expr(value));
                 let ty = self.convert_resolved_type(typ);
-                let reason = Reason::Assign(value.span);
-                let scheme = Scheme {
-                    vars: Vec::new(),
-                    typ: self.unify(&value.typ, &ty, reason),
-                };
-                self.env.insert(Spanned::into_value(sym), scheme);
+                if let Some(ref value) = value {
+                    let reason = Reason::Assign(value.span);
+                    let scheme = Scheme {
+                        vars: Vec::new(),
+                        typ: self.unify(&value.typ, &ty, reason),
+                    };
+                    self.env.insert(Spanned::into_value(sym), scheme);
+                } else {
+                    let scheme = Scheme {
+                        vars: Vec::new(),
+                        typ: ty.clone(),
+                    };
+                    self.env.insert(Spanned::into_value(sym), scheme);
+                }
                 let typ = Spanned::new(ty, Spanned::span(typ));
                 t::Statement::Let(sym, typ, value)
             }
@@ -640,7 +648,9 @@ impl<'a> Inferer<'a> {
                 self.normalize_statement(stmt);
             }
             t::Statement::Let(_, ref mut typ, ref mut value) => {
-                self.normalize_expr(value);
+                if let Some(ref mut value) = *value {
+                    self.normalize_expr(value);
+                }
                 match self.unifier.normalize(typ) {
                     Ok(t) => **typ = t,
                     Err(()) => {

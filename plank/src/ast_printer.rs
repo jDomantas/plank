@@ -252,11 +252,15 @@ impl Formatter {
                     self.fmt.write_symbol("let-typed");
                     self.format_ident(name);
                     self.format_type(typ);
-                    self.format_expr(value);
+                    if let Some(ref value) = *value {
+                        self.format_expr(value);
+                    }
                 } else {
                     self.fmt.write_symbol("let");
                     self.format_ident(name);
-                    self.format_expr(value);
+                    if let Some(ref value) = *value {
+                        self.format_expr(value);
+                    }
                 }
                 self.fmt.end_list();
             }

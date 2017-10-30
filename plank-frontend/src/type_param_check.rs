@@ -142,7 +142,9 @@ impl<'a> Context<'a> {
             }
             Statement::Let(_, ref mut typ, ref mut value) => {
                 self.check_type(typ);
-                self.check_expr(value);
+                if let Some(ref mut value) = *value {
+                    self.check_expr(value);
+                }
             }
             Statement::Loop(ref mut body) => self.check_statement(body),
             Statement::While(ref mut cond, ref mut body) => {
