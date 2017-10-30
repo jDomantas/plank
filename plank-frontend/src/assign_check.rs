@@ -106,13 +106,9 @@ impl<'a> Context<'a> {
                     .map(|set| set.contains(&block))
                     .unwrap_or(false);
                 if !live_start {
-                    let msg = format!(
-                        "variable used before being assigned (register %{})",
-                        reg.0,
-                    );
                     self.ctx
                         .reporter
-                        .warning(msg, span)
+                        .error("variable used before being assigned", span)
                         .span(span)
                         .build();
                     self.reported_regs.insert(reg);
@@ -147,7 +143,7 @@ impl<'a> Context<'a> {
                 self.add_start(block, param);
             }
         }
-        for (&id, block) in &self.function.blocks {
+        for block in self.function.blocks.values() {
             for reg in self.collect_assigned(block) {
                 match block.end {
                     BlockEnd::Jump(to) => {
@@ -160,6 +156,8 @@ impl<'a> Context<'a> {
                     BlockEnd::Return(_) | BlockEnd::Error => {}
                 }
             }
+        }
+        for (&id, block) in &self.function.blocks {
             self.check_block(id, block);
         }
     }
