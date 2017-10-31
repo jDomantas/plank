@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
 use plank_syntax::position::{Span, Spanned};
 
@@ -83,6 +84,6 @@ pub struct Struct {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub structs: Vec<Struct>,
+    pub structs: HashMap<Symbol, Struct>,
     pub functions: Vec<Function>,
 }

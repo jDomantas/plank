@@ -733,8 +733,8 @@ impl<'a> Inferer<'a> {
     fn infer_program(&mut self, program: &r::Program) -> t::Program {
         let mut functions = Vec::new();
         let mut structs = HashMap::new();
-        for s in &program.structs {
-            structs.insert(*s.name.name, self.convert_struct(s));
+        for (&name, s) in &program.structs {
+            structs.insert(name, self.convert_struct(s));
         }
         for f in &program.functions {
             self.add_function_to_env(f);

@@ -20,6 +20,7 @@ mod gen_constructors;
 mod struct_layout;
 mod build_ir;
 mod assign_check;
+mod struct_check;
 
 mod builtins {
     use ast::resolved::Symbol;
@@ -52,6 +53,7 @@ pub fn compile(program: &Program, reporter: Reporter) -> Result<plank_ir::Progra
     let mut resolved = resolve_symbols::resolve_program(program, &mut ctx);
     type_param_check::check_type_params(&mut resolved, &mut ctx);
     wildcard_check::check_for_wildcards(&resolved, &mut ctx);
+    struct_check::check_program(&mut resolved, &mut ctx);
     let mut typed = type_check::type_check(&resolved, &mut ctx);
     cast_check::check_casts(&mut typed, &mut ctx);
     let mut cfg = build_cfg::build_cfg(&typed, &mut ctx);

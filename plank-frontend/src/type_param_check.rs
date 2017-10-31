@@ -27,7 +27,7 @@ impl<'a> Context<'a> {
     }
 
     fn check_program(&mut self, program: &mut Program) {
-        for struct_ in &program.structs {
+        for struct_ in program.structs.values() {
             self.param_count.insert(
                 Spanned::into_value(struct_.name.name),
                 struct_.name.type_params.len(),
@@ -50,7 +50,7 @@ impl<'a> Context<'a> {
             }
         }
 
-        for struct_ in &mut program.structs {
+        for struct_ in program.structs.values_mut() {
             self.check_struct(struct_);
         }
 

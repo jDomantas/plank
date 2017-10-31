@@ -37,7 +37,10 @@ impl<'a> Resolver<'a> {
         let structs = program
             .structs
             .iter()
-            .map(|s| self.resolve_struct(s))
+            .map(|s| {
+                let s = self.resolve_struct(s);
+                (*s.name.name, s)
+            })
             .collect();
 
         let mut functions = program

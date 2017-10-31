@@ -29,7 +29,7 @@ impl<'a> Context<'a> {
             self.check_function(fn_);
         }
 
-        for struct_ in &program.structs {
+        for struct_ in program.structs.values() {
             self.check_struct(struct_);
         }
     }
