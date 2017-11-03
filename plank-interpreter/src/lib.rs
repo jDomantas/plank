@@ -575,7 +575,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                         self.write_value(to, Some(len), Value::DoubleWord(res));
                     }
                 }
-                unimplemented!()
+                Ok(())
             }
         }
     }
