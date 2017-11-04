@@ -2,8 +2,7 @@
 
 This is a short guide to the plank programming language.
 
-Plank is a low level language that syntaxically looks a bit like Rust, but its semantics are much closer to C. This guide assumes that you are somewhat (?) familiar with both languages.
-
+Plank is a low level language that syntaxically looks a bit like Rust, but its semantics are much closer to C.
 
 ## Expressions
 
