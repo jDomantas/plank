@@ -2,6 +2,8 @@
 
 This is an implementation of plank - a little programming language I am building for "Compiling methods" course.
 
+Here is a simple guide to the language: [plank-language.md](./plank-language.md).
+
 Currently there is a compiler frontend that can generate plank IR, and a simple interpreter that can execute generated IR.
 
 This repository currently consists of 7 crates:
