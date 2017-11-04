@@ -50,7 +50,7 @@ cargo install --path plank
 
 ## Editor support
 
-If you are using Visual Studio Code, you there is an extension that provides syntax highligting and displays diagnostics provided by plank language server.
+If you are using Visual Studio Code, there is an extension that provides syntax highligting and displays diagnostics provided by plank language server.
 
 You can find the extension [on the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=jDomantas.plank), and you can find its code on [jDomantas/plank-vscode](https://github.com/jDomantas/plank-vscode).
 
