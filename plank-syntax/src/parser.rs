@@ -66,6 +66,7 @@ type ParseResult<T> = Result<T, ()>;
 enum Expectation {
     Expression,
     Operator,
+    Type,
     Token(TokenKind),
 }
 
@@ -74,6 +75,7 @@ impl ::std::fmt::Display for Expectation {
         match *self {
             Expectation::Operator => write!(f, "operator"),
             Expectation::Expression => write!(f, "expression"),
+            Expectation::Type => write!(f, "type"),
             Expectation::Token(ref tok) => write!(f, "{}", tok),
         }
     }
@@ -133,6 +135,12 @@ impl<'a> Parser<'a> {
         if self.expected.contains(&Expectation::Operator) {
             self.expected.retain(|e| match *e {
                 Expectation::Token(ref tok) => !tok.is_operator(),
+                _ => true,
+            });
+        }
+        if self.expected.contains(&Expectation::Type) {
+            self.expected.retain(|e| match *e {
+                Expectation::Token(ref tok) => !tok.can_start_type(),
                 _ => true,
             });
         }
@@ -467,8 +475,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
-        self.expected
-            .insert(Expectation::Token(TokenKind::BuiltinType));
+        self.expected.insert(Expectation::Type);
         if self.check(Token::Keyword(Keyword::Unit)) {
             let span = self.previous_span();
             let typ = Type::Unit;

@@ -47,13 +47,6 @@ impl Token {
             Token::Number(_) | Token::Bool(_) | Token::Char(_) | Token::Str(_) => {
                 TokenKind::Literal
             }
-            Token::Keyword(Keyword::I8) |
-            Token::Keyword(Keyword::U8) |
-            Token::Keyword(Keyword::I16) |
-            Token::Keyword(Keyword::U16) |
-            Token::Keyword(Keyword::I32) |
-            Token::Keyword(Keyword::U32) |
-            Token::Keyword(Keyword::Bool) => TokenKind::BuiltinType,
             ref tok => TokenKind::Token(tok.clone()),
         }
     }
@@ -156,7 +149,6 @@ pub enum TokenKind {
     Token(Token),
     Ident,
     Literal,
-    BuiltinType,
 }
 
 impl TokenKind {
@@ -193,6 +185,24 @@ impl TokenKind {
             _ => false,
         }
     }
+
+    pub fn can_start_type(&self) -> bool {
+        match *self {
+            TokenKind::Token(Token::Keyword(Keyword::Unit)) |
+            TokenKind::Token(Token::Star) |
+            TokenKind::Token(Token::Keyword(Keyword::Fn)) |
+            TokenKind::Token(Token::Underscore) |
+            TokenKind::Token(Token::Keyword(Keyword::I8)) |
+            TokenKind::Token(Token::Keyword(Keyword::I16)) |
+            TokenKind::Token(Token::Keyword(Keyword::I32)) |
+            TokenKind::Token(Token::Keyword(Keyword::U8)) |
+            TokenKind::Token(Token::Keyword(Keyword::U16)) |
+            TokenKind::Token(Token::Keyword(Keyword::U32)) |
+            TokenKind::Token(Token::Keyword(Keyword::Bool)) |
+            TokenKind::Ident => true,
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for TokenKind {
@@ -200,7 +210,6 @@ impl fmt::Display for TokenKind {
         match *self {
             TokenKind::Ident => write!(f, "identifier"),
             TokenKind::Literal => write!(f, "literal"),
-            TokenKind::BuiltinType => write!(f, "builtin type"),
             TokenKind::Token(ref tok) => write!(f, "`{}`", tok),
         }
     }
