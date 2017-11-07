@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use plank_syntax::ast as p;
 use plank_syntax::position::{Position, Span, Spanned};
@@ -15,6 +15,8 @@ struct Resolver<'a> {
     ctx: &'a mut CompileCtx,
     global_structs: HashMap<String, (Symbol, Span)>,
     global_functions: HashMap<String, Function>,
+    possible_structs: HashSet<String>,
+    possible_functions: HashSet<String>,
     type_vars: HashMap<String, Symbol>,
     scopes: Vec<HashMap<String, Symbol>>,
 }
@@ -25,6 +27,8 @@ impl<'a> Resolver<'a> {
             ctx,
             global_structs: HashMap::new(),
             global_functions: HashMap::new(),
+            possible_structs: HashSet::new(),
+            possible_functions: HashSet::new(),
             type_vars: HashMap::new(),
             scopes: Vec::new(),
         }
@@ -75,6 +79,15 @@ impl<'a> Resolver<'a> {
             let span = Spanned::span(&fn_.name.name);
             let params = fn_.params.iter().map(|f| f.name.0.clone());
             self.add_function(name, span, params);
+        }
+
+        for struct_ in &program.possible_structs {
+            self.possible_structs.insert(struct_.0.clone());
+            self.possible_functions.insert(struct_.0.clone());
+        }
+
+        for fn_ in &program.possible_functions {
+            self.possible_functions.insert(fn_.0.clone());
         }
     }
 
@@ -306,6 +319,8 @@ impl<'a> Resolver<'a> {
                 } else if let Some(sym) = self.global_structs.get(&name.0) {
                     let name = Spanned::new(sym.0, Spanned::span(name));
                     r::Type::Concrete(name, params)
+                } else if self.possible_structs.contains(&name.0) {
+                    r::Type::Error
                 } else {
                     let msg = format!("unknown type `{}`", &name.0);
                     self.ctx
@@ -623,6 +638,11 @@ impl<'a> Resolver<'a> {
         }
         if let Some(f) = self.global_functions.get(var) {
             return Some(f.name);
+        }
+        if self.possible_functions.contains(var) {
+            // we kinda saw a broken declaration of this,
+            // so resolve to error but don't report about this
+            return None;
         }
         let msg = format!("unknown value `{}`", var);
         self.ctx.reporter.error(msg, span).span(span).build();

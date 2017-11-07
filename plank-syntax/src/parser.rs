@@ -62,14 +62,14 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
 
 type ParseResult<T> = Result<T, ()>;
 
-enum PartialResult<T> {
+enum PartialResult<T, U> {
     Ok(T),
-    Partial(T),
+    Partial(U),
     Error,
 }
 
-impl<T> From<ParseResult<T>> for PartialResult<T> {
-    fn from(res: ParseResult<T>) -> PartialResult<T> {
+impl<T, U> From<ParseResult<T>> for PartialResult<T, U> {
+    fn from(res: ParseResult<T>) -> PartialResult<T, U> {
         match res {
             Ok(x) => PartialResult::Ok(x),
             Err(()) => PartialResult::Error,
@@ -377,33 +377,51 @@ impl<'a> Parser<'a> {
         let mut program = Program {
             structs: Vec::new(),
             functions: Vec::new(),
+            possible_structs: Vec::new(),
+            possible_functions: Vec::new(),
         };
         loop {
             self.last_line_completed = true;
             if self.is_at_end() {
                 return program;
             } else if self.check(Token::Keyword(Keyword::Struct)) {
-                if let Ok(s) = self.parse_struct() {
-                    program.structs.push(s);
-                } else {
-                    self.synchronize_item();
+                match self.parse_struct() {
+                    PartialResult::Ok(s) => program.structs.push(s),
+                    PartialResult::Partial(name) => {
+                        program.possible_structs.push(name);
+                        self.synchronize_item();
+                    }
+                    PartialResult::Error => {
+                        self.synchronize_item();
+                    }
                 }
             } else if self.check(Token::Keyword(Keyword::Fn)) {
                 let start_span = self.previous_span();
-                if let Ok(f) = self.parse_function(start_span, FunctionType::Normal) {
-                    program.functions.push(f);
-                } else {
-                    self.synchronize_item();
+                match self.parse_function(start_span, FunctionType::Normal) {
+                    PartialResult::Ok(f) => program.functions.push(f),
+                    PartialResult::Partial(name) => {
+                        program.possible_functions.push(name);
+                        self.synchronize_item();
+                    }
+                    PartialResult::Error => {
+                        self.synchronize_item();
+                    }
                 }
             } else if self.check(Token::Keyword(Keyword::Extern)) {
                 let start_span = self.previous_span();
                 if self.expect(Token::Keyword(Keyword::Fn)).is_err() {
                     self.synchronize_item();
-                }
-                if let Ok(f) = self.parse_function(start_span, FunctionType::Extern) {
-                    program.functions.push(f);
                 } else {
-                    self.synchronize_item();
+                    match self.parse_function(start_span, FunctionType::Extern) {
+                        PartialResult::Ok(f) => program.functions.push(f),
+                        PartialResult::Partial(name) => {
+                            program.possible_functions.push(name);
+                            self.synchronize_item();
+                        }
+                        PartialResult::Error => {
+                            self.synchronize_item();
+                        }
+                    }
                 }
             } else {
                 self.emit_error(None);
@@ -412,9 +430,25 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_struct(&mut self) -> ParseResult<Struct> {
+    fn parse_struct(&mut self) -> PartialResult<Struct, Ident> {
         let start_span = self.previous_span();
-        let name = self.parse_item_name()?;
+        let name = match self.parse_item_name() {
+            PartialResult::Ok(name) => name,
+            PartialResult::Partial(name) => return PartialResult::Partial(name),
+            PartialResult::Error => return PartialResult::Error,
+        };
+        match self.parse_struct_fields() {
+            Ok(fields) => {
+                let complete_span = start_span.merge(self.previous_span());
+                PartialResult::Ok(Struct { name, fields, complete_span })
+            }
+            Err(()) => {
+                PartialResult::Partial(Spanned::into_value(name.name))
+            }
+        }
+    }
+
+    fn parse_struct_fields(&mut self) -> ParseResult<Vec<Var>> {
         self.expect(Token::LeftBrace)?;
         let mut fields = Vec::new();
         while !self.check(Token::RightBrace) {
@@ -428,12 +462,34 @@ impl<'a> Parser<'a> {
             }
             self.expect(Token::Comma)?;
         }
-        let complete_span = self.previous_span().merge(start_span);
-        Ok(Struct { name, fields, complete_span })
+        Ok(fields)
     }
 
-    fn parse_function(&mut self, start_span: Span, fn_type: FunctionType) -> ParseResult<Function> {
-        let name = self.parse_item_name()?;
+    fn parse_function(&mut self, start_span: Span, fn_type: FunctionType) -> PartialResult<Function, Ident> {
+        let name = match self.parse_item_name() {
+            PartialResult::Ok(name) => name,
+            PartialResult::Partial(name) => return PartialResult::Partial(name),
+            PartialResult::Error => return PartialResult::Error,
+        };
+        match self.parse_function_end() {
+            Ok((params, return_type, body)) => {
+                let complete_span = start_span.merge(self.previous_span());
+                PartialResult::Ok(Function {
+                    complete_span,
+                    fn_type,
+                    name,
+                    params,
+                    return_type,
+                    body,
+                })
+            }
+            Err(()) => {
+                PartialResult::Partial(Spanned::into_value(name.name))
+            }
+        }
+    }
+
+    fn parse_function_end(&mut self) -> ParseResult<(Vec<Var>, Spanned<Type>, Option<Spanned<Statement>>)> {
         self.expect(Token::LeftParen)?;
         let open_span = self.previous_span();
         let mut params = Vec::new();
@@ -452,29 +508,28 @@ impl<'a> Parser<'a> {
         } else {
             Spanned::new(Type::Unit, self.previous_span())
         };
-        let complete_span;
         let body = if self.check(Token::LeftBrace) {
-            let body = self.parse_block()?;
-            complete_span = start_span.merge(Spanned::span(&body));
-            Some(body)
+            Some(self.parse_block()?)
         } else {
             self.expect_semicolon()?;
-            complete_span = start_span.merge(self.previous_span());
             None
         };
-        Ok(Function {
-            complete_span,
-            fn_type,
-            name,
-            params,
-            return_type,
-            body,
-        })
+        Ok((params, return_type, body))
     }
 
-    fn parse_item_name(&mut self) -> ParseResult<ItemName> {
-        let name = self.consume_ident()?;
-        let type_params = if self.check(Token::Less) {
+    fn parse_item_name(&mut self) -> PartialResult<ItemName, Ident> {
+        let name = match self.consume_ident() {
+            Ok(ident) => ident,
+            Err(()) => return PartialResult::Error,
+        };
+        match self.parse_generic_params() {
+            Ok(type_params) => PartialResult::Ok(ItemName { name, type_params }),
+            Err(()) => PartialResult::Partial(Spanned::into_value(name)),
+        }
+    }
+
+    fn parse_generic_params(&mut self) -> ParseResult<Vec<Spanned<Ident>>> {
+        if self.check(Token::Less) {
             let open_span = self.previous_span();
             let mut type_params = Vec::new();
             type_params.push(self.consume_ident()?);
@@ -482,11 +537,10 @@ impl<'a> Parser<'a> {
                 type_params.push(self.consume_ident()?);
             }
             self.expect_closing(Token::Greater, open_span)?;
-            type_params
+            Ok(type_params)
         } else {
-            Vec::new()
-        };
-        Ok(ItemName { name, type_params })
+            Ok(Vec::new())
+        }
     }
 
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
@@ -570,7 +624,7 @@ impl<'a> Parser<'a> {
         Ok(types)
     }
 
-    fn parse_statement(&mut self) -> PartialResult<Spanned<Statement>> {
+    fn parse_statement(&mut self) -> PartialResult<Spanned<Statement>, Spanned<Statement>> {
         self.last_line_completed = true;
         if self.check(Token::Keyword(Keyword::Let)) {
             let start = self.previous_span();

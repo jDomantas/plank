@@ -170,4 +170,6 @@ pub struct Struct {
 pub struct Program {
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
+    pub possible_structs: Vec<Ident>,
+    pub possible_functions: Vec<Ident>,
 }
