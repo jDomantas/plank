@@ -288,6 +288,7 @@ impl<'a> Resolver<'a> {
             p::Type::I32 => r::Type::I32,
             p::Type::U32 => r::Type::U32,
             p::Type::Wildcard => r::Type::Wildcard,
+            p::Type::Error => r::Type::Error,
             p::Type::Pointer(ref typ) => {
                 let typ = self.resolve_type(typ);
                 r::Type::Pointer(Box::new(typ))
@@ -462,6 +463,7 @@ impl<'a> Resolver<'a> {
                 let typ = self.resolve_type(typ);
                 r::Expr::Cast(Box::new(expr), typ)
             }
+            p::Expr::Error => r::Expr::Error,
         };
         Spanned::new(expr, span)
     }

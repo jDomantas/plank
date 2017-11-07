@@ -60,6 +60,7 @@ pub enum Expr {
     Name(Spanned<Ident>, Vec<Spanned<Type>>),
     Literal(Literal),
     Cast(Box<Spanned<Expr>>, Spanned<Type>),
+    Error,
 }
 
 #[derive(Debug, Clone)]
@@ -127,6 +128,7 @@ pub enum Type {
     Concrete(Spanned<Ident>, Vec<Spanned<Type>>),
     Pointer(Box<Spanned<Type>>),
     Function(Vec<Spanned<Type>>, Box<Spanned<Type>>),
+    Error,
 }
 
 #[derive(Debug, Clone)]

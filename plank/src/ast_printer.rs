@@ -176,6 +176,7 @@ impl Formatter {
             Type::I32 => self.fmt.write_symbol("i32"),
             Type::U32 => self.fmt.write_symbol("u32"),
             Type::Wildcard => self.fmt.write_symbol("_"),
+            Type::Error => self.fmt.write_symbol("?"),
             Type::Pointer(ref typ) => {
                 self.fmt.start_list();
                 self.fmt.write_symbol("ptr");
@@ -346,6 +347,7 @@ impl Formatter {
                 self.format_type(typ);
                 self.fmt.end_list();
             }
+            Expr::Error => self.fmt.write_symbol("?"),
         }
     }
 

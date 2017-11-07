@@ -62,6 +62,21 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
 
 type ParseResult<T> = Result<T, ()>;
 
+enum PartialResult<T> {
+    Ok(T),
+    Partial(T),
+    Error,
+}
+
+impl<T> From<ParseResult<T>> for PartialResult<T> {
+    fn from(res: ParseResult<T>) -> PartialResult<T> {
+        match res {
+            Ok(x) => PartialResult::Ok(x),
+            Err(()) => PartialResult::Error,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 enum Expectation {
     Expression,
@@ -555,8 +570,35 @@ impl<'a> Parser<'a> {
         Ok(types)
     }
 
-    fn parse_statement(&mut self) -> ParseResult<Spanned<Statement>> {
+    fn parse_statement(&mut self) -> PartialResult<Spanned<Statement>> {
         self.last_line_completed = true;
+        if self.check(Token::Keyword(Keyword::Let)) {
+            let start = self.previous_span();
+            let name = match self.consume_ident() {
+                Ok(ident) => ident,
+                Err(()) => return PartialResult::Error,
+            };
+            match self.parse_let_end() {
+                Ok((typ, value)) => {
+                    let span = start.merge(self.previous_span());
+                    let stmt = Statement::Let(name, typ, value);
+                    PartialResult::Ok(Spanned::new(stmt, span))
+                }
+                Err(()) => {
+                    let name_span = Spanned::span(&name);
+                    let span = start.merge(name_span);
+                    let typ = Spanned::new(Type::Error, name_span);
+                    let value = Spanned::new(Expr::Error, name_span);
+                    let stmt = Statement::Let(name, Some(typ), Some(value));
+                    PartialResult::Partial(Spanned::new(stmt, span))
+                }
+            }
+        } else {
+            self.parse_non_let_stmt().into()
+        }
+    }
+
+    fn parse_non_let_stmt(&mut self) -> ParseResult<Spanned<Statement>> {
         if self.check(Token::Keyword(Keyword::If)) {
             self.parse_if()
         } else if self.check(Token::Keyword(Keyword::Loop)) {
@@ -593,27 +635,8 @@ impl<'a> Parser<'a> {
             };
             let span = start.merge(self.previous_span());
             Ok(Spanned::new(Statement::Return(value), span))
-        } else if self.check(Token::Keyword(Keyword::Let)) {
-            let start = self.previous_span();
-            let name = self.consume_ident()?;
-            let typ = if self.check(Token::Colon) {
-                Some(self.parse_type()?)
-            } else {
-                None
-            };
-            let value = if self.check(Token::Semicolon) {
-                None
-            } else {
-                self.expect(Token::Assign)?;
-                let value = self.parse_expr()?;
-                self.expect_semicolon()?;
-                Some(value)
-            };
-            let span = start.merge(self.previous_span());
-            let stmt = Statement::Let(name, typ, value);
-            Ok(Spanned::new(stmt, span))
         } else if self.check(Token::LeftBrace) {
-            self.parse_block()
+            self.parse_block().into()
         } else {
             let expr = self.parse_expr()?;
             self.expect_semicolon()?;
@@ -621,6 +644,23 @@ impl<'a> Parser<'a> {
             let stmt = Statement::Expr(expr);
             Ok(Spanned::new(stmt, span))
         }
+    }
+
+    fn parse_let_end(&mut self) -> ParseResult<(Option<Spanned<Type>>, Option<Spanned<Expr>>)> {
+        let typ = if self.check(Token::Colon) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        let value = if self.check(Token::Semicolon) {
+            None
+        } else {
+            self.expect(Token::Assign)?;
+            let value = self.parse_expr()?;
+            self.expect_semicolon()?;
+            Some(value)
+        };
+        Ok((typ, value))
     }
 
     fn parse_if(&mut self) -> ParseResult<Spanned<Statement>> {
@@ -649,8 +689,12 @@ impl<'a> Parser<'a> {
         while !self.check(Token::RightBrace) {
             let statement_start = self.previous_span();
             match self.parse_statement() {
-                Ok(stmt) => statements.push(stmt),
-                Err(()) => {
+                PartialResult::Ok(stmt) => statements.push(stmt),
+                PartialResult::Partial(stmt) => {
+                    statements.push(stmt);
+                    self.synchronize_statement()?;
+                }
+                PartialResult::Error => {
                     let span = statement_start.merge(self.previous_span());
                     statements.push(Spanned::new(Statement::Error, span));
                     self.synchronize_statement()?;
