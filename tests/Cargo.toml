@@ -1,0 +1,11 @@
+[package]
+name = "tests"
+version = "0.1.0"
+authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
+
+[dependencies]
+plank-errors = { path = "../plank-errors" }
+plank-syntax = { path = "../plank-syntax" }
+plank-frontend = { path = "../plank-frontend" }
+plank-ir = { path = "../plank-ir" }
+plank-interpreter = { path = "../plank-interpreter" }

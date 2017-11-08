@@ -1,0 +1,15 @@
+fn puts(string: *u8) {
+    while *string != 0 {
+        putc(*string);
+        // this doesn't look very nice :(
+        string = (string as u32 + 1) as *u8;
+    }
+    putc('\n');
+}
+
+fn main() -> i32 {
+    puts("Hello, world!");
+    return 0;
+}
+
+// OUTPUT: Hello, world!\x0A

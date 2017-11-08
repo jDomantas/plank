@@ -1,0 +1,11 @@
+struct Foo { // ERROR: struct `Foo` is recursive
+    foo: Foo,
+}
+
+struct Bar<T> {
+    bar: T,
+}
+
+struct Baz { // ERROR: struct `Baz` is recursive
+    bar: Bar<Baz>,
+}

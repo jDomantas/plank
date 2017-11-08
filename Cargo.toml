@@ -7,4 +7,5 @@ members = [
     "plank-interpreter",
     "plank",
     "plank-server",
+    "tests",
 ]
