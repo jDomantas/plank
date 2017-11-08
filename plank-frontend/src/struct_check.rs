@@ -67,8 +67,10 @@ impl Solver {
 
     fn add_fact(&mut self, fact: Pair) {
         let node = self.concrete_node(fact.0, fact.1);
-        self.visit_queue.push(node);
-        self.needed_visits.insert(node, 0);
+        if self.needed_visits[&node] != 0 {
+            self.visit_queue.push(node);
+            self.needed_visits.insert(node, 0);
+        }
     }
 
     fn add_rule<I: ExactSizeIterator<Item=Pair>>(&mut self, bounds: I, result: Pair) {
