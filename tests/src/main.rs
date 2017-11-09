@@ -9,6 +9,7 @@ extern crate plank_interpreter;
 mod test_parser;
 
 use std::fs;
+use std::io;
 use std::io::prelude::*;
 use plank_errors::reporter::Diagnostic;
 
@@ -95,29 +96,136 @@ fn run_test(source: &str) -> TestResult {
     }
 }
 
-fn main() {
+fn run_tests() -> io::Result<Vec<(String, String, TestResult)>> {
+    let mut test_results = Vec::new();
     for dir in TEST_DIRS {
-        let entries = fs::read_dir(dir).expect("failed to read dir");
-        for entry in entries {
-            let entry = entry.unwrap();
-            if !entry.file_type().unwrap().is_file() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
                 continue;
             }
-            let mut file = fs::File::open(entry.path()).unwrap();
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).unwrap();
-            let test_result = run_test(&contents);
+            let mut file = fs::File::open(entry.path())?;
+            let mut source = String::new();
+            file.read_to_string(&mut source)?;
+            let test_result = run_test(&source);
+            let test_name = entry.path().display().to_string();
             if let TestResult::Ok = test_result {
-                println!("test {} ... ok", entry.path().display());
+                println!("test {} ... ok", test_name);
             } else {
-                println!("test {} ... FAIL", entry.path().display());
-                println!("{:?}", test_result);
+                println!("test {} ... FAIL", test_name);
+            }
+            test_results.push((test_name, source, test_result));
+        }
+    }
+    Ok(test_results)
+}
+
+fn print_expected_errors(errors: &[test_parser::Error]) {
+    for err in errors {
+        println!("at line {}: {}", err.line + 1, err.message);
+    }
+}
+
+fn print_output(out: &[u8]) {
+    for &byte in out {
+        if byte < 32 || byte >= 127 || byte == b'\\' {
+            print!("\\x{:>02X}", byte);
+        } else {
+            print!("{}", byte as char);
+        }
+    }
+    println!();
+}
+
+fn report_results(results: &[(String, String, TestResult)]) {
+    let mut passed = 0;
+    for &(ref name, ref source, ref result) in results {
+        match *result {
+            TestResult::Ok => passed += 1,
+            TestResult::BuildFail(ref diagnostics) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("unexpected build failure");
+                plank_errors::printer::print_diagnostics(source, diagnostics);
+                println!();
+            }
+            TestResult::BadBuildPass(ref expected) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("build passed but expected failure");
+                print_expected_errors(expected);
+            }
+            TestResult::BuildErrorMismatch(ref got, ref expected) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("build error mismatch");
+                println!(">> unmatched errors:");
+                print_expected_errors(expected);
+                println!(">> actual errors:");
+                plank_errors::printer::print_diagnostics(source, got);
+                println!();
+            }
+            TestResult::IoMismatch { ref expected, ref got } => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("wrong output");
+                print!("Expected: ");
+                print_output(expected);
+                print!("Got:      ");
+                print_output(got);
+                println!();
+            }
+            TestResult::MalformedTest(ref err) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("malformed test");
+                println!("{}", err);
+                println!();
+            }
+            TestResult::InterpreterExit(code) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("interpreted program exited with code {}", code);
+                println!();
+            }
+            TestResult::InterpreterError(ref err) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("interpreted program crashed");
+                match *err {
+                    plank_interpreter::Error::BadDeref => {
+                        println!("invalid memory access");
+                    }
+                    plank_interpreter::Error::DivisionByZero => {
+                        println!("division by zero");
+                    }
+                    plank_interpreter::Error::MissingSymbol(_) => {
+                        println!("missing symbol definition");
+                    }
+                    plank_interpreter::Error::Io(ref err) => {
+                        println!("io error: {}", err);
+                    }
+                }
+                println!();
             }
         }
+    }
+    println!("========================================");
+    println!("tests:  {}", results.len());
+    println!("passed: {}", passed);
+    println!("failed: {}", results.len() - passed);
+}
+
+fn main() {
+    match run_tests() {
+        Ok(results) => report_results(&results),
+        Err(e) => println!("io error: {}", e),
     }
 }
 
 const TEST_DIRS: &'static [&'static str] = &[
+    // test examples because obviously we want the
+    // examples people come accross to build successfully
     "./examples",
     "./tests/compile-fail",
     "./tests/pass",
