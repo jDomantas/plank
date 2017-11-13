@@ -357,7 +357,8 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&built_value, value.span);
             }
-            t::Statement::Let(_, name, ref typ, None) => {
+            t::Statement::Let(mutability, name, ref typ, None) => {
+                self.var_mutability.insert(*name, mutability);
                 // give it a register, but don't initialize it
                 self.new_var_register(Spanned::into_value(name), (**typ).clone());
             }
