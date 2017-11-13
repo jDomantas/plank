@@ -89,18 +89,25 @@ impl Type {
 }
 
 #[derive(Debug, Clone)]
+pub struct FnParam {
+    pub mutability: Mutability,
+    pub name: Symbol,
+    pub typ: Type,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     pub complete_span: Span,
     pub fn_type: FunctionType,
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
-    pub params: Vec<Var>,
+    pub params: Vec<FnParam>,
     pub return_type: Type,
     pub body: Option<Spanned<Statement>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Var {
+pub struct Field {
     pub name: Symbol,
     pub typ: Type,
 }
@@ -110,7 +117,7 @@ pub struct Struct {
     pub complete_span: Span,
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
-    pub fields: Vec<Var>,
+    pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Clone)]

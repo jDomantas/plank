@@ -456,9 +456,10 @@ impl<'a> Inferer<'a> {
                         let var = self.fresh_var();
                         (var.clone(), Type::Pointer(Mutability::Mut, Rc::new(var)))
                     }
-                    // TODO: figure out which mutability to use
                     UnaryOp::Deref => {
                         let var = self.fresh_var();
+                        // if operand is `*mut _` it will be successfully
+                        // coerced to `*_`, so we expect const here
                         (Type::Pointer(Mutability::Const, Rc::new(var.clone())), var)
                     }
                     UnaryOp::Minus | UnaryOp::Plus => {
@@ -521,7 +522,6 @@ impl<'a> Inferer<'a> {
                     .build();
                 (t::Expr::Error, Type::Error)
             }
-            // TODO: mutability is probably relevant
             Type::Pointer(_, ref typ) => {
                 let span = expr.span;
                 let op = Spanned::new(t::UnaryOp::Deref, span);
@@ -564,24 +564,22 @@ impl<'a> Inferer<'a> {
                 self.unify(&cond.typ, &Type::Bool, Reason::IfCondition(cond.span));
                 t::Statement::If(cond, Box::new(then), else_.map(Box::new))
             }
-            // TODO: store mutability in env
             r::Statement::Let(mutability, sym, ref typ, ref value) => {
                 let value = value.as_ref().map(|value| self.infer_expr(value));
                 let ty = self.convert_resolved_type(typ);
-                if let Some(ref value) = value {
+                let scheme = if let Some(ref value) = value {
                     let reason = Reason::Assign(value.span);
-                    let scheme = Scheme {
+                    Scheme {
                         vars: Vec::new(),
                         typ: self.unify(&value.typ, &ty, reason),
-                    };
-                    self.env.insert(Spanned::into_value(sym), scheme);
+                    }
                 } else {
-                    let scheme = Scheme {
+                    Scheme {
                         vars: Vec::new(),
                         typ: ty.clone(),
-                    };
-                    self.env.insert(Spanned::into_value(sym), scheme);
-                }
+                    }
+                };
+                self.env.insert(Spanned::into_value(sym), scheme);
                 let typ = Spanned::new(ty, Spanned::span(typ));
                 t::Statement::Let(mutability, sym, typ, value)
             }
@@ -614,7 +612,8 @@ impl<'a> Inferer<'a> {
                 typ: typ.clone(),
             };
             self.env.insert(Spanned::into_value(param.name), scheme);
-            params.push(t::Var {
+            params.push(t::FnParam {
+                mutability: param.mutability,
                 name: Spanned::into_value(param.name),
                 typ,
             });
@@ -796,7 +795,7 @@ impl<'a> Inferer<'a> {
         let fields = s.fields
             .iter()
             .map(|f| {
-                t::Var {
+                t::Field {
                     name: Spanned::into_value(f.name),
                     typ: self.convert_resolved_type(&f.typ),
                 }

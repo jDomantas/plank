@@ -92,16 +92,20 @@ impl<'a> Context<'a> {
                 if !self.reachable_labels.contains(&(reg, block)) {
                     return;
                 }
-                let var_symbol = self.function.register_symbols[&reg];
-                let name = self.ctx.symbols.get_name(var_symbol);
-                let msg = format!("var `{}` might be uninitialized here", name);
-                let span = Spanned::span(value);
-                self.ctx
-                    .reporter
-                    .error(msg, span)
-                    .span(span)
-                    .build();
-                self.reported_regs.insert(reg);
+                // occasionally temporary registers happen to be uninitialized
+                // (in cases of constness mismatch when taking references),
+                // so don't report about that
+                if let Some(&var_symbol) = self.function.register_symbols.get(&reg) {
+                    let name = self.ctx.symbols.get_name(var_symbol);
+                    let msg = format!("var `{}` might be uninitialized here", name);
+                    let span = Spanned::span(value);
+                    self.ctx
+                        .reporter
+                        .error(msg, span)
+                        .span(span)
+                        .build();
+                    self.reported_regs.insert(reg);
+                }
             }
         }
     }

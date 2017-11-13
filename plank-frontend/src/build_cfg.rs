@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use plank_syntax::position::{Span, Spanned};
-use ast::typed as t;
+use ast::typed::{self as t, Mutability as Mut};
 use ast::cfg;
 use CompileCtx;
 
@@ -10,9 +10,10 @@ struct LoopDescr {
     after: cfg::BlockId,
 }
 
+#[derive(Debug)]
 enum LValue {
-    Reg(cfg::Reg, Vec<usize>),
-    Deref(RValue, t::Type, Vec<usize>),
+    Reg(Mut, cfg::Reg, Vec<usize>),
+    Deref(Mut, RValue, t::Type, Vec<usize>),
     Invalid,
     Error,
 }
@@ -20,7 +21,8 @@ enum LValue {
 impl LValue {
     fn add_field(&mut self, index: usize) {
         match *self {
-            LValue::Reg(_, ref mut fields) | LValue::Deref(_, _, ref mut fields) => {
+            LValue::Reg(_, _, ref mut fields) |
+            LValue::Deref(_, _, _, ref mut fields) => {
                 fields.push(index)
             }
             LValue::Error | LValue::Invalid => {}
@@ -28,6 +30,7 @@ impl LValue {
     }
 }
 
+#[derive(Debug)]
 enum RValue {
     Temp(cfg::Value),
     Var(cfg::Reg),
@@ -53,6 +56,7 @@ struct Builder<'a> {
     var_registers: HashMap<t::Symbol, cfg::Reg>,
     register_vars: HashMap<cfg::Reg, t::Symbol>,
     current_block: Option<(cfg::BlockId, Vec<Spanned<cfg::Instruction>>)>,
+    var_mutability: HashMap<t::Symbol, Mut>,
 }
 
 impl<'a> Builder<'a> {
@@ -68,6 +72,7 @@ impl<'a> Builder<'a> {
             var_registers: HashMap::new(),
             register_vars: HashMap::new(),
             current_block: None,
+            var_mutability: HashMap::new(),
         }
     }
 
@@ -116,7 +121,15 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(val, typ, fields) => {
+            LValue::Deref(Mut::Const, _, _, _) |
+            LValue::Reg(Mut::Const, _, _) => {
+                self.ctx
+                    .reporter
+                    .error("cannot modify non-mut value", target_span)
+                    .span(target_span)
+                    .build();
+            }
+            LValue::Deref(Mut::Mut, val, typ, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::DerefStore(
                         Spanned::new(val.as_value(), target_span),
@@ -128,10 +141,10 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&val, target_span);
             }
-            LValue::Reg(reg, ref fields) if fields.is_empty() => {
+            LValue::Reg(Mut::Mut, reg, ref fields) if fields.is_empty() => {
                 self.emit_instruction(cfg::Instruction::Assign(reg, value), op_span);
             }
-            LValue::Reg(reg, fields) => {
+            LValue::Reg(Mut::Mut, reg, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::FieldStore(
                         Spanned::new(reg, target_span),
@@ -144,7 +157,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn emit_take_address(&mut self, target: cfg::Reg, value: Spanned<LValue>, op_span: Span) {
+    fn emit_take_address(&mut self, target: cfg::Reg, value: Spanned<LValue>, op_span: Span, mutable: bool) {
         let value_span = Spanned::span(&value);
         match Spanned::into_value(value) {
             LValue::Invalid => {
@@ -155,7 +168,16 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(ref val, _, ref fields) if fields.is_empty() => {
+            LValue::Deref(Mut::Const, _, _, _) |
+            LValue::Reg(Mut::Const, _, _) if mutable => {
+                let span = op_span.merge(value_span);
+                self.ctx
+                    .reporter
+                    .error("cannot take mutable reference to non-mut value", span)
+                    .span(span)
+                    .build();
+            }
+            LValue::Deref(_, ref val, _, ref fields) if fields.is_empty() => {
                 self.emit_instruction(
                     cfg::Instruction::Assign(
                         target,
@@ -165,7 +187,7 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(val, value_span);
             }
-            LValue::Deref(val, typ, fields) => {
+            LValue::Deref(_, val, typ, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::UnaryOp(
                         target,
@@ -176,7 +198,7 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&val, value_span);
             }
-            LValue::Reg(reg, fields) => {
+            LValue::Reg(_, reg, fields) => {
                 self.emit_instruction(
                     cfg::Instruction::TakeAddress(
                         target,
@@ -205,6 +227,7 @@ impl<'a> Builder<'a> {
     fn build_function(&mut self, f: &t::Function) -> Option<cfg::BlockId> {
         for var in &f.params {
             let param = self.new_var_register(var.name, var.typ.clone());
+            self.var_mutability.insert(var.name, var.mutability);
             self.parameters.push(param);
         }
         if let Some(ref body) = f.body {
@@ -320,7 +343,8 @@ impl<'a> Builder<'a> {
                 self.start_block(after);
                 self.drop_value(&c, cond.span);
             }
-            t::Statement::Let(_, name, ref typ, Some(ref value)) => {
+            t::Statement::Let(mutability, name, ref typ, Some(ref value)) => {
+                self.var_mutability.insert(*name, mutability);
                 let typ = (**typ).clone();
                 let var_register = self.new_var_register(*name, typ);
                 let built_value = self.build_expr(value);
@@ -515,6 +539,7 @@ impl<'a> Builder<'a> {
                         result,
                         Spanned::new(value, expr.span),
                         expr.span,
+                        op == t::UnaryOp::MutAddressOf,
                     );
                     RValue::Temp(cfg::Value::Reg(result))
                 } else if let Some(op) = unop_to_instruction(op, &expr.typ) {
@@ -562,8 +587,9 @@ impl<'a> Builder<'a> {
                 lvalue
             }
             t::Expr::Name(ref name, _) => {
+                let mutability = self.var_mutability[name];
                 if let Some(reg) = self.var_registers.get(&**name).cloned() {
-                    LValue::Reg(reg, Vec::new())
+                    LValue::Reg(mutability, reg, Vec::new())
                 } else {
                     LValue::Invalid
                 }
@@ -571,7 +597,11 @@ impl<'a> Builder<'a> {
             t::Expr::Unary(op, ref expr) => match Spanned::into_value(op) {
                 t::UnaryOp::Deref => {
                     let ptr = self.build_expr(expr);
-                    LValue::Deref(ptr, expr.typ.clone(), Vec::new())
+                    let mutability = match expr.typ {
+                        t::Type::Pointer(mutability, _) => mutability,
+                        _ => panic!("cannot deref {:?}", expr.typ),
+                    };
+                    LValue::Deref(mutability, ptr, expr.typ.clone(), Vec::new())
                 }
                 _ => LValue::Invalid,
             },
