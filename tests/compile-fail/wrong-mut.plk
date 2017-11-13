@@ -1,0 +1,21 @@
+fn foo() {
+    *"a" = 'b'; // ERROR: cannot modify non-mut value
+
+    let x = 1;
+    let a = &mut x; // ERROR: cannot take mutable reference to non-mut value
+    x = 2; // ERROR: cannot modify non-mut value
+    a = &x; // ERROR: cannot modify non-mut value
+
+    let x = 1;
+    let a = &x;
+    let b = &mut *a; // ERROR: cannot take mutable reference to non-mut value
+
+    let mut x = 1;
+    let a = &x;
+    let b = &mut *a; // ERROR: cannot take mutable reference to non-mut value
+
+    // coercing should work
+    let mut x = 1;
+    let a: *i32 = &mut x;
+    *a = 2; // ERROR: cannot modify non-mut value
+}
