@@ -22,7 +22,7 @@ This repository currently consists of 8 crates:
 Here's a hello world program:
 
 ```rust
-fn puts(string: *u8) {
+fn puts(mut string: *u8) {
     while *string != 0 {
         putc(*string);
         // this doesn't look very nice :(
