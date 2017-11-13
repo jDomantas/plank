@@ -95,6 +95,8 @@ Here is a table of tokens and their internal representation:
 | `break`    | `Keyword::Break`        |
 | `let`      | `Keyword::Let`          |
 | `return`   | `Keyword::Return`       |
+| `as`       | `Keyword::As`           |
+| `mut`      | `Keyword::Mut`          |
 | `bool`     | `Keyword::Bool`         |
 | `i8`       | `Keyword::I8`           |
 | `u8`       | `Keyword::U8`           |
@@ -102,3 +104,4 @@ Here is a table of tokens and their internal representation:
 | `u16`      | `Keyword::U16`          |
 | `i32`      | `Keyword::I32`          |
 | `u32`      | `Keyword::U32`          |
+| `unit`     | `Keyword::Unit`         |

@@ -12,9 +12,9 @@
 <function-body>     ::= <block> | ";"
 <function-header>   ::= "fn" <item-name> "(" <param-list> ")" "->" <type> | "fn" <item-name> "(" <param-list> ")"
 <param-list>        ::= "" | <param> | <param> "," <param-list>
-<param>             ::= <ident> ":" <type>
+<param>             ::= <opt-mut> <ident> ":" <type>
 
-<type>              ::= "_" | "*" <type> | <fn-type> | <type-name> | <builtin-type>
+<type>              ::= "_" | "*" <type> | "*" "mut" <type> | <fn-type> | <type-name> | <builtin-type>
 <fn-type>           ::= "fn" "(" <type-list> ")" "->" <type> | "fn" "(" <type-list> ")"
 <type-list>         ::= "" | <type> | <type> "," <type-list>
 <type-name>         ::= <ident> | <ident> "<" <type-param-list> ">"
@@ -33,7 +33,8 @@
 <return>            ::= "return" <expr> ";" | "return" ";"
 <expr-statement>    ::= <expr> ";"
 
-<let>               ::= "let" <ident> <opt-type> <opt-initializer> ";"
+<let>               ::= "let" <opt-mut> <ident> <opt-type> <opt-initializer> ";"
+<opt-mut>           ::= "mut" | ""
 <opt-type>          ::= "" | ":" <type>
 <opt-initializer>   ::= "" | "=" <expr>
 
@@ -57,7 +58,7 @@
 <compare-op>        ::= "<" | "<=" | ">" | ">="
 <add-op>            ::= "+" | "-"
 <mul-op>            ::= "*" | "/" | "%"
-<unary-op>          ::= "+" | "-" | "*" | "&" | "!"
+<unary-op>          ::= "+" | "-" | "*" | "&" | "&" "mut" | "!"
 
 <name>              ::= <ident> | <ident> "::" "<" <type-param-list> ">"
 
