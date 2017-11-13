@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
+pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp, Mutability};
 use plank_syntax::position::{Span, Spanned};
 
 
@@ -30,7 +30,7 @@ pub enum Statement {
     Break,
     Continue,
     Return(Spanned<Expr>),
-    Let(Spanned<Symbol>, Spanned<Type>, Option<Spanned<Expr>>),
+    Let(Mutability, Spanned<Symbol>, Spanned<Type>, Option<Spanned<Expr>>),
     Block(Vec<Spanned<Statement>>),
     Expr(Spanned<Expr>),
     Error,
@@ -48,7 +48,7 @@ pub enum Type {
     Bool,
     Unit,
     Concrete(Spanned<Symbol>, Vec<Spanned<Type>>),
-    Pointer(Box<Spanned<Type>>),
+    Pointer(Mutability, Box<Spanned<Type>>),
     Function(Vec<Spanned<Type>>, Box<Spanned<Type>>),
     Error,
 }
@@ -60,17 +60,24 @@ pub struct ItemName {
 }
 
 #[derive(Debug, Clone)]
+pub struct FnParam {
+    pub mutability: Mutability,
+    pub name: Spanned<Symbol>,
+    pub typ: Spanned<Type>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     pub fn_type: FunctionType,
     pub complete_span: Span,
     pub name: ItemName,
-    pub params: Vec<Var>,
+    pub params: Vec<FnParam>,
     pub return_type: Spanned<Type>,
     pub body: Option<Spanned<Statement>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Var {
+pub struct Field {
     pub name: Spanned<Symbol>,
     pub typ: Spanned<Type>,
 }
@@ -79,7 +86,7 @@ pub struct Var {
 pub struct Struct {
     pub complete_span: Span,
     pub name: ItemName,
-    pub fields: Vec<Var>,
+    pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Clone)]

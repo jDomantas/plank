@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use plank_syntax::position::{Span, Spanned};
 use ast::typed;
-pub use ast::typed::{Signedness, Size, Symbol, Type};
+pub use ast::typed::{Mutability, Signedness, Size, Symbol, Type};
 
 
 #[derive(Debug, Clone)]
@@ -147,8 +147,12 @@ pub(crate) mod printer {
             Type::Error => write!(f, "?"),
             Type::Function(ref _params, ref _out) => unimplemented!(),
             Type::Int(sign, size) => write_int(f, sign, size),
-            Type::Pointer(ref to) => {
+            Type::Pointer(Mutability::Const, ref to) => {
                 write!(f, "*")?;
+                write_type(f, to, ctx)
+            }
+            Type::Pointer(Mutability::Mut, ref to) => {
+                write!(f, "*mut ")?;
                 write_type(f, to, ctx)
             }
             Type::Var(_) => panic!("found type var"),

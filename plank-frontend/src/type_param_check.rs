@@ -89,7 +89,7 @@ impl<'a> Context<'a> {
             Type::U16 |
             Type::U32 |
             Type::Wildcard => return,
-            Type::Pointer(ref mut typ) => {
+            Type::Pointer(_, ref mut typ) => {
                 self.check_type(typ);
                 return;
             }
@@ -140,7 +140,7 @@ impl<'a> Context<'a> {
                     self.check_statement(else_);
                 }
             }
-            Statement::Let(_, ref mut typ, ref mut value) => {
+            Statement::Let(_, _, ref mut typ, ref mut value) => {
                 self.check_type(typ);
                 if let Some(ref mut value) = *value {
                     self.check_expr(value);

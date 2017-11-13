@@ -1,4 +1,4 @@
-use plank_syntax::ast::{Program, Statement, Expr, Function, Struct, Ident, Var, Type, FunctionType, BinaryOp, UnaryOp, CallParam, Literal, Signedness, Size};
+use plank_syntax::ast::{Program, Statement, Expr, Function, Struct, Ident, FnParam, Field, Type, FunctionType, BinaryOp, UnaryOp, CallParam, Literal, Signedness, Size, Mutability};
 
 
 #[derive(Copy, Clone)]
@@ -119,7 +119,7 @@ impl Formatter {
             self.format_ident(type_param);
         }
         self.fmt.end_list();
-        self.format_var_list(&s.fields, true);
+        self.format_field_list(&s.fields, true);
         self.fmt.end_list();
     }
 
@@ -139,7 +139,7 @@ impl Formatter {
             self.format_ident(type_param);
         }
         self.fmt.end_list();
-        self.format_var_list(&f.params, false);
+        self.format_param_list(&f.params, false);
         self.format_type(&f.return_type);
         if let Some(ref body) = f.body {
             self.format_statement(body);
@@ -151,15 +151,33 @@ impl Formatter {
         self.fmt.write_symbol(&i.0);
     }
 
-    fn format_var_list(&mut self, vars: &[Var], multiline: bool) {
+    fn format_param_list(&mut self, params: &[FnParam], multiline: bool) {
         self.fmt.start_list();
         if multiline {
             self.fmt.make_list_multiline();
         }
-        for v in vars {
+        for p in params {
             self.fmt.start_list();
-            self.format_ident(&v.name);
-            self.format_type(&v.typ);
+            match p.mutability {
+                Mutability::Mut => self.fmt.write_symbol("mut"),
+                Mutability::Const => {}
+            }
+            self.format_ident(&p.name);
+            self.format_type(&p.typ);
+            self.fmt.end_list();
+        }
+        self.fmt.end_list();
+    }
+
+    fn format_field_list(&mut self, fields: &[Field], multiline: bool) {
+        self.fmt.start_list();
+        if multiline {
+            self.fmt.make_list_multiline();
+        }
+        for f in fields {
+            self.fmt.start_list();
+            self.format_ident(&f.name);
+            self.format_type(&f.typ);
             self.fmt.end_list();
         }
         self.fmt.end_list();
@@ -177,9 +195,15 @@ impl Formatter {
             Type::U32 => self.fmt.write_symbol("u32"),
             Type::Wildcard => self.fmt.write_symbol("_"),
             Type::Error => self.fmt.write_symbol("?"),
-            Type::Pointer(ref typ) => {
+            Type::Pointer(Mutability::Const, ref typ) => {
                 self.fmt.start_list();
                 self.fmt.write_symbol("ptr");
+                self.format_type(typ);
+                self.fmt.end_list();
+            }
+            Type::Pointer(Mutability::Mut, ref typ) => {
+                self.fmt.start_list();
+                self.fmt.write_symbol("mutptr");
                 self.format_type(typ);
                 self.fmt.end_list();
             }
@@ -247,17 +271,24 @@ impl Formatter {
                 }
                 self.fmt.end_list();
             }
-            Statement::Let(ref name, ref typ, ref value) => {
+            Statement::Let(mutability, ref name, ref typ, ref value) => {
                 self.fmt.start_list();
                 if let Some(ref typ) = *typ {
-                    self.fmt.write_symbol("let-typed");
+                    self.fmt.write_symbol(match mutability {
+                        Mutability::Const => "let-typed",
+                        Mutability::Mut => "let-mut-typed",
+                    });
                     self.format_ident(name);
                     self.format_type(typ);
                     if let Some(ref value) = *value {
                         self.format_expr(value);
                     }
                 } else {
-                    self.fmt.write_symbol("let");
+                    self.fmt.write_symbol(match mutability {
+                        Mutability::Const => "let",
+                        Mutability::Mut => "let-mut",
+                    });
+                    self.fmt.write_symbol("let-mut");
                     self.format_ident(name);
                     if let Some(ref value) = *value {
                         self.format_expr(value);
@@ -431,6 +462,7 @@ impl Formatter {
 
     fn format_unary_op(&mut self, op: &UnaryOp) {
         let sym = match *op {
+            UnaryOp::MutAddressOf => "take-address-mut",
             UnaryOp::AddressOf => "take-address",
             UnaryOp::Deref => "deref",
             UnaryOp::Minus => "minus",

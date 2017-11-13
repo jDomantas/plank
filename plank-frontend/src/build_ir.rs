@@ -199,7 +199,7 @@ impl<'a> Builder<'a> {
                     None
                 } else {
                     let typ = match *typ {
-                        cfg::Type::Pointer(ref t) => t,
+                        cfg::Type::Pointer(_, ref t) => t,
                         _ => panic!("cannot deref non-pointer"),
                     };
                     let offset = self.find_offset(typ, fields);
@@ -305,7 +305,7 @@ impl<'a> Builder<'a> {
             ) => {
                 let dest = ir::Reg(dest.0);
                 let typ = match *typ {
-                    cfg::Type::Pointer(ref t) => t,
+                    cfg::Type::Pointer(_, ref t) => t,
                     _ => panic!("cannot deref non-pointer"),
                 };
                 let offset = self.find_offset(typ, fields);
@@ -370,7 +370,7 @@ impl<'a> Builder<'a> {
             cfg::Type::Bool => to.push_str("bool"),
             cfg::Type::Error => panic!("cannot build ir with errors"),
             cfg::Type::Var(_) => panic!("cannot build ir with type vars"),
-            cfg::Type::Pointer(ref ty) => {
+            cfg::Type::Pointer(_, ref ty) => {
                 to.push('*');
                 self.write_type(to, ty);
             }

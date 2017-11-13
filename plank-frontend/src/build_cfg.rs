@@ -230,7 +230,7 @@ impl<'a> Builder<'a> {
                     self.build_statement(stmt);
                 }
                 for stmt in stmts {
-                    if let t::Statement::Let(sym, _, _) = **stmt {
+                    if let t::Statement::Let(_, sym, _, _) = **stmt {
                         let span = Spanned::span(stmt);
                         let reg = self.var_registers[&sym];
                         self.emit_instruction(cfg::Instruction::Drop(reg), span);
@@ -320,7 +320,7 @@ impl<'a> Builder<'a> {
                 self.start_block(after);
                 self.drop_value(&c, cond.span);
             }
-            t::Statement::Let(name, ref typ, Some(ref value)) => {
+            t::Statement::Let(_, name, ref typ, Some(ref value)) => {
                 let typ = (**typ).clone();
                 let var_register = self.new_var_register(*name, typ);
                 let built_value = self.build_expr(value);
@@ -333,7 +333,7 @@ impl<'a> Builder<'a> {
                 );
                 self.drop_value(&built_value, value.span);
             }
-            t::Statement::Let(name, ref typ, None) => {
+            t::Statement::Let(_, name, ref typ, None) => {
                 // give it a register, but don't initialize it
                 self.new_var_register(Spanned::into_value(name), (**typ).clone());
             }
@@ -705,7 +705,7 @@ fn unop_to_instruction(op: t::UnaryOp, arg_type: &t::Type) -> Option<cfg::UnaryO
         t::UnaryOp::Deref => Some(cfg::UnaryOp::DerefLoad),
         t::UnaryOp::Minus => int.map(|(sign, size)| cfg::UnaryOp::Negate(sign, size)),
         t::UnaryOp::Not => Some(cfg::UnaryOp::Not),
-        t::UnaryOp::Plus | t::UnaryOp::AddressOf => panic!("invalid unary op"),
+        t::UnaryOp::Plus | t::UnaryOp::AddressOf | t::UnaryOp::MutAddressOf => panic!("invalid unary op"),
     }
 }
 

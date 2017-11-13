@@ -94,6 +94,13 @@ pub enum UnaryOp {
     Not,
     Deref,
     AddressOf,
+    MutAddressOf,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
+pub enum Mutability {
+    Mut,
+    Const,
 }
 
 #[derive(Debug, Clone)]
@@ -108,7 +115,7 @@ pub enum Statement {
     Break,
     Continue,
     Return(Spanned<Expr>),
-    Let(Spanned<Ident>, Option<Spanned<Type>>, Option<Spanned<Expr>>),
+    Let(Mutability, Spanned<Ident>, Option<Spanned<Type>>, Option<Spanned<Expr>>),
     Block(Vec<Spanned<Statement>>),
     Expr(Spanned<Expr>),
     Error,
@@ -126,7 +133,7 @@ pub enum Type {
     Bool,
     Unit,
     Concrete(Spanned<Ident>, Vec<Spanned<Type>>),
-    Pointer(Box<Spanned<Type>>),
+    Pointer(Mutability, Box<Spanned<Type>>),
     Function(Vec<Spanned<Type>>, Box<Spanned<Type>>),
     Error,
 }
@@ -144,17 +151,24 @@ pub enum FunctionType {
 }
 
 #[derive(Debug, Clone)]
+pub struct FnParam {
+    pub mutability: Mutability,
+    pub name: Spanned<Ident>,
+    pub typ: Spanned<Type>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     pub complete_span: Span,
     pub fn_type: FunctionType,
     pub name: ItemName,
-    pub params: Vec<Var>,
+    pub params: Vec<FnParam>,
     pub return_type: Spanned<Type>,
     pub body: Option<Spanned<Statement>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Var {
+pub struct Field {
     pub name: Spanned<Ident>,
     pub typ: Spanned<Type>,
 }
@@ -163,7 +177,7 @@ pub struct Var {
 pub struct Struct {
     pub complete_span: Span,
     pub name: ItemName,
-    pub fields: Vec<Var>,
+    pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Clone)]

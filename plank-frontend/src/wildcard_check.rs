@@ -62,7 +62,7 @@ impl<'a> Context<'a> {
             Type::U8 |
             Type::U16 |
             Type::U32 => {}
-            Type::Pointer(ref typ) => self.check_type(typ),
+            Type::Pointer(_, ref typ) => self.check_type(typ),
             Type::Function(ref params, ref out) => {
                 for param in params {
                     self.check_type(param);

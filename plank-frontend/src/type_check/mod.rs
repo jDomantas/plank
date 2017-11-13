@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use plank_syntax::position::{Span, Spanned};
-use ast::resolved::{self as r, BinaryOp, Symbol, UnaryOp};
+use ast::resolved::{self as r, BinaryOp, Mutability, Symbol, UnaryOp};
 use ast::typed::{self as t, Type};
 use CompileCtx;
 use self::unify::UnifyTable;
@@ -46,7 +46,7 @@ impl Scheme {
                     sym
                 }
                 Type::Bool | Type::Int(_, _) | Type::Error | Type::Var(_) | Type::Unit => return,
-                Type::Pointer(ref mut t) => {
+                Type::Pointer(_, ref mut t) => {
                     walk(Rc::make_mut(t), vars, params);
                     return;
                 }
@@ -148,9 +148,17 @@ impl<'a> fmt::Display for TypeFormatter<'a> {
                     r::Size::Bit32 => write!(f, "32"),
                 }
             }
-            Type::Pointer(ref typ) => write!(
+            Type::Pointer(Mutability::Const, ref typ) => write!(
                 f,
                 "*{}",
+                TypeFormatter {
+                    typ,
+                    inferer: self.inferer,
+                }
+            ),
+            Type::Pointer(Mutability::Mut, ref typ) => write!(
+                f,
+                "*mut {}",
                 TypeFormatter {
                     typ,
                     inferer: self.inferer,
@@ -173,7 +181,7 @@ struct Inferer<'a> {
 impl<'a> Inferer<'a> {
     fn new(ctx: &'a mut CompileCtx) -> Self {
         let char_type = Type::Int(t::Signedness::Unsigned, t::Size::Bit8);
-        let string_type = Type::Pointer(Rc::new(char_type));
+        let string_type = Type::Pointer(Mutability::Const, Rc::new(char_type));
         Inferer {
             ctx,
             unifier: UnifyTable::new(),
@@ -272,9 +280,9 @@ impl<'a> Inferer<'a> {
             r::Type::U16 => Type::Int(t::Signedness::Unsigned, t::Size::Bit16),
             r::Type::I32 => Type::Int(t::Signedness::Signed, t::Size::Bit32),
             r::Type::U32 => Type::Int(t::Signedness::Unsigned, t::Size::Bit32),
-            r::Type::Pointer(ref typ) => {
+            r::Type::Pointer(mutability, ref typ) => {
                 let typ = self.convert_resolved_type(typ);
-                t::Type::Pointer(Rc::new(typ))
+                t::Type::Pointer(mutability, Rc::new(typ))
             }
             r::Type::Concrete(sym, ref params) => {
                 let params = params
@@ -303,7 +311,7 @@ impl<'a> Inferer<'a> {
             Type::Error => "error".into(),
             Type::Function(_, _) => "a function".into(),
             Type::Int(_, _) => "an int".into(),
-            Type::Pointer(_) => "a pointer".into(),
+            Type::Pointer(_, _) => "a pointer".into(),
             Type::Var(_) => "type variable".into(),
         }
     }
@@ -442,11 +450,16 @@ impl<'a> Inferer<'a> {
                 let (param_type, out_type) = match Spanned::into_value(op) {
                     UnaryOp::AddressOf => {
                         let var = self.fresh_var();
-                        (var.clone(), Type::Pointer(Rc::new(var)))
+                        (var.clone(), Type::Pointer(Mutability::Const, Rc::new(var)))
                     }
+                    UnaryOp::MutAddressOf => {
+                        let var = self.fresh_var();
+                        (var.clone(), Type::Pointer(Mutability::Mut, Rc::new(var)))
+                    }
+                    // TODO: figure out which mutability to use
                     UnaryOp::Deref => {
                         let var = self.fresh_var();
-                        (Type::Pointer(Rc::new(var.clone())), var)
+                        (Type::Pointer(Mutability::Const, Rc::new(var.clone())), var)
                     }
                     UnaryOp::Minus | UnaryOp::Plus => {
                         let var = self.fresh_int_var();
@@ -508,7 +521,8 @@ impl<'a> Inferer<'a> {
                     .build();
                 (t::Expr::Error, Type::Error)
             }
-            Type::Pointer(ref typ) => {
+            // TODO: mutability is probably relevant
+            Type::Pointer(_, ref typ) => {
                 let span = expr.span;
                 let op = Spanned::new(t::UnaryOp::Deref, span);
                 let deref = t::TypedExpr {
@@ -550,7 +564,8 @@ impl<'a> Inferer<'a> {
                 self.unify(&cond.typ, &Type::Bool, Reason::IfCondition(cond.span));
                 t::Statement::If(cond, Box::new(then), else_.map(Box::new))
             }
-            r::Statement::Let(sym, ref typ, ref value) => {
+            // TODO: store mutability in env
+            r::Statement::Let(mutability, sym, ref typ, ref value) => {
                 let value = value.as_ref().map(|value| self.infer_expr(value));
                 let ty = self.convert_resolved_type(typ);
                 if let Some(ref value) = value {
@@ -568,7 +583,7 @@ impl<'a> Inferer<'a> {
                     self.env.insert(Spanned::into_value(sym), scheme);
                 }
                 let typ = Spanned::new(ty, Spanned::span(typ));
-                t::Statement::Let(sym, typ, value)
+                t::Statement::Let(mutability, sym, typ, value)
             }
             r::Statement::Loop(ref stmt) => {
                 let s = Spanned::map_ref(stmt, |s| self.infer_statement(s));
@@ -647,7 +662,7 @@ impl<'a> Inferer<'a> {
                 self.normalize_expr(cond);
                 self.normalize_statement(stmt);
             }
-            t::Statement::Let(_, ref mut typ, ref mut value) => {
+            t::Statement::Let(_, _, ref mut typ, ref mut value) => {
                 if let Some(ref mut value) = *value {
                     self.normalize_expr(value);
                 }

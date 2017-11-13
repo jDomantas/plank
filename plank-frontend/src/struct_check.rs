@@ -123,7 +123,7 @@ impl Solver {
             Type::U32 |
             Type::Bool |
             Type::Unit |
-            Type::Pointer(_) |
+            Type::Pointer(_, _) |
             Type::Function(_, _) |
             Type::Error => {}
             Type::Concrete(sym, ref params) => {

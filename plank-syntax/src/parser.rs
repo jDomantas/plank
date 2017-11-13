@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use plank_errors::Reporter;
 use ast::{BinaryOp, CallParam, Expr, Function, FunctionType, Ident, ItemName, Literal, Program,
-          Statement, Struct, Type, UnaryOp, Var};
+          Statement, Struct, Type, UnaryOp, Field, FnParam, Mutability};
 use position::{Position, Span, Spanned};
 use tokens::{Keyword, Token, TokenKind};
 
@@ -22,10 +22,7 @@ pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     parser.prefix(TokenKind::Literal, &LiteralParser);
     parser.prefix(TokenKind::Token(Token::Keyword(Keyword::Unit)), &LiteralParser);
     parser.prefix(TokenKind::Ident, &NameParser);
-    parser.prefix(
-        TokenKind::Token(Token::Ampersand),
-        &UnaryOpParser(UnaryOp::AddressOf),
-    );
+    parser.prefix(TokenKind::Token(Token::Ampersand), &AddressOfParser);
     parser.prefix(TokenKind::Token(Token::Plus), &UnaryOpParser(UnaryOp::Plus));
     parser.prefix(
         TokenKind::Token(Token::Minus),
@@ -448,7 +445,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_struct_fields(&mut self) -> ParseResult<Vec<Var>> {
+    fn parse_struct_fields(&mut self) -> ParseResult<Vec<Field>> {
         self.expect(Token::LeftBrace)?;
         let mut fields = Vec::new();
         while !self.check(Token::RightBrace) {
@@ -456,7 +453,7 @@ impl<'a> Parser<'a> {
             let name = self.consume_ident()?;
             self.expect(Token::Colon)?;
             let typ = self.parse_type()?;
-            fields.push(Var { name, typ });
+            fields.push(Field { name, typ });
             if self.check(Token::RightBrace) {
                 break;
             }
@@ -489,20 +486,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_function_end(&mut self) -> ParseResult<(Vec<Var>, Spanned<Type>, Option<Spanned<Statement>>)> {
+    fn parse_function_end(&mut self) -> ParseResult<(Vec<FnParam>, Spanned<Type>, Option<Spanned<Statement>>)> {
         self.expect(Token::LeftParen)?;
-        let open_span = self.previous_span();
-        let mut params = Vec::new();
-        while !self.check(Token::RightParen) {
-            let name = self.consume_ident()?;
-            self.expect(Token::Colon)?;
-            let typ = self.parse_type()?;
-            params.push(Var { name, typ });
-            if self.check(Token::RightParen) {
-                break;
-            }
-            self.expect_closing(Token::Comma, open_span)?;
-        }
+        let params = self.parse_function_params()?;
         let return_type = if self.check(Token::Arrow) {
             self.parse_type()?
         } else {
@@ -515,6 +501,27 @@ impl<'a> Parser<'a> {
             None
         };
         Ok((params, return_type, body))
+    }
+
+    fn parse_function_params(&mut self) -> ParseResult<Vec<FnParam>> {
+        let open_span = self.previous_span();
+        let mut params = Vec::new();
+        while !self.check(Token::RightParen) {
+            let mutability = if self.check(Token::Keyword(Keyword::Mut)) {
+                Mutability::Mut
+            } else {
+                Mutability::Const
+            };
+            let name = self.consume_ident()?;
+            self.expect(Token::Colon)?;
+            let typ = self.parse_type()?;
+            params.push(FnParam { mutability, name, typ });
+            if self.check(Token::RightParen) {
+                break;
+            }
+            self.expect_closing(Token::Comma, open_span)?;
+        }
+        Ok(params)
     }
 
     fn parse_item_name(&mut self) -> PartialResult<ItemName, Ident> {
@@ -551,9 +558,14 @@ impl<'a> Parser<'a> {
             Ok(Spanned::new(typ, span))
         } else if self.check(Token::Star) {
             let start = self.previous_span();
+            let mutability = if self.check(Token::Keyword(Keyword::Mut)) {
+                Mutability::Mut
+            } else {
+                Mutability::Const
+            };
             let typ = self.parse_type()?;
             let span = start.merge(Spanned::span(&typ));
-            let typ = Type::Pointer(Box::new(typ));
+            let typ = Type::Pointer(mutability, Box::new(typ));
             Ok(Spanned::new(typ, span))
         } else if self.check(Token::Keyword(Keyword::Fn)) {
             let start = self.previous_span();
@@ -628,6 +640,11 @@ impl<'a> Parser<'a> {
         self.last_line_completed = true;
         if self.check(Token::Keyword(Keyword::Let)) {
             let start = self.previous_span();
+            let mutability = if self.check(Token::Keyword(Keyword::Mut)) {
+                Mutability::Mut
+            } else {
+                Mutability::Const
+            };
             let name = match self.consume_ident() {
                 Ok(ident) => ident,
                 Err(()) => return PartialResult::Error,
@@ -635,7 +652,7 @@ impl<'a> Parser<'a> {
             match self.parse_let_end() {
                 Ok((typ, value)) => {
                     let span = start.merge(self.previous_span());
-                    let stmt = Statement::Let(name, typ, value);
+                    let stmt = Statement::Let(mutability, name, typ, value);
                     PartialResult::Ok(Spanned::new(stmt, span))
                 }
                 Err(()) => {
@@ -643,7 +660,7 @@ impl<'a> Parser<'a> {
                     let span = start.merge(name_span);
                     let typ = Spanned::new(Type::Error, name_span);
                     let value = Spanned::new(Expr::Error, name_span);
-                    let stmt = Statement::Let(name, Some(typ), Some(value));
+                    let stmt = Statement::Let(mutability, name, Some(typ), Some(value));
                     PartialResult::Partial(Spanned::new(stmt, span))
                 }
             }
@@ -962,6 +979,25 @@ impl PrefixParser for UnaryOpParser {
         let op = Spanned::new(self.0, op_span);
         let operand = parser.pratt_parse(Precedence::Prefix)?;
         let span = op_span.merge(Spanned::span(&operand));
+        let expr = Expr::Unary(op, Box::new(operand));
+        Ok(Spanned::new(expr, span))
+    }
+}
+
+struct AddressOfParser;
+
+impl PrefixParser for AddressOfParser {
+    fn parse(&self, parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
+        let op = parser.consume().expect("token disappeared");
+        let op = if parser.check(Token::Keyword(Keyword::Mut)) {
+            let span = Spanned::span(&op).merge(parser.previous_span());
+            Spanned::new(UnaryOp::MutAddressOf, span)
+        } else {
+            let span = Spanned::span(&op);
+            Spanned::new(UnaryOp::AddressOf, span)
+        };
+        let operand = parser.pratt_parse(Precedence::Prefix)?;
+        let span = Spanned::span(&op).merge(Spanned::span(&operand));
         let expr = Expr::Unary(op, Box::new(operand));
         Ok(Spanned::new(expr, span))
     }

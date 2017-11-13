@@ -83,7 +83,8 @@ impl UnifyTable {
                     Err(())
                 }
             }
-            (Type::Pointer(ref a), Type::Pointer(ref b)) => self.unify_raw(a, b),
+            // TODO: accout for mutability
+            (Type::Pointer(_, ref a), Type::Pointer(_, ref b)) => self.unify_raw(a, b),
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
             (Type::Bool, Type::Bool) |
             (Type::Unit, Type::Unit) |
@@ -167,7 +168,7 @@ impl UnifyTable {
                 }
                 self.occurs(var, out)
             }
-            Type::Pointer(ref to) => self.occurs(var, to),
+            Type::Pointer(_, ref to) => self.occurs(var, to),
             Type::Var(v) => var == v,
         }
     }
@@ -207,9 +208,9 @@ impl UnifyTable {
                 Ok(Type::Function(normalized.into(), Rc::new(out)))
             }
             ty @ Type::Int(_, _) => Ok(ty),
-            Type::Pointer(ref ty) => {
+            Type::Pointer(mutability, ref ty) => {
                 let ty = self.normalize(ty)?;
-                Ok(Type::Pointer(Rc::new(ty)))
+                Ok(Type::Pointer(mutability, Rc::new(ty)))
             }
             Type::Var(var) => {
                 match self.var_target.get(&var) {

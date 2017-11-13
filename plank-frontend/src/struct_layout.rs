@@ -53,7 +53,7 @@ impl<'a> LayoutEngine<'a> {
         match *ty {
             Type::Bool => LayoutResult::Ok((1, 1)),
             Type::Error => LayoutResult::Error,
-            Type::Pointer(_) => LayoutResult::Ok((POINTER_SIZE, POINTER_SIZE)),
+            Type::Pointer(_, _) => LayoutResult::Ok((POINTER_SIZE, POINTER_SIZE)),
             Type::Function(_, _) => LayoutResult::Ok((FUNCTION_SIZE, FUNCTION_SIZE)),
             Type::Int(_, Size::Bit8) => LayoutResult::Ok((1, 1)),
             Type::Int(_, Size::Bit16) => LayoutResult::Ok((2, 2)),
@@ -102,7 +102,7 @@ impl<'a> LayoutEngine<'a> {
             Type::Unit |
             Type::Bool |
             Type::Error |
-            Type::Pointer(_) |
+            Type::Pointer(_, _) |
             Type::Function(_, _) |
             Type::Int(_, _) |
             Type::Var(_) => panic!("no fields on type"),

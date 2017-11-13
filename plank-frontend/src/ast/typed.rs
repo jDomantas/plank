@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
 use plank_syntax::position::{Span, Spanned};
-pub use ast::resolved::Symbol;
+pub use ast::resolved::{Mutability, Symbol};
 
 
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ pub enum Statement {
     Break,
     Continue,
     Return(TypedExpr),
-    Let(Spanned<Symbol>, Spanned<Type>, Option<TypedExpr>),
+    Let(Mutability, Spanned<Symbol>, Spanned<Type>, Option<TypedExpr>),
     Block(Vec<Spanned<Statement>>),
     Expr(TypedExpr),
     Error,
@@ -52,7 +52,7 @@ pub enum Type {
     Unit,
     Int(Signedness, Size),
     Concrete(Symbol, Rc<[Type]>),
-    Pointer(Rc<Type>),
+    Pointer(Mutability, Rc<Type>),
     Function(Rc<[Type]>, Rc<Type>),
     Error,
 }
@@ -80,9 +80,9 @@ impl Type {
                 let out = out.replace(mapping);
                 Type::Function(params, Rc::new(out))
             }
-            Type::Pointer(ref to) => {
+            Type::Pointer(mutability, ref to) => {
                 let to = to.replace(mapping);
-                Type::Pointer(Rc::new(to))
+                Type::Pointer(mutability, Rc::new(to))
             }
         }
     }

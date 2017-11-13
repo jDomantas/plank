@@ -223,7 +223,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_struct(&mut self, struct_: &p::Struct) -> r::Struct {
         let name = self.resolve_item_name(&struct_.name);
-        let fields = self.resolve_var_list(&struct_.fields, "field");
+        let fields = self.resolve_field_list(&struct_.fields);
         r::Struct {
             name,
             fields,
@@ -260,14 +260,14 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_var_list(&mut self, vars: &[p::Var], kind: &str) -> Vec<r::Var> {
-        let mut result_vars = Vec::new();
-        let mut var_spans = HashMap::new();
-        for var in vars {
-            let name = &var.name.0;
-            let span = Spanned::span(&var.name);
-            if let Some(&prev_span) = var_spans.get(name) {
-                let msg = format!("{} `{}` is listed multiple times", kind, name);
+    fn resolve_param_list(&mut self, params: &[p::FnParam]) -> Vec<r::FnParam> {
+        let mut result_params = Vec::new();
+        let mut param_spans = HashMap::new();
+        for param in params {
+            let name = &param.name.0;
+            let span = Spanned::span(&param.name);
+            if let Some(&prev_span) = param_spans.get(name) {
+                let msg = format!("parameter `{}` is listed multiple times", name);
                 let short_msg = format!("`{}` is defined here", name);
                 self.ctx
                     .reporter
@@ -276,17 +276,47 @@ impl<'a> Resolver<'a> {
                     .span_note(short_msg, prev_span)
                     .build();
             } else {
-                var_spans.insert(name, span);
+                param_spans.insert(name, span);
             }
             let symbol = self.ctx.symbols.new_symbol(name.clone());
-            let field_type = self.resolve_type(&var.typ);
-            let field = r::Var {
+            let param_type = self.resolve_type(&param.typ);
+            let param = r::FnParam {
+                mutability: param.mutability,
+                name: Spanned::new(symbol, span),
+                typ: param_type,
+            };
+            result_params.push(param);
+        }
+        result_params
+    }
+
+    fn resolve_field_list(&mut self, fields: &[p::Field]) -> Vec<r::Field> {
+        let mut result_fields = Vec::new();
+        let mut field_spans = HashMap::new();
+        for field in fields {
+            let name = &field.name.0;
+            let span = Spanned::span(&field.name);
+            if let Some(&prev_span) = field_spans.get(name) {
+                let msg = format!("field `{}` is listed multiple times", name);
+                let short_msg = format!("`{}` is defined here", name);
+                self.ctx
+                    .reporter
+                    .error(msg, span)
+                    .span_note("and again here", span)
+                    .span_note(short_msg, prev_span)
+                    .build();
+            } else {
+                field_spans.insert(name, span);
+            }
+            let symbol = self.ctx.symbols.new_symbol(name.clone());
+            let field_type = self.resolve_type(&field.typ);
+            let field = r::Field {
                 name: Spanned::new(symbol, span),
                 typ: field_type,
             };
-            result_vars.push(field);
+            result_fields.push(field);
         }
-        result_vars
+        result_fields
     }
 
     fn resolve_type(&mut self, typ: &Spanned<p::Type>) -> Spanned<r::Type> {
@@ -302,9 +332,9 @@ impl<'a> Resolver<'a> {
             p::Type::U32 => r::Type::U32,
             p::Type::Wildcard => r::Type::Wildcard,
             p::Type::Error => r::Type::Error,
-            p::Type::Pointer(ref typ) => {
+            p::Type::Pointer(mutability, ref typ) => {
                 let typ = self.resolve_type(typ);
-                r::Type::Pointer(Box::new(typ))
+                r::Type::Pointer(mutability, Box::new(typ))
             }
             p::Type::Function(ref params, ref out) => {
                 let params = params.iter().map(|typ| self.resolve_type(typ)).collect();
@@ -337,7 +367,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_function(&mut self, f: &p::Function) -> r::Function {
         let name = self.resolve_item_name(&f.name);
-        let params = self.resolve_var_list(&f.params, "parameter");
+        let params = self.resolve_param_list(&f.params);
         let return_type = self.resolve_type(&f.return_type);
 
         debug_assert!(self.scopes.is_empty());
@@ -407,7 +437,7 @@ impl<'a> Resolver<'a> {
                 let else_ = else_.as_ref().map(|s| self.resolve_statement(s));
                 r::Statement::If(cond, Box::new(then), else_.map(Box::new))
             }
-            p::Statement::Let(ref name, ref typ, ref value) => {
+            p::Statement::Let(mutability, ref name, ref typ, ref value) => {
                 let name_span = Spanned::span(name);
                 let typ = typ.as_ref()
                     .map(|t| self.resolve_type(t))
@@ -416,7 +446,7 @@ impl<'a> Resolver<'a> {
                 let symbol = self.ctx.symbols.new_symbol(name.0.clone());
                 self.add_local(&name.0, symbol);
                 let symbol = Spanned::new(symbol, name_span);
-                r::Statement::Let(symbol, typ, value)
+                r::Statement::Let(mutability, symbol, typ, value)
             }
             p::Statement::Loop(ref statement) => {
                 let statement = self.resolve_statement(statement);
@@ -721,7 +751,8 @@ fn make_builtin_putc() -> r::Function {
             type_params: Vec::new(),
         },
         params: vec![
-            r::Var {
+            r::FnParam {
+                mutability: r::Mutability::Const,
                 name: Spanned::new(::builtins::PUTC_PARAM, dummy_span),
                 typ: Spanned::new(r::Type::U8, dummy_span),
             },
