@@ -1,15 +1,15 @@
-fn modify(ptr: *u8) {
+fn modify(ptr: *mut u8) {
     *ptr = 'c';
 }
 
 fn main() -> i32 {
-    let a = 'a';
+    let mut a = 'a';
     putc(a);
-    let b = &a;
+    let b = &mut a;
     *b = 'b';
     putc(a);
     putc(*b);
-    modify(&a);
+    modify(&mut a);
     putc(a);
     putc(*b);
     return 0;

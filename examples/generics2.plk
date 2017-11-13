@@ -4,7 +4,7 @@ struct Pair<A, B> {
     second: B,
 }
 
-fn puts(string: *u8) {
+fn puts(mut string: *u8) {
     while *string != 0 {
         putc(*string);
         // this doesn't look very nice :(

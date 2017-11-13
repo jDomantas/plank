@@ -5,16 +5,16 @@ fn print_byte(x: u8) {
     putc('0' + x % 10);
 }
 
-fn modify(ptr: *u8) {
+fn modify(ptr: *mut u8) {
     *ptr = *ptr * 10 + 2;
 }
 
 fn basic() {
-    let x = 3;
+    let mut x = 3;
     print_byte(x);
     putc('\n');
 
-    modify(&x);
+    modify(&mut x);
     print_byte(x);
     putc('\n');
 }
@@ -22,7 +22,7 @@ fn basic() {
 fn arithmetic() {
     // there is no builtin pointer arithmetic,
     // but we can use casts! :D
-    let string: *u8 = "Test string!\n";
+    let mut string: *u8 = "Test string!\n";
     while *string != 0 {
         putc(*string);
         // pointers are currently 32 bits wide,

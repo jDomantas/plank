@@ -4,7 +4,7 @@ struct Foo {
 }
 
 fn main() -> i32 {
-    let foo = Foo('a', 123);
+    let mut foo = Foo('a', 123);
     putc(foo.a);
     foo.a = 'b';
     putc(foo.a);

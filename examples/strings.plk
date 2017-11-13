@@ -17,7 +17,7 @@ fn from_u8_ptr(ptr: *u8) -> String {
     return str;
 }
 
-fn strcpy(to: *u8, from: *u8) {
+fn strcpy(mut to: *mut u8, mut from: *u8) {
     while *from != 0 {
         *to = *from;
         to = (to as _ + 1) as _;
@@ -26,8 +26,8 @@ fn strcpy(to: *u8, from: *u8) {
     *to = 0;
 }
 
-fn append(to: *String, str: String) {
-    let ptr = to as *u8;
+fn append(to: *mut String, str: String) {
+    let mut ptr = to as *mut u8;
     while *ptr != 0 {
         ptr = (ptr as _ + 1) as _;
     }
@@ -38,7 +38,7 @@ fn append(to: *String, str: String) {
 }
 
 fn print(str: String) {
-    let ptr = &str as _;
+    let mut ptr = &str as _;
     while *ptr != 0 {
         putc(*ptr);
         ptr = (ptr as _ + 1) as _;
@@ -46,11 +46,11 @@ fn print(str: String) {
 }
 
 fn main() -> i32 {
-    let a = from_u8_ptr("Stack ");
+    let mut a = from_u8_ptr("Stack ");
     let b = from_u8_ptr("allocated ");
     let c = from_u8_ptr("strings!\n");
-    append(&a, b);
-    append(&a, c);
+    append(&mut a, b);
+    append(&mut a, c);
     print(a);
     return 0;
 }

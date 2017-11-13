@@ -15,7 +15,7 @@ fn print_num(num: u32) {
     putc('0' + ((num % 10) as Pair<u8, u16>).first);
 }
 
-fn print(msg: *u8) {
+fn print(mut msg: *u8) {
     while *msg != 0 {
         putc(*msg);
         msg = (msg as u32 + 1) as *u8;

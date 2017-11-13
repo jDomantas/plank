@@ -7,7 +7,7 @@ fn next_letter(x: u8) -> u8 {
 }
 
 fn print_letters() {
-    let letter = 'a';
+    let mut letter = 'a';
     loop {
         putc(letter);
         letter = next_letter(letter);
