@@ -1,0 +1,7 @@
+fn foo() {
+    if (true)
+        putc('!'); // ERROR: expected one of
+
+    while (false)
+        putc('!'); // ERROR: expected one of
+}

@@ -1,0 +1,18 @@
+fn foo() {
+    break; // ERROR: cannot use `break` outside loop
+    continue; // ERROR: cannot use `continue` outside loop
+
+    loop {
+        break;
+        continue;
+    }
+
+    while true {
+        break;
+        continue;
+
+        loop {
+            continue;
+        }
+    }
+}

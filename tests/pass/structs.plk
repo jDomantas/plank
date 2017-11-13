@@ -1,0 +1,22 @@
+struct Foo {
+    a: u8,
+    b: i32,
+}
+
+fn main() -> i32 {
+    let foo = Foo('a', 123);
+    putc(foo.a);
+    foo.a = 'b';
+    putc(foo.a);
+    if foo.b != 123 {
+        putc('!');
+    }
+    foo.b = 456;
+    if foo.b != 456 {
+        putc('!');
+    }
+    putc(foo.a);
+    return 0;
+}
+
+// OUTPUT: abb

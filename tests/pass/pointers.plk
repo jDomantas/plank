@@ -1,0 +1,18 @@
+fn modify(ptr: *u8) {
+    *ptr = 'c';
+}
+
+fn main() -> i32 {
+    let a = 'a';
+    putc(a);
+    let b = &a;
+    *b = 'b';
+    putc(a);
+    putc(*b);
+    modify(&a);
+    putc(a);
+    putc(*b);
+    return 0;
+}
+
+// OUTPUT: abbcc

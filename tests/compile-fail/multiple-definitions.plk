@@ -1,0 +1,7 @@
+struct A {}
+struct A {} // ERROR: `A` is defined multiple times
+fn A() {} // ERROR: `A` is defined multiple times
+fn f() {}
+fn f() {} // ERROR: `f` is defined multiple times
+fn g() {}
+fn f() {} // ERROR: `f` is defined multiple times

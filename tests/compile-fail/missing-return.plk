@@ -1,0 +1,11 @@
+fn foo() -> bool { // ERROR: not all paths return a value
+
+}
+
+fn bar() -> unit {
+
+}
+
+fn baz<T>() -> T { // ERROR: not all paths return a value
+
+}

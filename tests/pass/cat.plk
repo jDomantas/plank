@@ -1,0 +1,17 @@
+struct S {
+    a: u8, b: u8, c: u8, d: u8,
+}
+
+fn main() -> i32 {
+    loop {
+        let ch = getc();
+        if ch == -1 {
+            return 0;
+        } else {
+            putc((ch as S).a);
+        }
+    }
+}
+
+// INPUT: do be do be doo
+// OUTPUT: do be do be doo
