@@ -508,7 +508,7 @@ impl<'a> Builder<'a> {
             }
             t::Expr::Unary(op, ref expr) => {
                 let op = Spanned::into_value(op);
-                if op == t::UnaryOp::AddressOf {
+                if op == t::UnaryOp::AddressOf || op == t::UnaryOp::MutAddressOf {
                     let value = self.build_expr_lvalue(expr);
                     let result = self.new_register(e.typ.clone());
                     self.emit_take_address(
