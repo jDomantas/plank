@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use ast::typed::{Signedness, Size, Type, TypeVar};
+use ast::typed::{Mutability, Signedness, Size, Type, TypeVar};
 use super::rollback_map::Map;
 
 
@@ -41,7 +41,7 @@ impl UnifyTable {
     }
 
     pub fn unify(&mut self, a: &Type, b: &Type) -> Result<Type, ()> {
-        match self.unify_raw(a, b) {
+        match self.unify_raw(a, b, true) {
             Ok(()) => {
                 self.commit();
                 Ok(a.clone())
@@ -53,14 +53,14 @@ impl UnifyTable {
         }
     }
 
-    fn unify_raw(&mut self, a: &Type, b: &Type) -> Result<(), ()> {
+    fn unify_raw(&mut self, a: &Type, b: &Type, allow_coerce: bool) -> Result<(), ()> {
         let a = self.shallow_normalize(a);
         let b = self.shallow_normalize(b);
         match (a, b) {
             (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => if a == b {
                 assert_eq!(ap.len(), bp.len());
                 for (a, b) in ap.iter().zip(bp.iter()) {
-                    self.unify_raw(a, b)?;
+                    self.unify_raw(a, b, false)?;
                 }
                 Ok(())
             } else {
@@ -69,9 +69,12 @@ impl UnifyTable {
             (Type::Function(ref ap, ref a), Type::Function(ref bp, ref b)) => {
                 if ap.len() == bp.len() {
                     for (a, b) in ap.iter().zip(bp.iter()) {
-                        self.unify_raw(a, b)?;
+                        // flip `a` and `b` when unifying because fns are
+                        // contravariant on their arguments - so we can only
+                        // coerce types backwards.
+                        self.unify_raw(b, a, true)?;
                     }
-                    self.unify_raw(a, b)
+                    self.unify_raw(a, b, true)
                 } else {
                     Err(())
                 }
@@ -83,8 +86,13 @@ impl UnifyTable {
                     Err(())
                 }
             }
-            // TODO: accout for mutability
-            (Type::Pointer(_, ref a), Type::Pointer(_, ref b)) => self.unify_raw(a, b),
+            (Type::Pointer(m1, ref a), Type::Pointer(m2, ref b)) if m1 == m2 => {
+                self.unify_raw(a, b, false)
+            }
+            (Type::Pointer(Mutability::Mut, ref a), Type::Pointer(Mutability::Const, ref b))
+            if allow_coerce => {
+                self.unify_raw(a, b, false)
+            }
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
             (Type::Bool, Type::Bool) |
             (Type::Unit, Type::Unit) |
