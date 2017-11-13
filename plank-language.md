@@ -24,7 +24,7 @@ Expressions in Plank are similar to most other imperative languages:
 
     And you can negate bools: `!a`.
 
-    You can take address of a lvalue with `&` operator: `&a`.
+    You can take address of a lvalue with `&` operator: `&a`. If you want to get a mutable pointer, you need to also use `mut`: `&mut value`.
 
     You can dereference pointers with `*`: `*ptr`.
 
@@ -175,13 +175,17 @@ Statements in Plank should also be familiar to you:
     You can declare local variables with `let`:
 
     ```rust
+    let mut x: u32 = 1;
+    let mut x = 1;
+    let mut x: u32;
+    let mut x;
     let x: u32 = 1;
     let x = 1;
     let x: u32;
     let x;
     ```
 
-    Both the type and the initial value are optional. However, variable cannot be used before being assigned. Local is in scope starting from the statement following the declaration, and locals can be shadowed (same as in Rust). Therefore, this code is legal:
+    Both the type and the initial value are optional. However, variable cannot be used before being assigned. If you want variable to be mutable, write `mut` between `let` and variable name. Variable is in scope starting from the statement following the declaration, and they can be shadowed (same as in Rust). Therefore, this code is legal:
 
     ```rust
     let x: i32 = 1;
@@ -229,6 +233,15 @@ Functions can be declared without a body, and can also be annotated with `extern
 ```rust
 fn no_body(x: u32) -> u32;
 extern fn foo() -> u8;
+```
+
+Inside the function, parameters are not `mut`, as if they were locals declared using `let param = ...`. If you want to mutate the parameters inside the function, you can prefix them with `mut` in argument list, like this:
+
+```rust
+fn foo(mut x: i32) {
+    // now I can reassign `x` inside
+    x = 2;
+}
 ```
 
 ## Structs
@@ -282,7 +295,7 @@ There are 10 built-in types in Plank:
 * `unit`, with a single value `unit`.
 * `bool`, with two values `true` and `false`.
 * number types `u8`, `i8`, `u16`, `i16`, `u32`, `i32`.
-* pointers: `*<type>`, for example: `*u8`, `*unit`, `*********bool`.
+* pointers, which can be mutable or not: `*<type>` and `*mut <type>`, for example: `*u8`, `*mut unit`, `**mut *mut ****mut **mut bool`.
 * function pointers: `fn(<type-list>) -> <type>`, for example: `fn(u8) -> bool`, `fn()`. Return type can be omitted, in that case it is `unit`.
 
 You can also declare you own types (structs).
