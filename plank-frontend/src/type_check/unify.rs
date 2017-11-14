@@ -44,7 +44,8 @@ impl UnifyTable {
         match self.unify_raw(a, b, true) {
             Ok(()) => {
                 self.commit();
-                Ok(a.clone())
+                // `a` might get coerced to `b`, so we return `b` as result
+                Ok(b.clone())
             }
             Err(()) => {
                 self.rollback();
