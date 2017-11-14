@@ -1,0 +1,33 @@
+// At one point this compiled :(
+
+// here's a matching closed parentheses, because
+// of rainbow brackets extension: )
+
+fn puts(mut string: *u8) {
+    while *string != 0 {
+        putc(*string);
+        string = (string as u32 + 1) as *u8;
+    }
+    putc('\n');
+}
+
+struct A<T> {
+    a: fn(T),
+}
+
+fn foo(x: *mut u8) {
+    *x = '!';
+}
+
+fn bar(f: fn(*u8)) {
+    let str = "abc";
+    f(str);
+    puts(str);
+}
+
+fn main() -> i32 {
+    let a: A<fn(*mut u8)> = A(bar); // ERROR: cannot assign `A<fn(*u8) -> unit>` to `A<fn(*mut u8) -> unit>`
+    a.a(foo);
+
+    return 0;
+}

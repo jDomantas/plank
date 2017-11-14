@@ -73,9 +73,9 @@ impl UnifyTable {
                         // flip `a` and `b` when unifying because fns are
                         // contravariant on their arguments - so we can only
                         // coerce types backwards.
-                        self.unify_raw(b, a, true)?;
+                        self.unify_raw(b, a, allow_coerce)?;
                     }
-                    self.unify_raw(a, b, true)
+                    self.unify_raw(a, b, allow_coerce)
                 } else {
                     Err(())
                 }
