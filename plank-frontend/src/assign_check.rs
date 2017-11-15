@@ -49,9 +49,13 @@ impl<'a> Context<'a> {
             match **op {
                 Instruction::Assign(_, ref val) |
                 Instruction::UnaryOp(_, _, ref val) |
-                Instruction::FieldStore(_, _, ref val) |
                 Instruction::CastAssign(_, ref val) => {
                     self.check_value(val, id, index);
+                }
+                Instruction::FieldStore(reg, _, ref val) => {
+                    self.check_value(val, id, index);
+                    let reg = Spanned::map(reg, Value::Reg);
+                    self.check_value(&reg, id, index);
                 }
                 Instruction::DerefStore(ref a, _, _, ref b) |
                 Instruction::BinaryOp(_, _, ref a, ref b) => {
