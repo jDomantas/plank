@@ -225,7 +225,8 @@ fn emit_ir<W: Write>(source: &str, mut output: W) -> Result<()> {
     let program = plank_syntax::parse(tokens, reporter.clone());
     let ir = plank_frontend::compile(&program, reporter.clone());
     emit_diagnostics(source, reporter)?;
-    let ir = ir.expect("no errors but failed to produce IR");
+    let mut ir = ir.expect("no errors but failed to produce IR");
+    plank_ir::optimization::optimize(&mut ir);
     plank_ir::emit_program(&ir, &mut output)?;
     plank_ir::validate_ir(&ir);
     Ok(())

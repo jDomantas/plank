@@ -74,7 +74,7 @@ pub enum Instruction {
     CastAssign(Reg, Value),
 }
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Value {
     Int(u64, Size),
     Reg(Reg),
@@ -111,6 +111,32 @@ pub enum Size {
     Bit32,
 }
 
+impl Size {
+    pub fn in_bytes(&self) -> u32 {
+        match *self {
+            Size::Bit8 => 1,
+            Size::Bit16 => 2,
+            Size::Bit32 => 4,
+        }
+    }
+
+    pub fn truncate(&self, value: u64) -> u64 {
+        match *self {
+            Size::Bit8 => value & 0xff,
+            Size::Bit16 => value & 0xffff,
+            Size::Bit32 => value & 0xffffffff,
+        }
+    }
+
+    pub fn to_signed(&self, value: u64) -> i64 {
+        match *self {
+            Size::Bit8 => (value as i8) as i64,
+            Size::Bit16 => (value as i16) as i64,
+            Size::Bit32 => (value as i32) as i64,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum IntOp {
     Add,
@@ -131,7 +157,7 @@ pub enum BitOp {
     Xor,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum UnaryOp {
     Negate(Signedness, Size),
 }

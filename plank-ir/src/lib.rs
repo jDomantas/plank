@@ -1,4 +1,5 @@
 pub mod ir;
+pub mod optimization;
 mod printer;
 mod validation;
 
