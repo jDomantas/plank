@@ -1,0 +1,14 @@
+fn foo(x: *unit) {}
+fn bar() -> *mut unit { loop {} }
+
+fn main() -> i32 {
+    let mut x = 0i32;
+    let a: *i32 = &mut x;
+    let b: fn(*mut unit) = foo;
+    let c: fn() -> *unit = bar;
+    putc('!');
+    return 0;
+}
+
+// INPUT: 
+// OUTPUT: !
