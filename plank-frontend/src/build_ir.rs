@@ -421,7 +421,7 @@ impl<'a> Builder<'a> {
                     cfg::Size::Bit16 => ir::Size::Bit16,
                     cfg::Size::Bit32 => ir::Size::Bit32,
                 };
-                ir::Value::Int(value, size)
+                ir::Value::Int(size.truncate(value), size)
             }
             cfg::Value::Reg(reg) => ir::Value::Reg(ir::Reg(reg.0)),
             cfg::Value::Symbol(sym, ref types) => ir::Value::Symbol(self.make_symbol(sym, types)),
