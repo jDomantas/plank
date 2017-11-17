@@ -397,17 +397,14 @@ impl Formatter {
                 self.fmt.write_symbol(&format!("'\\x{:X}'", value));
             }
             Literal::Number(num) => {
-                let suffix = match (num.signedness, num.size) {
-                    (None, None) => "",
-                    (Some(Signedness::Signed), None) => "i",
-                    (Some(Signedness::Unsigned), None) => "u",
-                    (Some(Signedness::Signed), Some(Size::Bit8)) => "i8",
-                    (Some(Signedness::Signed), Some(Size::Bit16)) => "i16",
-                    (Some(Signedness::Signed), Some(Size::Bit32)) => "i32",
-                    (Some(Signedness::Unsigned), Some(Size::Bit8)) => "u8",
-                    (Some(Signedness::Unsigned), Some(Size::Bit16)) => "u16",
-                    (Some(Signedness::Unsigned), Some(Size::Bit32)) => "u32",
-                    _ => panic!("bad number literal"),
+                let suffix = match num.typ {
+                    None => "",
+                    Some((Signedness::Signed, Size::Bit8)) => "i8",
+                    Some((Signedness::Signed, Size::Bit16)) => "i16",
+                    Some((Signedness::Signed, Size::Bit32)) => "i32",
+                    Some((Signedness::Unsigned, Size::Bit8)) => "u8",
+                    Some((Signedness::Unsigned, Size::Bit16)) => "u16",
+                    Some((Signedness::Unsigned, Size::Bit32)) => "u32",
                 };
                 self.fmt.write_symbol(&format!("{}{}", num.value, suffix));
             }

@@ -197,7 +197,7 @@ impl<'a> Inferer<'a> {
     }
 
     fn fresh_int_var(&mut self) -> Type {
-        Type::Var(self.unifier.fresh_int_var(None))
+        Type::Var(self.unifier.fresh_int_var())
     }
 
     fn unify(&mut self, a: &Type, b: &Type, reason: Reason) -> Type {
@@ -318,11 +318,9 @@ impl<'a> Inferer<'a> {
 
     fn infer_literal(&mut self, literal: &r::Literal) -> Type {
         match *literal {
-            r::Literal::Number(num) => match (num.signedness, num.size) {
-                (None, None) => self.fresh_int_var(),
-                (Some(sign), None) => Type::Var(self.unifier.fresh_int_var(Some(sign))),
-                (Some(sign), Some(size)) => Type::Int(sign, size),
-                (None, Some(_)) => panic!("int literal with size but no sign"),
+            r::Literal::Number(num) => match num.typ {
+                Some((sign, size)) => Type::Int(sign, size),
+                None => self.fresh_int_var(),
             },
             r::Literal::Bool(_) => Type::Bool,
             r::Literal::Char(_) => Type::Int(t::Signedness::Unsigned, t::Size::Bit8),

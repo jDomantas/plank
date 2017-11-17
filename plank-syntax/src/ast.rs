@@ -16,23 +16,22 @@ pub enum Literal {
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub struct Number {
     pub value: u64,
-    pub signedness: Option<Signedness>,
-    pub size: Option<Size>,
+    pub typ: Option<(Signedness, Size)>,
 }
 
 impl ::std::fmt::Display for Number {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "{}", self.value)?;
-        match self.signedness {
-            Some(Signedness::Signed) => write!(f, "i")?,
-            Some(Signedness::Unsigned) => write!(f, "u")?,
-            None => {}
-        }
-        match self.size {
-            Some(Size::Bit8) => write!(f, "8")?,
-            Some(Size::Bit16) => write!(f, "16")?,
-            Some(Size::Bit32) => write!(f, "32")?,
-            None => {}
+        if let Some((sign, size)) = self.typ {
+            match sign {
+                Signedness::Signed => write!(f, "i")?,
+                Signedness::Unsigned => write!(f, "u")?,
+            }
+            match size {
+                Size::Bit8 => write!(f, "8")?,
+                Size::Bit16 => write!(f, "16")?,
+                Size::Bit32 => write!(f, "32")?,
+            }
         }
         Ok(())
     }

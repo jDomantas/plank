@@ -375,9 +375,13 @@ impl<'a> Lexer<'a> {
 }
 
 fn is_ident_char(ch: char) -> bool {
-    // TODO: grammar allows only /[a-zA-Z0-9_]/,
-    // but here we allow funky unicode stuff
-    ch.is_alphanumeric() || ch == '_'
+    ch as u32 <= 0x7f && {
+        let byte = ch as u8;
+        (byte >= b'a' && byte <= b'z')
+        || (byte >= b'A' && byte <= b'Z')
+        || (byte >= b'0' && byte <= b'9')
+        || byte == b'_'
+    }
 }
 
 fn keyword(s: &str) -> Option<Token> {
@@ -413,7 +417,7 @@ fn keyword(s: &str) -> Option<Token> {
 enum ParseNumberError {
     BadInt,
     TooLarge,
-    BadBitCount,
+    InvalidSuffix,
 }
 
 impl ::std::fmt::Display for ParseNumberError {
@@ -421,36 +425,36 @@ impl ::std::fmt::Display for ParseNumberError {
         let msg = match *self {
             ParseNumberError::BadInt => "invalid int literal",
             ParseNumberError::TooLarge => "int literal is too big",
-            ParseNumberError::BadBitCount => "invalid int size",
+            ParseNumberError::InvalidSuffix => "suffix should be primitive numeric type",
         };
         write!(f, "{}", msg)
     }
 }
 
 fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
-    match s.find(|c| c == 'i' || c == 'u') {
+    fn is_letter(c: char) -> bool {
+        let byte = c as u8;
+        (byte >= b'a' && byte <= b'z') || (byte >= b'A' && byte <= b'Z')
+    }
+    match s.find(is_letter) {
         Some(index) => {
             // we have a suffix
             // parse prefix as number, parse rest as bit count
             let prefix = s.get(..index).unwrap();
-            let suffix = s.get((index + 1)..).unwrap();
+            let suffix = s.get(index..).unwrap();
             let value = parse_simple_number(prefix)?;
-            let signedness = if s.get(index..(index + 1)).unwrap() == "i" {
-                Signedness::Signed
-            } else {
-                Signedness::Unsigned
-            };
-            let size = match suffix {
-                "8" => Some(Size::Bit8),
-                "16" => Some(Size::Bit16),
-                "32" => Some(Size::Bit32),
-                "" => None,
-                _ => return Err(ParseNumberError::BadBitCount),
-            };
+            let typ = Some(match suffix {
+                "i8" => (Signedness::Signed, Size::Bit8),
+                "u8" => (Signedness::Unsigned, Size::Bit8),
+                "i16" => (Signedness::Signed, Size::Bit16),
+                "u16" => (Signedness::Unsigned, Size::Bit16),
+                "i32" => (Signedness::Signed, Size::Bit32),
+                "u32" => (Signedness::Unsigned, Size::Bit32),
+                _ => return Err(ParseNumberError::InvalidSuffix),
+            });
             Ok(Number {
                 value,
-                signedness: Some(signedness),
-                size,
+                typ,
             })
         }
         None => {
@@ -458,8 +462,7 @@ fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
             let value = parse_simple_number(s)?;
             Ok(Number {
                 value,
-                signedness: None,
-                size: None,
+                typ: None,
             })
         }
     }

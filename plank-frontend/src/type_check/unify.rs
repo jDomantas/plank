@@ -6,7 +6,6 @@ use super::rollback_map::Map;
 #[derive(Debug, Clone)]
 enum VarTarget {
     Type(Type),
-    UnsizedInt(Signedness),
     Int,
 }
 
@@ -29,12 +28,9 @@ impl UnifyTable {
         var
     }
 
-    pub fn fresh_int_var(&mut self, sign: Option<Signedness>) -> TypeVar {
+    pub fn fresh_int_var(&mut self) -> TypeVar {
         let var = TypeVar(self.next_var);
-        match sign {
-            Some(sign) => self.var_target.insert(var, VarTarget::UnsizedInt(sign)),
-            None => self.var_target.insert(var, VarTarget::Int),
-        }
+        self.var_target.insert(var, VarTarget::Int);
         self.var_target.commit();
         self.next_var += 1;
         var
@@ -113,16 +109,10 @@ impl UnifyTable {
                 self.var_target.insert(a, VarTarget::Type(Type::Var(b)));
                 Ok(())
             }
-            (_, None) | (Some(_), Some(VarTarget::Int)) => {
+            (_, None) => {
                 self.var_target.insert(b, VarTarget::Type(Type::Var(a)));
                 Ok(())
             }
-            (Some(VarTarget::UnsizedInt(s1)), Some(VarTarget::UnsizedInt(s2))) => if s1 == s2 {
-                self.var_target.insert(a, VarTarget::Type(Type::Var(b)));
-                Ok(())
-            } else {
-                Err(())
-            },
         }
     }
 
@@ -146,13 +136,6 @@ impl UnifyTable {
                 self.var_target.insert(v, VarTarget::Type(ty));
                 Ok(())
             }
-            (Some(VarTarget::UnsizedInt(sign)), Type::Int(sign2, size)) => if sign == sign2 {
-                self.var_target
-                    .insert(v, VarTarget::Type(Type::Int(sign2, size)));
-                Ok(())
-            } else {
-                Err(())
-            },
             _ => Err(()),
         }
     }
@@ -185,7 +168,7 @@ impl UnifyTable {
     fn get_var_type(&self, var: TypeVar) -> Type {
         match self.var_target.get(&var) {
             Some(&VarTarget::Type(ref ty)) => self.shallow_normalize(ty),
-            Some(&VarTarget::Int) | Some(&VarTarget::UnsizedInt(_)) | None => Type::Var(var),
+            Some(&VarTarget::Int) | None => Type::Var(var),
         }
     }
 
@@ -227,9 +210,6 @@ impl UnifyTable {
                     Some(&VarTarget::Int) => {
                         return Ok(Type::Int(Signedness::Signed, Size::Bit32));
                     }
-                    Some(&VarTarget::UnsizedInt(sign)) => {
-                        return Ok(Type::Int(sign, Size::Bit32));
-                    }
                     None => {
                         // there is no sensible default
                         // fall though because of borrowck
@@ -246,8 +226,6 @@ impl UnifyTable {
     pub fn describe_var(&self, var: TypeVar) -> &'static str {
         match self.var_target.get(&var) {
             Some(&VarTarget::Int) => "{int}",
-            Some(&VarTarget::UnsizedInt(Signedness::Signed)) => "{signed}",
-            Some(&VarTarget::UnsizedInt(Signedness::Unsigned)) => "{unsigned}",
             _ => "_",
         }
     }
