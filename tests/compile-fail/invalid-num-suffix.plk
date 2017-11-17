@@ -1,0 +1,15 @@
+fn foo() {
+    42;
+    42a; // ERROR: suffix should be primitive numeric type
+    42foobar; // ERROR: suffix should be primitive numeric type
+    42i; // ERROR: suffix should be primitive numeric type
+    42u; // ERROR: suffix should be primitive numeric type
+    42_u8;
+    4_2u8;
+    42i8;
+    42u8;
+    42i16;
+    42u16;
+    42i32;
+    42u32;
+}

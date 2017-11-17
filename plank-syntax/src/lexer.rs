@@ -478,6 +478,9 @@ fn parse_simple_number(s: &str) -> Result<u64, ParseNumberError> {
     }
     let mut result = 0u64;
     for ch in s.chars() {
+        if ch == '_' {
+            continue;
+        }
         match ch.to_digit(10) {
             Some(digit) => {
                 result = result
