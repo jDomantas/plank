@@ -570,6 +570,7 @@ impl<'a> Builder<'a> {
                     ),
                     expr.span,
                 );
+                self.drop_value(&value, expr.span);
                 RValue::Temp(cfg::Value::Reg(result))
             }
         }
