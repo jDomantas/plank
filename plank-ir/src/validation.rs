@@ -1,11 +1,27 @@
-use std::collections::HashMap;
-use ir::{BinaryOp, Block, BlockEnd, Function, Instruction, IntOp, Program, Reg, Size, Symbol,
+use std::collections::{HashMap, HashSet};
+use analysis::Loc;
+use ir::{BinaryOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Program, Reg, Symbol,
          UnaryOp, Value};
 
+
+#[derive(Debug)]
+pub enum Error {
+    BadLayout,
+    UnknownRegister(Reg),
+    UnknownBlock(BlockId),
+    NonLiveRegUsage(Reg, Loc),
+    BadValueSize(Loc),
+    BadParamCount(Loc),
+    BadCall(Loc),
+    ZeroSizedVal(Loc),
+    OutOfBounds(Loc),
+    InvalidReturn,
+}
 
 struct Context<'a> {
     functions: &'a HashMap<Symbol, Function>,
     function: &'a Function,
+    live_locations: HashMap<Reg, HashSet<Loc>>,
 }
 
 impl<'a> Context<'a> {
@@ -13,129 +29,192 @@ impl<'a> Context<'a> {
         Context {
             functions: &program.functions,
             function,
+            live_locations: ::analysis::liveness::live_locations(function),
         }
     }
 
-    fn validate(&self) {
+    fn validate(&self) -> Result<(), Error> {
         if let Some(layout) = self.function.output_layout {
-            assert!(layout.size > 0);
+            if layout.size <= 0 {
+                return Err(Error::BadLayout);
+            }
         }
         for &layout in self.function.registers.values() {
-            assert!(layout.size > 0);
+            if layout.size <= 0 {
+                return Err(Error::BadLayout);
+            }
         }
         for &reg in &self.function.parameters {
-            assert!(self.function.registers.contains_key(&reg));
+            if !self.function.registers.contains_key(&reg) {
+                return Err(Error::UnknownRegister(reg));
+            }
         }
         if let Some(block) = self.function.start_block {
-            assert!(self.function.blocks.contains_key(&block));
+            if !self.function.blocks.contains_key(&block) {
+                return Err(Error::UnknownBlock(block));
+            }
         }
-        for block in self.function.blocks.values() {
-            self.validate_block(block);
+        for (&id, block) in &self.function.blocks {
+            self.validate_block(id, block)?;
         }
+        Ok(())
     }
 
-    fn validate_block(&self, block: &Block) {
-        for op in &block.ops {
-            self.validate_instruction(op);
+    fn validate_block(&self, id: BlockId, block: &Block) -> Result<(), Error> {
+        for (index, op) in block.ops.iter().enumerate() {
+            let loc = Loc { block: id, pos: index };
+            self.validate_instruction(op, loc)?;
         }
+        let loc = Loc { block: id, pos: block.ops.len() };
         match block.end {
             BlockEnd::Branch(ref val, a, b) => {
-                assert_eq!(self.value_size(val), 1);
-                assert!(self.function.blocks.contains_key(&a));
-                assert!(self.function.blocks.contains_key(&b));
+                assert_equal(self.value_size(val), 1, loc)?;
+                if !self.function.blocks.contains_key(&a) {
+                    return Err(Error::UnknownBlock(a));
+                }
+                if !self.function.blocks.contains_key(&b) {
+                    return Err(Error::UnknownBlock(b));
+                }
             }
             BlockEnd::Jump(block) => {
-                assert!(self.function.blocks.contains_key(&block));
+                if !self.function.blocks.contains_key(&block) {
+                    return Err(Error::UnknownBlock(block));
+                }
             }
             BlockEnd::Return(ref val) => {
-                let return_size = self.function.output_layout.unwrap().size;
-                assert_eq!(self.value_size(val), return_size);
+                match self.function.output_layout {
+                    Some(layout) => {
+                        assert_equal(self.value_size(val), layout.size, loc)?;
+                    }
+                    None => {
+                        return Err(Error::InvalidReturn);
+                    }
+                }
             }
             BlockEnd::ReturnProc => {
-                assert!(self.function.output_layout.is_none());
+                if self.function.output_layout.is_some() {
+                    return Err(Error::InvalidReturn);
+                }
             }
         }
+        Ok(())
     }
 
-    fn validate_instruction(&self, i: &Instruction) {
+    fn validate_instruction(&self, i: &Instruction, loc: Loc) -> Result<(), Error> {
         match *i {
             Instruction::Assign(reg, ref val) |
             Instruction::CastAssign(reg, ref val) => {
-                assert_eq!(self.register_size(reg), self.value_size(val));
+                self.assert_live_val(val, loc)?;
+                assert_equal(self.register_size(reg), self.value_size(val), loc)?;
             }
             Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Greater, _, size), ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::GreaterEq, _, size), ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Less, _, size), ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::LessEq, _, size), ref a, ref b) => {
-                assert_eq!(self.register_size(dest), 1);
-                assert_eq!(self.value_size(a), in_bytes(size));
-                assert_eq!(self.value_size(b), in_bytes(size));
+                self.assert_live_val(a, loc)?;
+                self.assert_live_val(b, loc)?;
+                assert_equal(self.register_size(dest), 1, loc)?;
+                assert_equal(self.value_size(a), size.in_bytes(), loc)?;
+                assert_equal(self.value_size(b), size.in_bytes(), loc)?;
             }
             Instruction::BinaryOp(dest, BinaryOp::BitOp(_, size), ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::IntOp(_, _, size), ref a, ref b) => {
-                assert_eq!(self.register_size(dest), in_bytes(size));
-                assert_eq!(self.value_size(a), in_bytes(size));
-                assert_eq!(self.value_size(b), in_bytes(size));
+                self.assert_live_val(a, loc)?;
+                self.assert_live_val(b, loc)?;
+                assert_equal(self.register_size(dest), size.in_bytes(), loc)?;
+                assert_equal(self.value_size(a), size.in_bytes(), loc)?;
+                assert_equal(self.value_size(b), size.in_bytes(), loc)?;
             }
             Instruction::BinaryOp(dest, BinaryOp::Eq, ref a, ref b) |
             Instruction::BinaryOp(dest, BinaryOp::Neq, ref a, ref b) => {
-                assert_eq!(self.register_size(dest), 1);
-                assert_eq!(self.value_size(a), self.value_size(b));
+                self.assert_live_val(a, loc)?;
+                self.assert_live_val(b, loc)?;
+                assert_equal(self.register_size(dest), 1, loc)?;
+                assert_equal(self.value_size(a), self.value_size(b), loc)?;
             }
             Instruction::Call(dest, ref sym, ref params) => {
                 let callee = &self.functions[sym];
-                let out_size = callee.output_layout.unwrap().size;
-                assert_eq!(self.register_size(dest), out_size);
-                assert_eq!(params.len(), callee.parameters.len());
+                let out_size = match callee.output_layout {
+                    Some(layout) => layout.size,
+                    None => return Err(Error::BadCall(loc)),
+                };
+                assert_equal(self.register_size(dest), out_size, loc)?;
+                assert_equal_counts(params.len(), callee.parameters.len(), loc)?;
                 for (val, &reg) in params.iter().zip(callee.parameters.iter()) {
+                    self.assert_live_val(val, loc)?;
                     let reg_size = callee.registers[&reg].size;
-                    assert_eq!(self.value_size(val), reg_size);
+                    assert_equal(self.value_size(val), reg_size, loc)?;
                 }
             }
             Instruction::CallProc(ref sym, ref params) => {
                 let callee = &self.functions[sym];
-                assert!(callee.output_layout.is_none());
-                assert_eq!(params.len(), callee.parameters.len());
+                if callee.output_layout.is_some() {
+                    return Err(Error::BadCall(loc));
+                }
+                assert_equal_counts(params.len(), callee.parameters.len(), loc)?;
                 for (val, &reg) in params.iter().zip(callee.parameters.iter()) {
+                    self.assert_live_val(val, loc)?;
                     let reg_size = callee.registers[&reg].size;
-                    assert_eq!(self.value_size(val), reg_size);
+                    assert_equal(self.value_size(val), reg_size, loc)?;
                 }
             }
-            Instruction::CallVirt(_, ref address, _) |
-            Instruction::CallProcVirt(ref address, _) => {
-                assert_eq!(self.value_size(address), ::ir::POINTER_SIZE);
+            Instruction::CallVirt(_, ref address, ref params) |
+            Instruction::CallProcVirt(ref address, ref params) => {
+                assert_equal(self.value_size(address), ::ir::POINTER_SIZE, loc)?;
+                for val in params {
+                    self.assert_live_val(val, loc)?;
+                }
             }
             Instruction::DerefLoad(_, ref val, _) => {
-                assert_eq!(self.value_size(val), ::ir::POINTER_SIZE);
+                self.assert_live_val(val, loc)?;
+                assert_equal(self.value_size(val), ::ir::POINTER_SIZE, loc)?;
             }
             Instruction::DerefStore(ref address, _, ref value) => {
-                assert_eq!(self.value_size(address), ::ir::POINTER_SIZE);
-                assert!(self.value_size(value) > 0);
+                self.assert_live_val(address, loc)?;
+                self.assert_live_val(value, loc)?;
+                assert_equal(self.value_size(address), ::ir::POINTER_SIZE, loc)?;
+                if self.value_size(value) == 0 {
+                    return Err(Error::ZeroSizedVal(loc));
+                }
             }
             Instruction::Drop(reg) |
             Instruction::Init(reg) => {
-                assert!(self.function.registers.contains_key(&reg));
+                if !self.function.registers.contains_key(&reg) {
+                    return Err(Error::UnknownRegister(reg));
+                }
             }
             Instruction::Load(dest, reg, offset) => {
+                self.assert_live(reg, loc)?;
                 let dest_size = self.register_size(dest);
                 let reg_size = self.register_size(reg);
-                assert!(dest_size + offset <= reg_size);
+                if dest_size + offset > reg_size {
+                    return Err(Error::OutOfBounds(loc));
+                }
             }
             Instruction::Store(reg, offset, ref value) => {
+                self.assert_live(reg, loc)?;
+                self.assert_live_val(value, loc)?;
                 let reg_size = self.register_size(reg);
                 let val_size = self.value_size(value);
-                assert!(reg_size >= offset + val_size);
+                if reg_size < offset + val_size {
+                    return Err(Error::OutOfBounds(loc));
+                }
             }
             Instruction::TakeAddress(dest, reg, offset) => {
-                assert_eq!(self.register_size(dest), ::ir::POINTER_SIZE);
+                self.assert_live(reg, loc)?;
+                assert_equal(self.register_size(dest), ::ir::POINTER_SIZE, loc)?;
                 let reg_size = self.register_size(reg);
-                assert!(offset < reg_size);
+                if offset >= reg_size {
+                    return Err(Error::OutOfBounds(loc));
+                }
             }
             Instruction::UnaryOp(dest, UnaryOp::Negate(_, size), ref value) => {
-                assert_eq!(self.register_size(dest), in_bytes(size));
-                assert_eq!(self.value_size(value), in_bytes(size));
+                self.assert_live_val(value, loc)?;
+                assert_equal(self.register_size(dest), size.in_bytes(), loc)?;
+                assert_equal(self.value_size(value), size.in_bytes(), loc)?;
             }
         }
+        Ok(())
     }
 
     fn register_size(&self, reg: Reg) -> u32 {
@@ -145,24 +224,53 @@ impl<'a> Context<'a> {
     fn value_size(&self, value: &Value) -> u32 {
         match *value {
             Value::Bytes(_) => ::ir::POINTER_SIZE,
-            Value::Int(_, size) => in_bytes(size),
+            Value::Int(_, size) => size.in_bytes(),
             Value::Reg(reg) => self.register_size(reg),
             Value::Symbol(_) => ::ir::FUNCTION_SIZE,
         }
     }
-}
 
-fn in_bytes(size: Size) -> u32 {
-    match size {
-        Size::Bit8 => 1,
-        Size::Bit16 => 2,
-        Size::Bit32 => 4,
+    fn assert_live_val(&self, val: &Value, loc: Loc) -> Result<(), Error> {
+        match *val {
+            Value::Reg(reg) => self.assert_live(reg, loc),
+            _ => Ok(()),
+        }
+    }
+
+    fn assert_live(&self, reg: Reg, loc: Loc) -> Result<(), Error> {
+        self.live_locations
+            .get(&reg)
+            .and_then(|locs| if locs.contains(&loc) {
+                Some(())
+            } else {
+                None
+            })
+            .ok_or(Error::NonLiveRegUsage(reg, loc))
     }
 }
 
-pub fn validate_ir(program: &Program) {
-    for f in program.functions.values() {
+fn assert_equal(size1: u32, size2: u32, loc: Loc) -> Result<(), Error> {
+    if size1 == size2 {
+        Ok(())
+    } else {
+        Err(Error::BadValueSize(loc))
+    }
+}
+
+fn assert_equal_counts(cnt1: usize, cnt2: usize, loc: Loc) -> Result<(), Error> {
+    if cnt1 == cnt2 {
+        Ok(())
+    } else {
+        Err(Error::BadParamCount(loc))
+    }
+}
+
+pub fn validate_ir(program: &Program) -> Result<(), (&::ir::Symbol, Error)> {
+    for (sym, f) in &program.functions {
         let ctx = Context::new(program, f);
-        ctx.validate();
+        if let Err(e) = ctx.validate() {
+            return Err((sym, e));
+        }
     }
+    Ok(())
 }

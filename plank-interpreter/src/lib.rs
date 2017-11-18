@@ -35,7 +35,7 @@ impl ::std::fmt::Display for Error {
 }
 
 pub fn run_program<R: Read, W: Write>(program: &Program, input: R, output: W) -> Result<i32, Error> {
-    plank_ir::validate_ir(program);
+    plank_ir::validate_ir(program).expect("invalid ir");
     Vm::new(program, input, output)?.run()
 }
 

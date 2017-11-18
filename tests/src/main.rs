@@ -12,18 +12,28 @@ use std::io::prelude::*;
 use plank_errors::reporter::Diagnostic;
 
 
-fn build_code(source: &str) -> Result<plank_ir::Program, Vec<Diagnostic>> {
+enum BuildError {
+    Fail(Vec<Diagnostic>),
+    BadIr(plank_ir::ir::Symbol, plank_ir::validation::Error),
+}
+
+fn build_code(source: &str) -> Result<plank_ir::Program, BuildError> {
     let reporter = plank_errors::Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
-    plank_frontend::compile(&program, reporter.clone()).map_err(|()| {
-        reporter.get_diagnostics()
-    })
+    let ir = plank_frontend::compile(&program, reporter.clone()).map_err(|()| {
+        BuildError::Fail(reporter.get_diagnostics())
+    })?;
+    if let Err((sym, err)) = plank_ir::validate_ir(&ir) {
+        return Err(BuildError::BadIr(sym.clone(), err));
+    }
+    Ok(ir)
 }
 
 #[derive(Debug)]
 enum TestResult {
     BuildFail(Vec<Diagnostic>),
+    IrValidationFail(plank_ir::ir::Symbol, plank_ir::validation::Error),
     BadBuildPass(Vec<test_parser::Error>),
     BuildErrorMismatch(Vec<Diagnostic>, Vec<test_parser::Error>),
     IoMismatch { expected: Vec<u8>, got: Vec<u8> },
@@ -76,19 +86,22 @@ fn run_test(source: &str) -> TestResult {
         test_parser::Expectation::BuildErrors(errors) => {
             match build_code(source) {
                 Ok(_) => TestResult::BadBuildPass(errors),
-                Err(got) => match_build_errors(errors, got),
+                Err(BuildError::Fail(got)) => match_build_errors(errors, got),
+                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
             }
         }
         test_parser::Expectation::Io { input, output} => {
             match build_code(source) {
                 Ok(program) => interpret_program(program, input, output),
-                Err(e) => TestResult::BuildFail(e),
+                Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
+                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
             }
         }
         test_parser::Expectation::BuildSuccess => {
             match build_code(source) {
                 Ok(_) => TestResult::Ok,
-                Err(e) => TestResult::BuildFail(e),
+                Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
+                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
             }
         }
     }
@@ -171,6 +184,13 @@ fn report_results(results: &[(String, String, TestResult)]) {
                 print_output(expected);
                 print!("Got:      ");
                 print_output(got);
+                println!();
+            }
+            TestResult::IrValidationFail(ref sym, ref err) => {
+                println!("========================================");
+                println!("test {}", name);
+                println!("ir validation failed");
+                println!("error in symbol {:?}: {:?}", sym, err);
                 println!();
             }
             TestResult::MalformedTest(ref err) => {

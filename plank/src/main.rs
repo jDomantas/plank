@@ -227,7 +227,9 @@ fn emit_ir<W: Write>(source: &str, mut output: W) -> Result<()> {
     emit_diagnostics(source, reporter)?;
     let ir = ir.expect("no errors but failed to produce IR");
     plank_ir::emit_program(&ir, &mut output)?;
-    plank_ir::validate_ir(&ir);
+    if let Err((sym, err)) = plank_ir::validate_ir(&ir) {
+        println!("ir validation error in function {:?}: {:?}", sym, err);
+    }
     Ok(())
 }
 
