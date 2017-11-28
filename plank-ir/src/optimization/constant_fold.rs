@@ -248,6 +248,23 @@ fn rewrite_function(f: &mut Function) {
                     changed = true;
                 }
             }
+            let loc = Loc { block: id, pos: block.ops.len() };
+            match block.end {
+                BlockEnd::Branch(ref mut val, _, _) |
+                BlockEnd::Return(ref mut val) => {
+                    if try_replace_val(val, ctx, loc) {
+                        changed = true;
+                    }
+                }
+                BlockEnd::Jump(_) | BlockEnd::ReturnProc => {}
+            }
+            if let BlockEnd::Branch(Value::Int(0, _), _, a) = block.end {
+                block.end = BlockEnd::Jump(a);
+                changed = true;
+            } else if let BlockEnd::Branch(Value::Int(_, _), a, _) = block.end {
+                block.end = BlockEnd::Jump(a);
+                changed = true;
+            }
         }
         if !changed {
             break;
