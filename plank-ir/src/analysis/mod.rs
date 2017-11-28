@@ -1,5 +1,6 @@
 pub mod liveness;
 pub mod volatility;
+pub mod usage;
 
 use ir::{BlockId, Instruction, Reg};
 

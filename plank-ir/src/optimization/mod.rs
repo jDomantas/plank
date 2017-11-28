@@ -1,6 +1,7 @@
 mod constant_fold;
 mod simplify_newtypes;
 mod dead_store_elimination;
+mod intermediate_removal;
 
 use analysis::Loc;
 use ir::{Program, Function, BlockId, Block, Instruction};
@@ -43,6 +44,7 @@ fn rewrite_block<R: Rewriter + ?Sized>(r: &mut R, id: BlockId, block: &mut Block
 
 pub fn optimize(program: &mut Program) {
     simplify_newtypes::rewrite(program);
+    intermediate_removal::rewrite(program);
     constant_fold::rewrite(program);
     dead_store_elimination::rewrite(program);
 }
