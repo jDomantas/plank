@@ -210,20 +210,7 @@ fn report_results(results: &[(String, String, TestResult)]) {
                 println!("========================================");
                 println!("test {}", name);
                 println!("interpreted program crashed");
-                match *err {
-                    plank_interpreter::Error::BadDeref => {
-                        println!("invalid memory access");
-                    }
-                    plank_interpreter::Error::DivisionByZero => {
-                        println!("division by zero");
-                    }
-                    plank_interpreter::Error::MissingSymbol(_) => {
-                        println!("missing symbol definition");
-                    }
-                    plank_interpreter::Error::Io(ref err) => {
-                        println!("io error: {}", err);
-                    }
-                }
+                println!("{}", err);
                 println!();
             }
         }
