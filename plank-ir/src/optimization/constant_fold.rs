@@ -12,6 +12,14 @@ enum Val {
 }
 
 impl Val {
+    fn from_ir(v: &Value) -> Val {
+        if let Value::Reg(_) = *v {
+            Val::Unknown
+        } else {
+            Val::Ir(v.clone())
+        }
+    }
+
     fn merge(self, other: Val) -> Val {
         match (self, other) {
             (Val::Any, other) | (other, Val::Any) => other,
@@ -63,7 +71,7 @@ impl<'a> Context<'a> {
                 let op = &block.ops[pos - 1];
                 match *op {
                     Instruction::Assign(r, ref val) |
-                    Instruction::CastAssign(r, ref val) if r == reg => return Val::Ir(val.clone()),
+                    Instruction::CastAssign(r, ref val) if r == reg => return Val::from_ir(val),
                     Instruction::BinaryOp(r, _, _, _) |
                     Instruction::DerefLoad(r, _, _) |
                     Instruction::Load(r, _, _) |
