@@ -59,7 +59,11 @@ impl<'a> Context<'a> {
             }
             self.visited.insert(loc);
             if pos == 0 {
-                let mut total = Val::Any;
+                let mut total = if self.f.start_block == Some(block_id) {
+                    Val::Unknown
+                } else {
+                    Val::Any
+                };
                 if let Some(inc) = self.incoming.get(&block_id) {
                     for &parent in inc {
                         total = total.merge(self.dfs_block_end(reg, parent));
