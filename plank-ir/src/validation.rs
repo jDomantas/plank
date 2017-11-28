@@ -69,6 +69,7 @@ impl<'a> Context<'a> {
         match block.end {
             BlockEnd::Branch(ref val, a, b) => {
                 assert_equal(self.value_size(val), 1, loc)?;
+                self.assert_live_val(val, loc)?;
                 if !self.function.blocks.contains_key(&a) {
                     return Err(Error::UnknownBlock(a));
                 }
@@ -82,6 +83,7 @@ impl<'a> Context<'a> {
                 }
             }
             BlockEnd::Return(ref val) => {
+                self.assert_live_val(val, loc)?;
                 match self.function.output_layout {
                     Some(layout) => {
                         assert_equal(self.value_size(val), layout.size, loc)?;
@@ -191,6 +193,7 @@ impl<'a> Context<'a> {
                     return Err(Error::OutOfBounds(loc));
                 }
             }
+            Instruction::Nop => {}
             Instruction::Store(reg, offset, ref value) => {
                 self.assert_live(reg, loc)?;
                 self.assert_live_val(value, loc)?;
@@ -213,6 +216,7 @@ impl<'a> Context<'a> {
                 assert_equal(self.register_size(dest), size.in_bytes(), loc)?;
                 assert_equal(self.value_size(value), size.in_bytes(), loc)?;
             }
+            Instruction::Unreachable => {}
         }
         Ok(())
     }
@@ -223,6 +227,7 @@ impl<'a> Context<'a> {
 
     fn value_size(&self, value: &Value) -> u32 {
         match *value {
+            Value::Undef => 1,
             Value::Bytes(_) => ::ir::POINTER_SIZE,
             Value::Int(_, size) => size.in_bytes(),
             Value::Reg(reg) => self.register_size(reg),

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use ir::{Function, Reg, BlockId, BlockEnd, Instruction};
-use super::Loc;
+use super::{Loc, initialized_register};
 
 
 struct Liveness<'a> {
@@ -60,22 +60,6 @@ impl<'a> Liveness<'a> {
             BlockEnd::Return(_) |
             BlockEnd::ReturnProc => {}
         }
-    }
-}
-
-fn initialized_register(instr: &Instruction) -> Option<Reg> {
-    match *instr {
-        Instruction::Assign(reg, _) |
-        Instruction::BinaryOp(reg, _, _, _) |
-        Instruction::Call(reg, _, _) |
-        Instruction::CallVirt(reg, _, _) |
-        Instruction::CastAssign(reg, _) |
-        Instruction::DerefLoad(reg, _, _) |
-        Instruction::Init(reg) |
-        Instruction::Load(reg, _, _) |
-        Instruction::TakeAddress(reg, _, _) |
-        Instruction::UnaryOp(reg, _, _) => Some(reg),
-        _ => None,
     }
 }
 

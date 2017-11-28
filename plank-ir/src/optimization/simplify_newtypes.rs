@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use analysis::Loc;
 use ir::{Program, Reg, Function, Instruction, Value};
 use optimization::{self as opt, Rewriter};
 
@@ -11,6 +12,7 @@ struct Simplifier {
 impl Simplifier {
     fn value_size(&self, val: &Value) -> u32 {
         match *val {
+            Value::Undef => 1,
             Value::Bytes(_) => ::ir::POINTER_SIZE,
             Value::Int(_, size) => size.in_bytes(),
             Value::Reg(reg) => self.reg_size[&reg],
@@ -28,7 +30,7 @@ impl Rewriter for Simplifier {
         opt::rewrite_function(self, f);
     }
 
-    fn rewrite_instruction(&mut self, instr: &mut Instruction) {
+    fn rewrite_instruction(&mut self, _loc: Loc, instr: &mut Instruction) {
         let mut result = None;
         match *instr {
             Instruction::Store(reg, 0, ref val) => {

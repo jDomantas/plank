@@ -1,109 +1,256 @@
 use std::collections::{HashMap, HashSet};
+use analysis::{self, Loc};
 use ir::{Function, BinaryOp, BitOp, IntOp, UnaryOp, Signedness, Size, Program, Reg, Block, Instruction, Value, BlockEnd, BlockId};
-use optimization::{self as opt, Rewriter};
 
 
-#[derive(Debug, Default)]
-struct BlockState {
-    have_any: bool,
-    values: HashMap<Reg, Value>,
-    volatile: HashSet<Reg>,
-    entries_left: u32,
+#[derive(Debug, Clone)]
+enum Val {
+    Ir(Value),
+    Ref(Reg, u32),
+    Unknown,
+    Any,
 }
 
-struct BlockFolder {
-    reg_value: HashMap<Reg, Value>,
-    volatile_regs: HashSet<Reg>,
-}
-
-impl BlockFolder {
-    fn get_value(&self, reg: Reg) -> Option<Value> {
-        self.reg_value.get(&reg).cloned()
-    }
-
-    fn simplify(&self, value: &mut Value) {
-        match *value {
-            Value::Reg(reg) => {
-                if let Some(val) = self.get_value(reg) {
-                    *value = val;
-                }
-            }
-            _ => {}
+impl Val {
+    fn merge(self, other: Val) -> Val {
+        match (self, other) {
+            (Val::Any, other) | (other, Val::Any) => other,
+            (Val::Unknown, _) | (_, Val::Unknown) => Val::Unknown,
+            (Val::Ref(a, oa), Val::Ref(b, ob)) if (a, oa) == (b, ob) => Val::Ref(a, oa),
+            (Val::Ir(a), Val::Ir(b)) => if a == b {
+                Val::Ir(a)
+            } else {
+                Val::Unknown
+            },
+            _ => Val::Unknown,
         }
     }
 }
 
-impl Rewriter for BlockFolder {
-    fn rewrite_block(&mut self, block: &mut Block) {
-        opt::rewrite_block(self, block);
+struct Context<'a> {
+    volatile: HashMap<Reg, HashSet<Loc>>,
+    f: &'a Function,
+    incoming: &'a HashMap<BlockId, Vec<BlockId>>,
+    visited: HashSet<Loc>,
+}
+
+impl<'a> Context<'a> {
+    fn is_volatile_at(&self, reg: Reg, loc: Loc) -> bool {
+        if let Some(locs) = self.volatile.get(&reg) {
+            locs.contains(&loc)
+        } else {
+            false
+        }
+    }
+
+    fn dfs(&mut self, reg: Reg, block_id: BlockId, block: &Block, mut pos: usize) -> Val {
+        loop {
+            let loc = Loc { block: block_id, pos };
+            if self.visited.contains(&loc) {
+                return Val::Any;
+            }
+            self.visited.insert(loc);
+            if pos == 0 {
+                let mut total = Val::Any;
+                if let Some(inc) = self.incoming.get(&block_id) {
+                    for &parent in inc {
+                        total = total.merge(self.dfs_block_end(reg, parent));
+                    }
+                }
+                return total;
+            } else {
+                let loc = Loc { block: block_id, pos: pos - 1 };
+                let op = &block.ops[pos - 1];
+                match *op {
+                    Instruction::Assign(r, ref val) |
+                    Instruction::CastAssign(r, ref val) if r == reg => return Val::Ir(val.clone()),
+                    Instruction::BinaryOp(r, _, _, _) |
+                    Instruction::DerefLoad(r, _, _) |
+                    Instruction::Load(r, _, _) |
+                    Instruction::Store(r, _, _) if r == reg => return Val::Unknown,
+                    Instruction::Call(r, _, _) |
+                    Instruction::CallVirt(r, _, _) => {
+                        if r == reg || self.is_volatile_at(reg, loc) {
+                            return Val::Unknown;
+                        }
+                    }
+                    Instruction::CallProc(_, _) |
+                    Instruction::CallProcVirt(_, _) |
+                    Instruction::DerefStore(_, _, _) => {
+                        if self.is_volatile_at(reg, loc) {
+                            return Val::Unknown;
+                        }
+                    }
+                    Instruction::Drop(r) |
+                    Instruction::Init(r) if r == reg => {
+                        return Val::Any;
+                    }
+                    Instruction::TakeAddress(r, r2, offset) => {
+                        if r == reg {
+                            return Val::Ref(r2, offset);
+                        }
+                    }
+                    _ => {}
+                }
+                pos -= 1;
+            }
+        }
+    }
+
+    fn dfs_block_end(&mut self, reg: Reg, block_id: BlockId) -> Val {
+        let block = &self.f.blocks[&block_id];
+        let pos = block.ops.len();
+        self.dfs(reg, block_id, block, pos)
+    }
+
+    fn get_value(&mut self, reg: Reg, loc: Loc) -> Val {
+        self.visited.clear();
+        let block = &self.f.blocks[&loc.block];
+        self.dfs(reg, loc.block, block, loc.pos)
+    }
+}
+
+fn build_context<'a>(
+    f: &'a Function,
+    incoming: &'a mut HashMap<BlockId, Vec<BlockId>>,
+) -> Context<'a> {
+    incoming.clear();
+    for (&id, block) in &f.blocks {
         match block.end {
-            BlockEnd::Branch(ref mut val, _, _) |
-            BlockEnd::Return(ref mut val) => self.simplify(val),
-            _ => {}
-        }
-        match block.end {
-            BlockEnd::Branch(Value::Int(0, _), _, a) |
-            BlockEnd::Branch(Value::Int(_, _), a, _) => {
-                block.end = BlockEnd::Jump(a);
+            BlockEnd::Branch(_, a, b) => {
+                incoming.entry(a).or_insert_with(Vec::new).push(id);
+                incoming.entry(b).or_insert_with(Vec::new).push(id);
+            }
+            BlockEnd::Jump(a) => {
+                incoming.entry(a).or_insert_with(Vec::new).push(id);
             }
             _ => {}
         }
     }
+    Context {
+        volatile: analysis::volatility::volatile_locations(f),
+        f,
+        incoming,
+        visited: HashSet::new(),
+    }
+}
 
-    fn rewrite_instruction(&mut self, instr: &mut Instruction) {
-        let mut result = None;
-        match *instr {
-            Instruction::Assign(reg, ref mut value) => {
-                self.simplify(value);
-                if let Value::Int(_, _) = *value {
-                    self.reg_value.insert(reg, value.clone());
-                }
+fn try_replace_val(val: &mut Value, ctx: &mut Context, loc: Loc) -> bool {
+    if let Value::Reg(r) = *val {
+        match ctx.get_value(r, loc) {
+            Val::Any => {
+                *val = Value::Undef;
+                true
             }
-            Instruction::BinaryOp(dest, op, ref mut a, ref mut b) => {
-                self.simplify(a);
-                self.simplify(b);
-                if let Some(value) = eval_binary_op(op, a, b) {
-                    self.reg_value.insert(dest, value.clone());
-                    result = Some(Instruction::Assign(dest, value));
-                }
+            Val::Ir(v) => {
+                *val = v;
+                true
             }
-            Instruction::Call(_, _, ref mut params) |
-            Instruction::CallProc(_, ref mut params) |
-            Instruction::CallProcVirt(_, ref mut params) |
-            Instruction::CallVirt(_, _, ref mut params) => {
-                for param in params {
-                    self.simplify(param);
-                }
-                for &reg in &self.volatile_regs {
-                    self.reg_value.remove(&reg);
-                }
-            }
-            Instruction::CastAssign(_, ref mut value) |
-            Instruction::DerefLoad(_, ref mut value, _) |
-            Instruction::Store(_, _, ref mut value) => {
-                self.simplify(value);
-            }
-            Instruction::DerefStore(ref mut val1, _, ref mut val2) => {
-                self.simplify(val1);
-                self.simplify(val2);
-                for &reg in &self.volatile_regs {
-                    self.reg_value.remove(&reg);
-                }
-            }
-            Instruction::TakeAddress(_, reg, _) => {
-                self.volatile_regs.insert(reg);
-            }
-            Instruction::UnaryOp(dest, op, ref mut arg) => {
-                self.simplify(arg);
-                if let Some(value) = eval_unary_op(op, arg) {
-                    self.reg_value.insert(dest, value.clone());
-                    result = Some(Instruction::Assign(dest, value));
-                }
-            }
-            _ => {}
+            Val::Ref(_, _) |
+            Val::Unknown => false
         }
-        if let Some(op) = result {
-            *instr = op;
+    } else {
+        false
+    }
+}
+
+fn rewrite_function(f: &mut Function) {
+    loop {
+        let mut changed = false;
+        let mut incoming = HashMap::new();
+        let analyzed_f = f.clone();
+        let ctx = &mut build_context(&analyzed_f, &mut incoming);
+        for (&id, block) in &mut f.blocks {
+            for (pos, op) in block.ops.iter_mut().enumerate() {
+                let loc = Loc { block: id, pos };
+                let mut replace_with = None;
+                match *op {
+                    Instruction::Assign(_, ref mut val) |
+                    Instruction::CastAssign(_, ref mut val) => {
+                        if try_replace_val(val, ctx, loc) {
+                            changed = true;
+                        }
+                    }
+                    Instruction::BinaryOp(r, op, ref mut a, ref mut b) => {
+                        if let Some(result) = eval_binary_op(op, a, b) {
+                            replace_with = Some(Instruction::Assign(r, result));
+                        } else {
+                            if try_replace_val(a, ctx, loc) {
+                                changed = true;
+                            }
+                            if try_replace_val(b, ctx, loc) {
+                                changed = true;
+                            }
+                        }
+                    }
+                    Instruction::Call(_, _, ref mut params) |
+                    Instruction::CallProc(_, ref mut params) => {
+                        for param in params {
+                            if try_replace_val(param, ctx, loc) {
+                                changed = true;
+                            }
+                        }
+                    }
+                    Instruction::CallVirt(_, ref mut f, ref mut params) |
+                    Instruction::CallProcVirt(ref mut f, ref mut params) => {
+                        if try_replace_val(f, ctx, loc) {
+                            changed = true;
+                        }
+                        for param in params {
+                            if try_replace_val(param, ctx, loc) {
+                                changed = true;
+                            }
+                        }
+                    }
+                    Instruction::DerefLoad(r, Value::Reg(r2), 0) => {
+                        match ctx.get_value(r2, loc) {
+                            Val::Any => replace_with = Some(Instruction::Unreachable),
+                            Val::Ir(v) => replace_with = Some(Instruction::DerefLoad(r, v, 0)),
+                            Val::Ref(r3, 0) => replace_with = Some(Instruction::Assign(r, Value::Reg(r3))),
+                            Val::Ref(_, _) |
+                            Val::Unknown => {}
+                        }
+                    }
+                    Instruction::DerefStore(ref to, offset, ref mut val) => {
+                        if try_replace_val(val, ctx, loc) {
+                            changed = true;
+                        }
+                        if let Value::Reg(r) = *to {
+                            if offset == 0 {
+                                match ctx.get_value(r, loc) {
+                                    Val::Any => replace_with = Some(Instruction::Unreachable),
+                                    Val::Ir(v) => replace_with = Some(Instruction::DerefStore(v, 0, val.clone())),
+                                    Val::Ref(r, 0) => replace_with = Some(Instruction::Assign(r, val.clone())),
+                                    Val::Ref(_, _) |
+                                    Val::Unknown => {}
+                                }
+                            }
+                        }
+                    }
+                    Instruction::DerefLoad(_, _, _) |
+                    Instruction::Drop(_) |
+                    Instruction::Init(_) |
+                    Instruction::Nop |
+                    Instruction::Load(_, _, _) |
+                    Instruction::Store(_, _, _) |
+                    Instruction::TakeAddress(_, _, _) |
+                    Instruction::Unreachable => {}
+                    Instruction::UnaryOp(r, op, ref mut val) => {
+                        if let Some(result) = eval_unary_op(op, val) {
+                            replace_with = Some(Instruction::Assign(r, result));
+                        } else if try_replace_val(val, ctx, loc) {
+                            changed = true;
+                        }
+                    }
+                }
+                if let Some(new_op) = replace_with {
+                    *op = new_op;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
         }
     }
 }
@@ -237,146 +384,8 @@ fn eval_unary_op(op: UnaryOp, a: &Value) -> Option<Value> {
     }
 }
 
-#[derive(Default)]
-struct VolatileGather(HashSet<Reg>);
-
-impl VolatileGather {
-    fn volatile_regs(f: &mut Function) -> HashSet<Reg> {
-        let mut gather = VolatileGather::default();
-        gather.rewrite_function(f);
-        gather.0
-    }
-}
-
-impl Rewriter for VolatileGather {
-    fn rewrite_instruction(&mut self, instr: &mut Instruction) {
-        match *instr {
-            Instruction::TakeAddress(_, reg, _) => {
-                self.0.insert(reg);
-            }
-            _ => {}
-        }
-    }
-}
-
-#[derive(Default)]
-struct Folder {
-    block_states: HashMap<BlockId, BlockState>,
-}
-
-impl Folder {
-    fn add_block_entry(&mut self, id: BlockId) {
-        self.block_states
-            .entry(id)
-            .or_insert_with(Default::default)
-            .entries_left += 1;
-    }
-
-    fn got_entry_state(&mut self, id: BlockId, folder: &BlockFolder) {
-        if let Some(state) = self.block_states.get_mut(&id) {
-            state.entries_left -= 1;
-            state.volatile.extend(folder.volatile_regs.iter().cloned());
-            if state.have_any {
-                for (&reg, val) in &folder.reg_value {
-                    match state.values.get(&reg) {
-                        Some(value) if value == val => continue,
-                        _ => {}
-                    }
-                    state.values.remove(&reg);
-                }
-            } else {
-                state.values.extend(folder
-                    .reg_value
-                    .iter()
-                    .map(|(a, b)| (a.clone(), b.clone())));
-                state.have_any = true;
-            }
-        }
-    }
-
-    fn run_block(&mut self, id: BlockId, block: &mut Block, fn_volatile: &HashSet<Reg>) {
-        let state = self.block_states.remove(&id).unwrap();
-        let mut folder = if state.entries_left == 0 {
-            BlockFolder {
-                reg_value: state.values,
-                volatile_regs: state.volatile,
-            }
-        } else {
-            BlockFolder {
-                reg_value: HashMap::new(),
-                volatile_regs: fn_volatile.clone(),
-            }
-        };
-        match block.end {
-            BlockEnd::Branch(_, a, b) => {
-                folder.rewrite_block(block);
-                self.got_entry_state(a, &folder);
-                self.got_entry_state(b, &folder);
-            }
-            BlockEnd::Jump(a) => {
-                folder.rewrite_block(block);
-                self.got_entry_state(a, &folder);
-            }
-            _ => {
-                folder.rewrite_block(block);
-            }
-        }
-    }
-}
-
-impl Rewriter for Folder {
-    fn rewrite_function(&mut self, f: &mut Function) {
-        if let Some(block) = f.start_block {
-            self.add_block_entry(block);
-        }
-        for block in f.blocks.values() {
-            match block.end {
-                BlockEnd::Branch(_, a, b) => {
-                    self.add_block_entry(a);
-                    self.add_block_entry(b);
-                }
-                BlockEnd::Jump(a) => {
-                    self.add_block_entry(a);
-                }
-                _ => {}
-            }
-        }
-        let fn_volatile_regs = VolatileGather::volatile_regs(f);
-        if let Some(id) = f.start_block {
-            let block = f.blocks.get_mut(&id).unwrap();
-            self.run_block(id, block, &fn_volatile_regs);
-        }
-        loop {
-            let mut best = None;
-            for &id in f.blocks.keys() {
-                match (best, self.block_states.get(&id)) {
-                    (_, None) => {}
-                    (None, Some(state)) => {
-                        best = Some((id, state.entries_left));
-                        if state.entries_left == 0 {
-                            break;
-                        }
-                    }
-                    (Some((_, e)), Some(state)) => {
-                        if state.entries_left == 0 {
-                            best = Some((id, state.entries_left));
-                            break;
-                        } else if state.entries_left > e {
-                            best = Some((id, state.entries_left));
-                        }
-                    }
-                }
-            }
-            if let Some((id, _)) = best {
-                let block = f.blocks.get_mut(&id).unwrap();
-                self.run_block(id, block, &fn_volatile_regs);
-            } else {
-                break;
-            }
-        }
-    }
-}
-
 pub fn rewrite(program: &mut Program) {
-    Folder::default().rewrite_program(program);
+    for f in program.functions.values_mut() {
+        rewrite_function(f);
+    }
 }

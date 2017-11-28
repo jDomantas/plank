@@ -11,6 +11,8 @@ pub enum Error {
     DivisionByZero,
     MissingSymbol(ir::Symbol),
     Io(io::Error),
+    ReadUndef,
+    ExecutedUnreachable,
 }
 
 impl ::std::convert::From<io::Error> for Error {
@@ -30,6 +32,8 @@ impl ::std::fmt::Display for Error {
             Error::Io(ref err) => {
                 write!(f, "io error: {}", err)
             }
+            Error::ReadUndef => write!(f, "read undef value"),
+            Error::ExecutedUnreachable => write!(f, "reached unreachable instruction"),
         }
     }
 }
@@ -194,17 +198,18 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         }
     }
 
-    fn read_value(&self, val: &ir::Value) -> Value {
+    fn read_value(&self, val: &ir::Value) -> Result<Value, Error> {
         match *val {
-            ir::Value::Bytes(ref s) => Value::DoubleWord(self.strings[s]),
-            ir::Value::Int(i, ir::Size::Bit8) => Value::Byte(i as u8),
-            ir::Value::Int(i, ir::Size::Bit16) => Value::Word(i as u16),
-            ir::Value::Int(i, ir::Size::Bit32) => Value::DoubleWord(i as u32),
+            ir::Value::Undef => Err(Error::ReadUndef),
+            ir::Value::Bytes(ref s) => Ok(Value::DoubleWord(self.strings[s])),
+            ir::Value::Int(i, ir::Size::Bit8) => Ok(Value::Byte(i as u8)),
+            ir::Value::Int(i, ir::Size::Bit16) => Ok(Value::Word(i as u16)),
+            ir::Value::Int(i, ir::Size::Bit32) => Ok(Value::DoubleWord(i as u32)),
             ir::Value::Reg(reg) => {
                 let (at, size) = self.register_address(reg);
-                Value::AddressRange(at, size)
+                Ok(Value::AddressRange(at, size))
             }
-            ir::Value::Symbol(ref sym) => Value::DoubleWord(self.symbol_ids[sym]),
+            ir::Value::Symbol(ref sym) => Ok(Value::DoubleWord(self.symbol_ids[sym])),
         }
     }
 
@@ -328,7 +333,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             ir::Instruction::Assign(reg, ref val) |
             ir::Instruction::CastAssign(reg, ref val) => {
                 let (to, len) = self.register_address(reg);
-                let val = self.read_value(val);
+                let val = self.read_value(val)?;
                 self.write_value(to, Some(len), val);
                 Ok(())
             }
@@ -358,16 +363,16 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     }
                     ir::BinaryOp::Eq => {
                         assert_eq!(len, 1);
-                        let a = self.read_value(a);
-                        let b = self.read_value(b);
+                        let a = self.read_value(a)?;
+                        let b = self.read_value(b)?;
                         let res = self.compare_values(a, b) as u8;
                         self.memory[to as usize] = res;
                         Ok(())
                     }
                     ir::BinaryOp::Neq => {
                         assert_eq!(len, 1);
-                        let a = self.read_value(a);
-                        let b = self.read_value(b);
+                        let a = self.read_value(a)?;
+                        let b = self.read_value(b)?;
                         let res = !self.compare_values(a, b) as u8;
                         self.memory[to as usize] = res;
                         Ok(())
@@ -416,7 +421,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 for (param, val) in f.parameters.iter().zip(params.iter()) {
                     let at = registers[param];
                     let len = f.registers[param].size;
-                    let val = self.read_value(val);
+                    let val = self.read_value(val)?;
                     self.write_value(at, Some(len), val);
                 }
                 let frame = StackFrame {
@@ -444,7 +449,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 for (param, val) in f.parameters.iter().zip(params.iter()) {
                     let at = registers[param];
                     let len = f.registers[param].size;
-                    let val = self.read_value(val);
+                    let val = self.read_value(val)?;
                     self.write_value(at, Some(len), val);
                 }
                 let frame = StackFrame {
@@ -480,7 +485,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 for (param, val) in f.parameters.iter().zip(params.iter()) {
                     let at = registers[param];
                     let len = f.registers[param].size;
-                    let val = self.read_value(val);
+                    let val = self.read_value(val)?;
                     self.write_value(at, Some(len), val);
                 }
                 let frame = StackFrame {
@@ -509,7 +514,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 for (param, val) in f.parameters.iter().zip(params.iter()) {
                     let at = registers[param];
                     let len = f.registers[param].size;
-                    let val = self.read_value(val);
+                    let val = self.read_value(val)?;
                     self.write_value(at, Some(len), val);
                 }
                 let frame = StackFrame {
@@ -531,12 +536,13 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             }
             ir::Instruction::DerefStore(ref address, offset, ref value) => {
                 let address = self.load_32bit(address) + offset;
-                let value = self.read_value(value);
+                let value = self.read_value(value)?;
                 self.write_value(address, None, value);
                 Ok(())
             }
             ir::Instruction::Drop(_) |
-            ir::Instruction::Init(_) => Ok(()),
+            ir::Instruction::Init(_) |
+            ir::Instruction::Nop => Ok(()),
             ir::Instruction::Load(dest, reg, offset) => {
                 let (to, len) = self.register_address(dest);
                 let (from, _) = self.register_address(reg);
@@ -545,7 +551,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
             }
             ir::Instruction::Store(dest, offset, ref value) => {
                 let (to, _) = self.register_address(dest);
-                let value = self.read_value(value);
+                let value = self.read_value(value)?;
                 self.write_value(to + offset, None, value);
                 Ok(())
             }
@@ -577,6 +583,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 }
                 Ok(())
             }
+            ir::Instruction::Unreachable => Err(Error::ExecutedUnreachable),
         }
     }
 
@@ -598,7 +605,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                         }
                     }
                     ir::BlockEnd::Return(ref val) => {
-                        let val = self.read_value(val);
+                        let val = self.read_value(val)?;
                         let len = self.current_frame.function.output_layout.unwrap().size;
                         let to = self.current_frame.return_address.unwrap();
                         self.write_value(to, Some(len), val);

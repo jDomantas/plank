@@ -1,7 +1,9 @@
 mod constant_fold;
 mod simplify_newtypes;
+mod dead_store_elimination;
 
-use ir::{Program, Function, Block, Instruction};
+use analysis::Loc;
+use ir::{Program, Function, BlockId, Block, Instruction};
 
 
 trait Rewriter {
@@ -13,11 +15,11 @@ trait Rewriter {
         rewrite_function(self, f);
     }
 
-    fn rewrite_block(&mut self, block: &mut Block) {
-        rewrite_block(self, block);
+    fn rewrite_block(&mut self, id: BlockId, block: &mut Block) {
+        rewrite_block(self, id, block);
     }
 
-    fn rewrite_instruction(&mut self, _instr: &mut Instruction) {}
+    fn rewrite_instruction(&mut self, _loc: Loc, _instr: &mut Instruction) {}
 }
 
 fn rewrite_program<R: Rewriter + ?Sized>(r: &mut R, program: &mut Program) {
@@ -27,18 +29,20 @@ fn rewrite_program<R: Rewriter + ?Sized>(r: &mut R, program: &mut Program) {
 }
 
 fn rewrite_function<R: Rewriter + ?Sized>(r: &mut R, f: &mut Function) {
-    for f in f.blocks.values_mut() {
-        r.rewrite_block(f);
+    for (&id, block) in &mut f.blocks {
+        r.rewrite_block(id, block);
     }
 }
 
-fn rewrite_block<R: Rewriter + ?Sized>(r: &mut R, block: &mut Block) {
-    for i in &mut block.ops {
-        r.rewrite_instruction(i);
+fn rewrite_block<R: Rewriter + ?Sized>(r: &mut R, id: BlockId, block: &mut Block) {
+    for (index, i) in block.ops.iter_mut().enumerate() {
+        let loc = Loc { block: id, pos: index };
+        r.rewrite_instruction(loc, i);
     }
 }
 
 pub fn optimize(program: &mut Program) {
     simplify_newtypes::rewrite(program);
     constant_fold::rewrite(program);
+    dead_store_elimination::rewrite(program);
 }

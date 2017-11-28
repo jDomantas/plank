@@ -129,6 +129,9 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
         ir::Instruction::Load(dest, reg, offset) => {
             writeln!(out, "    %{} = %{}[{}]", dest.0, reg.0, offset)
         }
+        ir::Instruction::Nop => {
+            writeln!(out, "    nop")
+        }
         ir::Instruction::Store(dest, offset, ref value) => {
             write!(out, "    %{}[{}] = ", dest.0, offset)?;
             emit_value(value, out)?;
@@ -144,6 +147,9 @@ fn emit_instruction<W: Write>(i: &ir::Instruction, out: &mut W) -> io::Result<()
             write!(out, " ")?;
             emit_value(arg, out)?;
             writeln!(out)
+        }
+        ir::Instruction::Unreachable => {
+            writeln!(out, "    unreachable")
         }
     }
 }
@@ -170,6 +176,7 @@ fn emit_value<W: Write>(val: &ir::Value, out: &mut W) -> io::Result<()> {
         },
         ir::Value::Reg(reg) => write!(out, "%{}", reg.0),
         ir::Value::Symbol(ref sym) => write!(out, "{}", sym.0),
+        ir::Value::Undef => write!(out, "undef"),
     }
 }
 

@@ -42,6 +42,10 @@ pub struct Block {
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
+    /// `unreachable`
+    Unreachable,
+    /// `nop`
+    Nop,
     /// `init reg`
     Init(Reg),
     /// `drop reg`
@@ -80,6 +84,7 @@ pub enum Value {
     Reg(Reg),
     Symbol(Symbol),
     Bytes(Vec<u8>),
+    Undef,
 }
 
 #[derive(Debug, Clone)]
