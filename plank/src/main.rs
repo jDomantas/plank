@@ -51,6 +51,7 @@ enum Stream {
 #[derive(Debug)]
 struct Params {
     command: Command,
+    optimize: bool,
     input: Stream,
     output: Stream,
 }
@@ -86,21 +87,21 @@ fn run() -> Result<()> {
         Stream::Std => {
             let stdout = io::stdout();
             let stdout = stdout.lock();
-            run_command(&input, &params.command, stdout)
+            run_command(&input, &params.command, params.optimize, stdout)
         }
         Stream::File(ref name) => {
             let file = ::std::fs::File::create(name)?;
-            run_command(&input, &params.command, file)
+            run_command(&input, &params.command, params.optimize, file)
         }
     }
 }
 
-fn run_command<W: Write>(input: &str, command: &Command, output: W) -> Result<()> {
+fn run_command<W: Write>(input: &str, command: &Command, optimize: bool, output: W) -> Result<()> {
     match *command {
         Command::Lex => lex(input, output),
         Command::Parse => parse(input, output),
-        Command::EmitIr => emit_ir(input, output),
-        Command::Interpret => interpret(input, output),
+        Command::EmitIr => emit_ir(input, output, optimize),
+        Command::Interpret => interpret(input, output, optimize),
     }
 }
 
@@ -124,6 +125,10 @@ fn parse_params() -> Result<Params> {
             .long("interpret")
             .help("Compile to IR and interpret")
             .conflicts_with_all(&["lex", "parse", "emit-ir"]))
+        .arg(Arg::with_name("optimize")
+            .long("optimize")
+            .short("O")
+            .help("Perform optimizations on IR"))
         .arg(Arg::with_name("input")
             .index(1)
             .help("Set input file, uses stdin if none provided"))
@@ -155,9 +160,12 @@ fn parse_params() -> Result<Params> {
         Some(path) => Stream::File(Path::new(path).to_owned()),
         None => Stream::Std,
     };
+    
+    let optimize = matches.is_present("optimize");
 
     Ok(Params {
         command,
+        optimize,
         input,
         output,
     })
@@ -219,13 +227,16 @@ fn parse<W: Write>(source: &str, mut output: W) -> Result<()> {
     Ok(())
 }
 
-fn emit_ir<W: Write>(source: &str, mut output: W) -> Result<()> {
+fn emit_ir<W: Write>(source: &str, mut output: W, optimize: bool) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
     let ir = plank_frontend::compile(&program, reporter.clone());
     emit_diagnostics(source, reporter)?;
-    let ir = ir.expect("no errors but failed to produce IR");
+    let mut ir = ir.expect("no errors but failed to produce IR");
+    if optimize {
+        plank_ir::optimization::optimize(&mut ir);
+    }
     plank_ir::emit_program(&ir, &mut output)?;
     if let Err((sym, err)) = plank_ir::validate_ir(&ir) {
         println!("ir validation error in function {:?}: {:?}", sym, err);
@@ -233,13 +244,16 @@ fn emit_ir<W: Write>(source: &str, mut output: W) -> Result<()> {
     Ok(())
 }
 
-fn interpret<W: Write>(source: &str, output: W) -> Result<()> {
+fn interpret<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
     let ir = plank_frontend::compile(&program, reporter.clone());
     emit_diagnostics(source, reporter)?;
-    let ir = ir.expect("build succeeded but failed to produce IR");
+    let mut ir = ir.expect("build succeeded but failed to produce IR");
+    if optimize {
+        plank_ir::optimization::optimize(&mut ir);
+    }
     let input = io::empty();
     let exit_code = plank_interpreter::run_program(&ir, input, output)?;
     if exit_code == 0 {
