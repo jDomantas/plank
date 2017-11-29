@@ -11,7 +11,7 @@ This repository currently consists of 8 crates:
 * `plank-errors` - defines `Position` and `Span` types, handles error reporting and formatting.
 * `plank-syntax` - defines plank AST, and contains parser for plank source code.
 * `plank-frontend` - validates plank programs and converts AST to intermediate representation.
-* `plank-ir` - defines plank intermediate representation.
+* `plank-ir` - defines plank intermediate representation and contains optimizations.
 * `plank-interpreter` - a simple virtual machine for executing plank intermediate representation.
 * `plank` - driver program that glues everything together.
 * `plank-server` - plank language server.
