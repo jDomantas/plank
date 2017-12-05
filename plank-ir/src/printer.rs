@@ -62,6 +62,9 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
             ir::BlockEnd::ReturnProc => {
                 writeln!(out, "    return")?;
             }
+            ir::BlockEnd::Unreachable => {
+                writeln!(out, "    unreachable")?;
+            }
         }
     }
     Ok(())

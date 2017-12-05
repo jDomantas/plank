@@ -98,6 +98,7 @@ impl<'a> Context<'a> {
                     return Err(Error::InvalidReturn);
                 }
             }
+            BlockEnd::Unreachable => {}
         }
         Ok(())
     }

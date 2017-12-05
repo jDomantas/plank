@@ -52,7 +52,8 @@ impl<'a> Context<'a> {
                             return true;
                         }
                     }
-                    BlockEnd::ReturnProc => {}
+                    BlockEnd::ReturnProc |
+                    BlockEnd::Unreachable => {}
                 }
             } else {
                 match block.ops[loc.pos] {

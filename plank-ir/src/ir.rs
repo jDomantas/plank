@@ -93,6 +93,7 @@ pub enum BlockEnd {
     ReturnProc,
     Jump(BlockId),
     Branch(Value, BlockId, BlockId),
+    Unreachable,
 }
 
 #[derive(Debug, Copy, Clone)]

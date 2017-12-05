@@ -58,7 +58,8 @@ impl<'a> Volatility<'a> {
                 self.walk_block(a, is_volatile);
             }
             BlockEnd::Return(_) |
-            BlockEnd::ReturnProc => {}
+            BlockEnd::ReturnProc |
+            BlockEnd::Unreachable => {}
         }
     }
 }

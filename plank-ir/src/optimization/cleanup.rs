@@ -15,6 +15,23 @@ impl Rewriter for RemoveNops {
     }
 }
 
+struct ShortenUnreachable;
+
+impl Rewriter for ShortenUnreachable {
+    fn rewrite_block(&mut self, _id: BlockId, block: &mut Block) {
+        let mut to_keep = None;
+        for (index, op) in block.ops.iter().enumerate() {
+            if let Instruction::Unreachable = *op {
+                to_keep = Some(index);
+            }
+        }
+        if let Some(index) = to_keep {
+            block.ops.truncate(index);
+            block.end = BlockEnd::Unreachable;
+        }
+    }
+}
+
 #[derive(Default)]
 struct JoinBlocks {
     references: HashMap<BlockId, u32>,
@@ -32,7 +49,9 @@ impl Rewriter for JoinBlocks {
                 BlockEnd::Jump(a) => {
                     *self.references.entry(a).or_insert(0) += 1;
                 }
-                BlockEnd::Return(_) | BlockEnd::ReturnProc => {}
+                BlockEnd::Return(_) |
+                BlockEnd::ReturnProc |
+                BlockEnd::Unreachable => {}
             }
         }
         if let Some(block) = f.start_block {
@@ -74,7 +93,9 @@ impl Rewriter for JoinBlocks {
                         BlockEnd::Jump(a) => {
                             *self.references.get_mut(&a).unwrap() -= 1;
                         }
-                        BlockEnd::Return(_) | BlockEnd::ReturnProc => {}
+                        BlockEnd::Return(_) |
+                        BlockEnd::ReturnProc |
+                        BlockEnd::Unreachable => {}
                     }
                     first.end = removed.end;
                 }
@@ -88,7 +109,9 @@ impl Rewriter for JoinBlocks {
                         BlockEnd::Jump(a) => {
                             *self.references.get_mut(&a).unwrap() -= 1;
                         }
-                        BlockEnd::Return(_) | BlockEnd::ReturnProc => {}
+                        BlockEnd::Return(_) |
+                        BlockEnd::ReturnProc |
+                        BlockEnd::Unreachable => {}
                     }
                 }
                 Change::None => break,
@@ -100,4 +123,5 @@ impl Rewriter for JoinBlocks {
 pub fn rewrite(program: &mut Program) {
     RemoveNops.rewrite_program(program);
     JoinBlocks::default().rewrite_program(program);
+    ShortenUnreachable.rewrite_program(program);
 }

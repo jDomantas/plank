@@ -268,7 +268,9 @@ fn rewrite_function(f: &mut Function) {
                         changed = true;
                     }
                 }
-                BlockEnd::Jump(_) | BlockEnd::ReturnProc => {}
+                BlockEnd::Jump(_) |
+                BlockEnd::ReturnProc |
+                BlockEnd::Unreachable => {}
             }
             if let BlockEnd::Branch(Value::Int(0, _), _, a) = block.end {
                 block.end = BlockEnd::Jump(a);

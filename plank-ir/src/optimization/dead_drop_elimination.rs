@@ -59,7 +59,8 @@ impl<'a> Liveness<'a> {
                 self.walk_block(a, is_live);
             }
             BlockEnd::Return(_) |
-            BlockEnd::ReturnProc => {}
+            BlockEnd::ReturnProc |
+            BlockEnd::Unreachable => {}
         }
     }
 }

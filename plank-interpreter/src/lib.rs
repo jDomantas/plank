@@ -628,6 +628,9 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                             None => panic!("main did not return a value"),
                         }
                     }
+                    ir::BlockEnd::Unreachable => {
+                        return Err(Error::ExecutedUnreachable);
+                    }
                 }
             } else {
                 let op = &block.ops[self.current_frame.current_op];
