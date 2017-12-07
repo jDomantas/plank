@@ -22,18 +22,18 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
     }
     write!(out, ")")?;
     if let Some(layout) = func.output_layout {
-        writeln!(out, ": {{ {}, {} }}", layout.size, layout.align)?;
-    } else {
-        writeln!(out)?;
+        write!(out, ": ")?;
+        emit_layout(layout, out)?;
     }
-    for (reg, layout) in &func.registers {
-        writeln!(
+    writeln!(out)?;
+    for (&reg, &layout) in &func.registers {
+        write!(
             out,
-            "    register %{}: size {}, align {}",
+            "    register %{}: ",
             reg.0,
-            layout.size,
-            layout.align
         )?;
+        emit_layout(layout, out)?;
+        writeln!(out)?;
     }
     if func.start_block.is_none() {
         return Ok(());
@@ -273,4 +273,14 @@ fn emit_params<W: Write>(params: &[ir::Value], out: &mut W) -> io::Result<()> {
         emit_value(param, out)?;
     }
     write!(out, ")")
+}
+
+fn emit_layout<W: Write>(layout: ir::Layout, out: &mut W) -> io::Result<()> {
+    write!(
+        out,
+        "(size {}, align {}, {})",
+        layout.size,
+        layout.align,
+        if layout.atomic { "atomic" } else { "composite" },
+    )
 }

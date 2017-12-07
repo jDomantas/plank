@@ -86,6 +86,19 @@ impl Type {
             }
         }
     }
+
+    pub fn is_atomic(&self) -> bool {
+        match *self {
+            Type::Bool |
+            Type::Function(_, _) |
+            Type::Int(_, _) |
+            Type::Pointer(_, _) |
+            Type::Unit => true,
+            Type::Concrete(_, _) => false,
+            Type::Error |
+            Type::Var(_) => panic!("cannot say atomicity of {:?}", self),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

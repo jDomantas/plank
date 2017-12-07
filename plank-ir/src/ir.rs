@@ -17,6 +17,7 @@ pub struct Program {
 pub struct Layout {
     pub size: u32,
     pub align: u32,
+    pub atomic: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -29,7 +29,11 @@ impl<'a> Builder<'a> {
             .map(|(&reg, ty)| {
                 let ty = ty.replace(&type_params);
                 let (s, a) = layouts.size_align(&ty).unwrap();
-                let layout = ir::Layout { size: s, align: a };
+                let layout = ir::Layout {
+                    size: s,
+                    align: a,
+                    atomic: ty.is_atomic(),
+                };
                 let reg = ir::Reg(reg.0);
                 (reg, layout)
             })
@@ -69,7 +73,11 @@ impl<'a> Builder<'a> {
         let output_layout = if s == 0 {
             None
         } else {
-            Some(ir::Layout { size: s, align: a })
+            Some(ir::Layout {
+                size: s,
+                align: a,
+                atomic: out_type.is_atomic(),
+            })
         };
         self.registers.retain(|_, layout| layout.size > 0);
         // cheat with size_of and align_of - insert an appropriate implementation

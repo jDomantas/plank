@@ -15,6 +15,7 @@ pub enum Error {
     BadCall(Loc),
     ZeroSizedVal(Loc),
     OutOfBounds(Loc),
+    InvalidOpOnAtomic(Loc),
     InvalidReturn,
 }
 
@@ -188,6 +189,9 @@ impl<'a> Context<'a> {
             }
             Instruction::Load(dest, reg, offset) => {
                 self.assert_live(reg, loc)?;
+                if self.function.registers[&reg].atomic {
+                    return Err(Error::InvalidOpOnAtomic(loc));
+                }
                 let dest_size = self.register_size(dest);
                 let reg_size = self.register_size(reg);
                 if dest_size + offset > reg_size {
@@ -198,6 +202,9 @@ impl<'a> Context<'a> {
             Instruction::Store(reg, offset, ref value) => {
                 self.assert_live(reg, loc)?;
                 self.assert_live_val(value, loc)?;
+                if self.function.registers[&reg].atomic {
+                    return Err(Error::InvalidOpOnAtomic(loc));
+                }
                 let reg_size = self.register_size(reg);
                 let val_size = self.value_size(value);
                 if reg_size < offset + val_size {
