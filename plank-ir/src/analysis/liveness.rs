@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use ir::{Function, Reg, BlockId, BlockEnd, Instruction};
+use ir::{Function, Reg, Block, BlockId, BlockEnd, Instruction};
 use super::{Loc, initialized_register};
 
 
@@ -28,6 +28,9 @@ impl<'a> Liveness<'a> {
         let block = &self.function.blocks[&id];
         let mut is_live = live_start;
         for (pos, instr) in block.ops.iter().enumerate() {
+            if is_dropped(block, pos, self.reg) {
+                is_live = false;
+            }
             if !is_live {
                 self.dead_locations.insert(Loc {
                     block: id,
@@ -36,11 +39,6 @@ impl<'a> Liveness<'a> {
             }
             if initialized_register(instr) == Some(self.reg) {
                 is_live = true;
-            }
-            if let Instruction::Drop(reg) = *instr {
-                if reg == self.reg {
-                    is_live = false;
-                }
             }
         }
         if !is_live {
@@ -62,6 +60,19 @@ impl<'a> Liveness<'a> {
             BlockEnd::Unreachable => {}
         }
     }
+}
+
+fn is_dropped(block: &Block, from: usize, reg: Reg) -> bool {
+    for op in &block.ops[from..] {
+        if let Instruction::Drop(r) = *op {
+            if r == reg {
+                return true;
+            }
+        } else {
+            return false;
+        }
+    }
+    false
 }
 
 fn get_dead_locations(f: &Function, reg: Reg) -> HashSet<Loc> {
