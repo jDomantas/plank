@@ -32,7 +32,7 @@ fn generate_constraints(f: &Function) -> Constraints {
     }
     for &param in &f.parameters {
         let size = f.registers[&param].size;
-        let size = (size + 3) / 4;
+        let size = (size + 3) / 4 * 4;
         for (&reg, &layout) in &f.registers {
             if layout.size > size {
                 constraints.intersect.insert((param, reg));
@@ -186,7 +186,7 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
         let loc = Location::Param(param_location);
         locations.insert(param, loc);
         location_candidates.push(loc);
-        param_location += (f.registers[&param].size + 3) / 4;
+        param_location += (f.registers[&param].size + 3) / 4 * 4;
     }
     let mut visit_order = f
         .registers
@@ -260,7 +260,7 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
         .collect::<HashMap<_, _>>();
     for (&reg, &loc) in &locations {
         if let Location::Stack(slot) = loc {
-            let size = (f.registers[&reg].size + 3) / 4;
+            let size = (f.registers[&reg].size + 3) / 4 * 4;
             let cur = slot_sizes.get_mut(&slot).unwrap();
             if *cur < size {
                 *cur = size;
@@ -366,8 +366,10 @@ impl<'a> FnCompiler<'a> {
                         x86::Rm::Register(_) => panic!("cannot load from register"),
                         x86::Rm::Memory(mem) => mem,
                     };
+                    let to_size = self.f.registers[&to].size;
                     let to = self.to_rm(to);
                     from.offset += offset as i32;
+                    from.ptr_size = to_size;
                     let from = x86::Rm::Memory(from);
                     self.emit_move(from, to, offset);
                 }
@@ -377,6 +379,7 @@ impl<'a> FnCompiler<'a> {
                         x86::Rm::Memory(mem) => mem,
                     };
                     to.offset += offset as i32;
+                    to.ptr_size = self.value_size(value);
                     let to = x86::Rm::Memory(to);
                     self.emit_assign(to, value, offset);
                 }
@@ -537,11 +540,13 @@ impl<'a> FnCompiler<'a> {
                 self.emitter.emit(x86::Instruction::Mov(args));
             }
             (x86::Rm::Register(r1), x86::Rm::Register(r2)) => {
-                let args = x86::TwoArgs::RmReg(
-                    x86::Rm::Register(r1),
-                    r2,
-                );
-                self.emitter.emit(x86::Instruction::Mov(args));
+                if r1 != r2 {
+                    let args = x86::TwoArgs::RmReg(
+                        x86::Rm::Register(r1),
+                        r2,
+                    );
+                    self.emitter.emit(x86::Instruction::Mov(args));
+                }
             }
             (x86::Rm::Register(reg), x86::Rm::Memory(mem)) => {
                 let args = x86::TwoArgs::RegRm(
@@ -552,6 +557,9 @@ impl<'a> FnCompiler<'a> {
             }
             (x86::Rm::Memory(mut m1), x86::Rm::Memory(mut m2)) => {
                 debug_assert_eq!(m1.ptr_size, m2.ptr_size);
+                if m1.register == m2.register && m1.offset == m2.offset {
+                    return;
+                }
                 fn gcd(a: u32, b: u32) -> u32 {
                     if b == 0 {
                         a
@@ -1369,6 +1377,16 @@ impl<'a> FnCompiler<'a> {
             self.emit_assign(x86::Rm::Memory(to), arg, 4);
         }
         total_size
+    }
+
+    fn value_size(&self, val: &Value) -> u32 {
+        match *val {
+            Value::Bytes(_) |
+            Value::Symbol(_) => 4,
+            Value::Int(_, size) => size.in_bytes(),
+            Value::Reg(r) => self.f.registers[&r].size,
+            Value::Undef => panic!("got undef"),
+        }
     }
 }
 
