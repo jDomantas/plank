@@ -9,4 +9,5 @@ plank-syntax = { path = "../plank-syntax" }
 plank-frontend = { path = "../plank-frontend" }
 plank-ir = { path = "../plank-ir" }
 plank-interpreter = { path = "../plank-interpreter" }
+plank-x86-backend = { path = "../plank-x86-backend" }
 clap = "2.26.2"
