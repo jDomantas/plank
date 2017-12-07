@@ -4,6 +4,7 @@ extern crate plank_syntax;
 extern crate plank_frontend;
 extern crate plank_ir;
 extern crate plank_interpreter;
+extern crate plank_x86_backend;
 
 mod ast_printer;
 
@@ -40,6 +41,7 @@ enum Command {
     Parse,
     EmitIr,
     Interpret,
+    CompileX86,
 }
 
 #[derive(Debug)]
@@ -102,6 +104,7 @@ fn run_command<W: Write>(input: &str, command: &Command, optimize: bool, output:
         Command::Parse => parse(input, output),
         Command::EmitIr => emit_ir(input, output, optimize),
         Command::Interpret => interpret(input, output, optimize),
+        Command::CompileX86 => compile_x86(input, output, optimize),
     }
 }
 
@@ -112,19 +115,23 @@ fn parse_params() -> Result<Params> {
         .arg(Arg::with_name("lex")
             .long("lex")
             .help("List tokens in input")
-            .conflicts_with_all(&["parse", "emit-ir", "interpret"]))
+            .conflicts_with_all(&["parse", "emit-ir", "interpret", "emit-asm"]))
         .arg(Arg::with_name("parse")
             .long("parse")
             .help("Parse input")
-            .conflicts_with_all(&["lex", "emit-ir", "interpret"]))
+            .conflicts_with_all(&["lex", "emit-ir", "interpret", "emit-asm"]))
         .arg(Arg::with_name("emit-ir")
             .long("emit-ir")
-            .help("Emit plank IR")
-            .conflicts_with_all(&["lex", "parse", "interpret"]))
+            .help("Compile to plank IR")
+            .conflicts_with_all(&["lex", "parse", "interpret", "emit-asm"]))
         .arg(Arg::with_name("interpret")
             .long("interpret")
             .help("Compile to IR and interpret")
-            .conflicts_with_all(&["lex", "parse", "emit-ir"]))
+            .conflicts_with_all(&["lex", "parse", "emit-ir", "emit-asm"]))
+        .arg(Arg::with_name("emit-asm")
+            .long("emit-asm")
+            .help("Compile to x86 assembly")
+            .conflicts_with_all(&["lex", "parse", "emit-ir", "interpret"]))
         .arg(Arg::with_name("optimize")
             .long("optimize")
             .short("O")
@@ -147,6 +154,8 @@ fn parse_params() -> Result<Params> {
         Command::EmitIr
     } else if matches.is_present("interpret") {
         Command::Interpret
+    } else if matches.is_present("emit-asm") {
+        Command::CompileX86
     } else {
         default_command
     };
@@ -239,7 +248,7 @@ fn emit_ir<W: Write>(source: &str, mut output: W, optimize: bool) -> Result<()> 
     }
     plank_ir::emit_program(&ir, &mut output)?;
     if let Err((sym, err)) = plank_ir::validate_ir(&ir) {
-        println!("ir validation error in function {:?}: {:?}", sym, err);
+        eprintln!("ir validation error in function {:?}: {:?}", sym, err);
     }
     Ok(())
 }
@@ -261,4 +270,19 @@ fn interpret<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
     } else {
         Err(Error::InterpreterExit(exit_code))
     }
+}
+
+fn compile_x86<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
+    let reporter = Reporter::new();
+    let tokens = plank_syntax::lex(source, reporter.clone());
+    let program = plank_syntax::parse(tokens, reporter.clone());
+    let ir = plank_frontend::compile(&program, reporter.clone());
+    emit_diagnostics(source, reporter)?;
+    let mut ir = ir.expect("build succeeded but failed to produce IR");
+    if optimize {
+        plank_ir::optimization::optimize(&mut ir);
+    }
+    let asm = plank_x86_backend::compile_program(&ir);
+    plank_x86_backend::print_asm(output, &asm)?;
+    Ok(())
 }
