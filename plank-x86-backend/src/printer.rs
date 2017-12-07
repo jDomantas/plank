@@ -22,8 +22,15 @@ fn print_instruction<W: Write>(to: &mut W, i: &x86::Instruction) -> io::Result<(
             print_args(to, args)?;
             writeln!(to)
         }
-        x86::Instruction::Call => {
-            writeln!(to, "    call")
+        x86::Instruction::Call(ref imm) => {
+            write!(to, "    call ")?;
+            print_immediate(to, imm)?;
+            writeln!(to)
+        }
+        x86::Instruction::CallVirt(rm) => {
+            write!(to, "    call ")?;
+            print_rm(to, rm)?;
+            writeln!(to)
         }
         x86::Instruction::Cdq => {
             writeln!(to, "    cdq")

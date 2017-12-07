@@ -389,12 +389,126 @@ impl<'a> FnCompiler<'a> {
                 Instruction::BinaryOp(to, op, ref a, ref b) => {
                     self.emit_binary_op(to, op, a, b);
                 }
-                Instruction::Call(..) |
-                Instruction::CallProc(..) |
-                Instruction::CallVirt(..) |
-                Instruction::CallProcVirt(..) => unimplemented!("calls not yet"),
-                Instruction::DerefLoad(..) |
-                Instruction::DerefStore(..) => unimplemented!("deref not yet"),
+                Instruction::Call(reg, ref f, ref args) => {
+                    let additional_stack = self.emit_call_args(args);
+                    let f = x86::Immediate::Label(x86::Label::Named(f.0.clone()));
+                    self.emitter.emit(x86::Instruction::Call(f));
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
+                    let result = match self.f.registers[&reg].size {
+                        1 => x86::Register::Al,
+                        2 => x86::Register::Ax,
+                        4 => x86::Register::Eax,
+                        _ => panic!("cannot return through eax"),
+                    };
+                    let to = self.to_rm(reg);
+                    self.emit_move(x86::Rm::Register(result), to, 4);
+                }
+                Instruction::CallProc(ref f, ref args) => {
+                    let additional_stack = self.emit_call_args(args);
+                    let f = x86::Immediate::Label(x86::Label::Named(f.0.clone()));
+                    self.emitter.emit(x86::Instruction::Call(f));
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
+                }
+                Instruction::CallProcVirt(ref f, ref args) => {
+                    let additional_stack = self.emit_call_args(args);
+                    if let Value::Reg(r) = *f {
+                        let f = self.to_rm(r);
+                        self.emitter.emit(x86::Instruction::CallVirt(f));
+                    } else {
+                        let f = self.to_immediate(f);
+                        self.emitter.emit(x86::Instruction::Call(f));
+                    }
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
+                }
+                Instruction::CallVirt(reg, ref f, ref args) => {
+                    let additional_stack = self.emit_call_args(args);
+                    if let Value::Reg(r) = *f {
+                        let f = self.to_rm(r);
+                        self.emitter.emit(x86::Instruction::CallVirt(f));
+                    } else {
+                        let f = self.to_immediate(f);
+                        self.emitter.emit(x86::Instruction::Call(f));
+                    }
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
+                    let result = match self.f.registers[&reg].size {
+                        1 => x86::Register::Al,
+                        2 => x86::Register::Ax,
+                        4 => x86::Register::Eax,
+                        _ => panic!("cannot return through eax"),
+                    };
+                    let to = self.to_rm(reg);
+                    self.emit_move(x86::Rm::Register(result), to, 4);
+                }
+                Instruction::DerefLoad(reg, ref address, offset) => {
+                    let layout = self.f.registers[&reg];
+                    self.emit_assign(x86::Rm::Register(x86::Register::Eax), address, 4);
+                    let from = x86::Memory {
+                        register: x86::Register::Eax,
+                        offset: offset as i32,
+                        ptr_size: layout.size,
+                    };
+                    let to = self.to_rm(reg);
+                    self.emit_move(x86::Rm::Memory(from), to, layout.align);
+                }
+                Instruction::DerefStore(ref address, offset, ref val) => {
+                    self.emit_assign(x86::Rm::Register(x86::Register::Eax), address, 4);
+                    let (to, align) = match *val {
+                        Value::Reg(r) => {
+                            let layout = self.f.registers[&r];
+                            (x86::Memory {
+                                register: x86::Register::Eax,
+                                offset: offset as i32,
+                                ptr_size: layout.size,
+                            }, layout.align)
+                        }
+                        Value::Bytes(_) |
+                        Value::Symbol(_) |
+                        Value::Int(_, Size::Bit32) => {
+                            (x86::Memory {
+                                register: x86::Register::Eax,
+                                offset: offset as i32,
+                                ptr_size: 4,
+                            }, 4)
+                        }
+                        Value::Int(_, Size::Bit16) => {
+                            (x86::Memory {
+                                register: x86::Register::Eax,
+                                offset: offset as i32,
+                                ptr_size: 2,
+                            }, 2)
+                        }
+                        Value::Int(_, Size::Bit8) => {
+                            (x86::Memory {
+                                register: x86::Register::Eax,
+                                offset: offset as i32,
+                                ptr_size: 1,
+                            }, 1)
+                        }
+                        Value::Undef => panic!("got undef value"),
+                    };
+                    let to = x86::Rm::Memory(to);
+                    self.emit_assign(to, val, align);
+                }
             }
         }
         self.emit_block_end(&block.end);
@@ -625,12 +739,42 @@ impl<'a> FnCompiler<'a> {
             BlockEnd::Branch(Value::Undef, _, _) => {
                 panic!("branching on undef");
             }
-            BlockEnd::Return(ref _val) => {
-                // something like
-                //  mov eax, val
-                //  add esp, ?
-                //  ret
-                unimplemented!("value returns not yet");
+            BlockEnd::Return(ref val) => {
+                match *val {
+                    Value::Bytes(_) |
+                    Value::Symbol(_) => {
+                        self.emit_assign(x86::Rm::Register(x86::Register::Eax), val, 4);
+                    }
+                    Value::Undef => panic!("got undef value"),
+                    Value::Int(val, size) => {
+                        let dest = match size {
+                            Size::Bit8 => x86::Register::Al,
+                            Size::Bit16 => x86::Register::Ax,
+                            Size::Bit32 => x86::Register::Eax,
+                        };
+                        self.emitter.emit(x86::Instruction::Mov(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(dest),
+                            x86::Immediate::Constant(val),
+                        )));
+                    }
+                    Value::Reg(r) => {
+                        let size = self.f.registers[&r].size;
+                        let dest = match size {
+                            1 => x86::Register::Al,
+                            2 => x86::Register::Ax,
+                            4 => x86::Register::Eax,
+                            _ => panic!("cannot return value of size {}", size),
+                        };
+                        self.emit_assign(x86::Rm::Register(dest), val, 4);
+                    }
+                }
+                if self.stack_size > 0 {
+                    self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
+                        x86::Rm::Register(x86::Register::Esp),
+                        x86::Immediate::Constant(u64::from(self.stack_size)),
+                    )));
+                }
+                self.emitter.emit(x86::Instruction::Ret);
             }
             BlockEnd::ReturnProc => {
                 if self.stack_size > 0 {
@@ -1163,6 +1307,68 @@ impl<'a> FnCompiler<'a> {
                 self.emitter.emit(x86::Instruction::Label(end_label));
             }
         }
+    }
+
+    fn emit_call_args(&mut self, args: &[Value]) -> u32 {
+        let mut total_size = 0u32;
+        for arg in args {
+            match *arg {
+                Value::Bytes(_) |
+                Value::Int(_, _) |
+                Value::Symbol(_) => total_size += 4,
+                Value::Reg(r) => total_size += (self.f.registers[&r].size + 3) / 4 * 4,
+                Value::Undef => panic!("got undef"),
+            }
+        }
+        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
+            x86::Rm::Register(x86::Register::Esp),
+            x86::Immediate::Constant(u64::from(total_size)),
+        )));
+        self.stack_size += total_size;
+        let mut offset = 0;
+        for arg in args {
+            let to = match *arg {
+                Value::Bytes(_) |
+                Value::Int(_, Size::Bit32) |
+                Value::Symbol(_) => {
+                    offset += 4;
+                    x86::Memory {
+                        register: x86::Register::Esp,
+                        offset: (offset - 4) as i32,
+                        ptr_size: 4,
+                    }
+                }
+                Value::Int(_, Size::Bit16) => {
+                    offset += 4;
+                    x86::Memory {
+                        register: x86::Register::Esp,
+                        offset: (offset - 4) as i32,
+                        ptr_size: 2,
+                    }
+                }
+                Value::Int(_, Size::Bit8) => {
+                    offset += 4;
+                    x86::Memory {
+                        register: x86::Register::Esp,
+                        offset: (offset - 4) as i32,
+                        ptr_size: 1,
+                    }
+                }
+                Value::Reg(r) => {
+                    let size = self.f.registers[&r].size;
+                    let padded = (size + 3) / 4 * 4;
+                    offset += padded;
+                    x86::Memory {
+                        register: x86::Register::Esp,
+                        offset: (offset - padded) as i32,
+                        ptr_size: size,
+                    }
+                }
+                Value::Undef => panic!("got undef"),
+            };
+            self.emit_assign(x86::Rm::Memory(to), arg, 4);
+        }
+        total_size
     }
 }
 

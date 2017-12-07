@@ -129,11 +129,12 @@ pub enum Instruction {
     Neg(Rm),
     Lea(Register, Memory),
     Push(Rm),
-    PushImm(u64),
+    PushImm(u64), // should be x86::Immediate instead of u64?
     Pop(Rm),
     Test(TwoArgs),
     Cmp(TwoArgs),
-    Call,
+    Call(Immediate),
+    CallVirt(Rm),
     Ret,
     Label(Label),
 }
