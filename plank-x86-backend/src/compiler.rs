@@ -1,7 +1,7 @@
 // #![allow(unused)]
 
 use std::collections::{HashMap, HashSet};
-use plank_ir::analysis;
+use plank_ir::analysis::{self, Loc};
 use plank_ir::ir::{Reg, Function, Instruction, Value, UnaryOp, BinaryOp, IntOp, Program, Block, BlockId, BlockEnd, Signedness, Size, BitOp};
 use x86;
 
@@ -16,6 +16,81 @@ struct Constraints {
 #[derive(Debug, Copy, Clone)]
 enum Bonus {
     SameLocation(Reg, Reg),
+}
+
+fn can_be_flag(reg: Reg, f: &Function, live: &HashSet<Loc>) -> bool {
+    let mut got_assign = false;
+    for (&id, block) in &f.blocks {
+        for (index, op) in block.ops.iter().enumerate() {
+            let loc = Loc {
+                block: id,
+                pos: index,
+            };
+            match *op {
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Greater, _, _), _, _) |
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::GreaterEq, _, _), _, _) |
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Less, _, _), _, _) |
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::LessEq, _, _), _, _) |
+                Instruction::BinaryOp(r, BinaryOp::Eq, _, _) |
+                Instruction::BinaryOp(r, BinaryOp::Neq, _, _) => {
+                    if r == reg {
+                        if got_assign {
+                            return false;
+                        }
+                        got_assign = true;
+                    } else if live.contains(&loc) {
+                        return false;
+                    }
+                }
+                Instruction::Assign(r, _) |
+                Instruction::Call(r, _, _) |
+                Instruction::CallVirt(r, _, _) |
+                Instruction::CastAssign(r, _) |
+                Instruction::DerefLoad(r, _, _) |
+                Instruction::Load(r, _, _) |
+                Instruction::Store(r, _, _) |
+                Instruction::TakeAddress(r, _, _) |
+                Instruction::UnaryOp(r, _, _) => {
+                    if r == reg {
+                        return false;
+                    }
+                    if live.contains(&loc) {
+                        return false;
+                    }
+                }
+                Instruction::CallProc(_, _) |
+                Instruction::CallProcVirt(_, _) |
+                Instruction::DerefStore(_, _, _) |
+                Instruction::BinaryOp(_, _, _, _) => {
+                    if live.contains(&loc) {
+                        return false;
+                    }
+                }
+                Instruction::Drop(_) |
+                Instruction::Init(_) |
+                Instruction::Nop |
+                Instruction::Unreachable => {}
+            }
+        }
+        let loc = Loc {
+            block: id,
+            pos: block.ops.len(),
+        };
+        match block.end {
+            BlockEnd::Branch(ref val, _, _) => {
+                if *val != Value::Reg(reg) && live.contains(&loc) {
+                    return false;
+                }
+            }
+            BlockEnd::Return(ref val) => {
+                if *val == Value::Reg(reg) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
 }
 
 fn generate_constraints(f: &Function) -> Constraints {
@@ -57,8 +132,21 @@ fn generate_constraints(f: &Function) -> Constraints {
             }
         }
     }
-    // TODO: this is temporary
-    constraints.not_flag = f.registers.keys().cloned().collect();
+    constraints.not_flag = f
+        .registers
+        .iter()
+        .filter_map(|(&r, &layout)| {
+            if constraints.not_register.contains(&r) {
+                Some(r)
+            } else if !layout.atomic {
+                Some(r)
+            } else if !can_be_flag(r, f, &liveness[&r]) {
+                Some(r)
+            } else {
+                None
+            }
+        })
+        .collect();
     constraints
 }
 
@@ -176,7 +264,7 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
     let mut locations = HashMap::new();
     let mut param_location = 4;
     let mut location_candidates = vec![
-        // Location::Flags,
+        Location::Flags(x86::Condition::Equal),
         Location::Ebx,
         Location::Ecx,
         Location::Esi,
@@ -978,8 +1066,8 @@ impl<'a> FnCompiler<'a> {
                         (b, a)
                     }
                 };
-                if let Value::Reg(a) = *a {
-                    let loc = self.locations.get_mut(&a).unwrap();
+                {
+                    let loc = self.locations.get_mut(&to).unwrap();
                     if let Location::Flags(ref mut c) = *loc {
                         *c = cond;
                     }
@@ -1445,7 +1533,6 @@ fn compile_function(f: &Function, emitter: &mut Emitter) {
     let mut compiler = FnCompiler::new(f, emitter);
     compiler.emit_function_intro();
     let blocks = order_blocks(f);
-    println!("{:?}", compiler.block_labels);
     for (index, &id) in blocks.iter().enumerate() {
         if index > 0 && !compiler.referenced_blocks.contains(&id) {
             continue;
