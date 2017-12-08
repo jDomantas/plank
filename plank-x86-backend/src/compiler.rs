@@ -316,6 +316,7 @@ struct FnCompiler<'a> {
     next_block: Option<BlockId>,
     emitter: &'a mut Emitter,
     stack_size: u32,
+    referenced_blocks: HashSet<BlockId>,
 }
 
 impl<'a> FnCompiler<'a> {
@@ -324,7 +325,7 @@ impl<'a> FnCompiler<'a> {
         let block_labels = f
             .blocks
             .keys()
-            .map(|&id| (id, emitter.make_label()))
+            .map(|&id| (id, x86::Label::Unnamed(id.0)))// emitter.make_label()))
             .collect::<HashMap<_, _>>();
         FnCompiler {
             f,
@@ -334,6 +335,7 @@ impl<'a> FnCompiler<'a> {
             next_block: None,
             emitter,
             stack_size,
+            referenced_blocks: HashSet::new(),
         }
     }
 
@@ -344,6 +346,44 @@ impl<'a> FnCompiler<'a> {
                 x86::Immediate::Constant(u64::from(self.stack_size)),
             );
             self.emitter.emit(x86::Instruction::Sub(args));
+        }
+    }
+
+    fn go_to_block(&mut self, id: BlockId) -> BlockEnd {
+        let block = &self.f.blocks[&id];
+        for op in &block.ops {
+            match *op {
+                Instruction::Init(_) |
+                Instruction::Drop(_) |
+                Instruction::Nop => {}
+                _ => return BlockEnd::Jump(id),
+            }
+        }
+        match block.end {
+            BlockEnd::Jump(to) => self.go_to_block(to),
+            ref other => other.clone(), 
+        }
+    }
+
+    fn get_block_label(&mut self, id: BlockId) -> x86::Label {
+        let block = &self.f.blocks[&id];
+        for op in &block.ops {
+            match *op {
+                Instruction::Init(_) |
+                Instruction::Drop(_) |
+                Instruction::Nop => {}
+                _ => {
+                    self.referenced_blocks.insert(id);
+                    return self.block_labels[&id].clone();
+                }
+            }
+        }
+        match block.end {
+            BlockEnd::Jump(to) => self.get_block_label(to),
+            _ => {
+                self.referenced_blocks.insert(id);
+                return self.block_labels[&id].clone();
+            }
         }
     }
 
@@ -672,39 +712,47 @@ impl<'a> FnCompiler<'a> {
         match *end {
             BlockEnd::Branch(Value::Int(0, _), _, b) => {
                 if self.next_block != Some(b) {
-                    let label = self.block_labels[&b].clone();
-                    self.emitter.emit(x86::Instruction::Jmp(label));
+                    self.emit_block_end(&BlockEnd::Jump(b));
                 }
             }
             BlockEnd::Branch(Value::Int(_, _), a, _) |
             BlockEnd::Branch(Value::Bytes(_), a, _) |
             BlockEnd::Branch(Value::Symbol(_), a, _) |
             BlockEnd::Jump(a) => {
-                if self.next_block != Some(a) {
-                    let label = self.block_labels[&a].clone();
-                    self.emitter.emit(x86::Instruction::Jmp(label));
+                let end = self.go_to_block(a);
+                if let BlockEnd::Jump(a) = end {
+                    self.referenced_blocks.insert(a);
+                    if self.next_block != Some(a) {
+                        let label = self.block_labels[&a].clone();
+                        self.emitter.emit(x86::Instruction::Jmp(label));
+                    }
+                } else {
+                    self.emit_block_end(&end);
                 }
             }
             BlockEnd::Branch(Value::Reg(r), a, b) => {
                 if let Location::Flags(cond) = self.locations[&r] {
                     if self.next_block == Some(a) {
+                        self.referenced_blocks.insert(a);
+                        let label = self.get_block_label(b);
                         self.emitter.emit(x86::Instruction::Jcc(
                             cond.opposite(),
-                            self.block_labels[&b].clone(),
+                            label,
                         ));
                     } else if self.next_block == Some(b) {
+                        self.referenced_blocks.insert(b);
+                        let label = self.get_block_label(a);
                         self.emitter.emit(x86::Instruction::Jcc(
                             cond,
-                            self.block_labels[&a].clone(),
+                            label,
                         ));
                     } else {
+                        let label = self.get_block_label(b);
                         self.emitter.emit(x86::Instruction::Jcc(
                             cond.opposite(),
-                            self.block_labels[&b].clone(),
+                            label,
                         ));
-                        self.emitter.emit(x86::Instruction::Jmp(
-                            self.block_labels[&a].clone(),
-                        ));
+                        self.emit_block_end(&BlockEnd::Jump(a));
                     }
                 } else {
                     match self.to_rm(r) {
@@ -724,23 +772,26 @@ impl<'a> FnCompiler<'a> {
                         }
                     }
                     if self.next_block == Some(a) {
+                        self.referenced_blocks.insert(a);
+                        let label = self.get_block_label(b);
                         self.emitter.emit(x86::Instruction::Jcc(
                             x86::Condition::Equal,
-                            self.block_labels[&b].clone(),
+                            label,
                         ));
                     } else if self.next_block == Some(b) {
+                        self.referenced_blocks.insert(b);
+                        let label = self.get_block_label(a);
                         self.emitter.emit(x86::Instruction::Jcc(
                             x86::Condition::NotEqual,
-                            self.block_labels[&a].clone(),
+                            label,
                         ));
                     } else {
+                        let label = self.get_block_label(b);
                         self.emitter.emit(x86::Instruction::Jcc(
                             x86::Condition::Equal,
-                            self.block_labels[&b].clone(),
+                            label,
                         ));
-                        self.emitter.emit(x86::Instruction::Jmp(
-                            self.block_labels[&a].clone(),
-                        ));
+                        self.emit_block_end(&BlockEnd::Jump(a));
                     }
                 }
             }
@@ -1394,7 +1445,11 @@ fn compile_function(f: &Function, emitter: &mut Emitter) {
     let mut compiler = FnCompiler::new(f, emitter);
     compiler.emit_function_intro();
     let blocks = order_blocks(f);
+    println!("{:?}", compiler.block_labels);
     for (index, &id) in blocks.iter().enumerate() {
+        if index > 0 && !compiler.referenced_blocks.contains(&id) {
+            continue;
+        }
         compiler.current_block = id;
         compiler.next_block = blocks.get(index + 1).cloned();
         compiler.emitter.emit(x86::Instruction::Label(compiler.block_labels[&id].clone()));
