@@ -161,7 +161,11 @@ fn generate_bonuses(f: &Function) -> Vec<Bonus> {
                 Instruction::BinaryOp(_, BinaryOp::IntOp(IntOp::Mod, _, _), _, _) |
                 // for these it's pointless to place operand and result in same position
                 Instruction::BinaryOp(_, BinaryOp::Eq, _, _) |
-                Instruction::BinaryOp(_, BinaryOp::Neq, _, _) => {}
+                Instruction::BinaryOp(_, BinaryOp::Neq, _, _) |
+                Instruction::BinaryOp(_, BinaryOp::IntOp(IntOp::Greater, _, _), _, _) |
+                Instruction::BinaryOp(_, BinaryOp::IntOp(IntOp::GreaterEq, _, _), _, _) |
+                Instruction::BinaryOp(_, BinaryOp::IntOp(IntOp::Less, _, _), _, _) |
+                Instruction::BinaryOp(_, BinaryOp::IntOp(IntOp::LessEq, _, _), _, _) => {}
                 // these are useful
                 Instruction::Assign(r, Value::Reg(r2)) |
                 Instruction::UnaryOp(r, UnaryOp::Negate(_, _), Value::Reg(r2)) |
