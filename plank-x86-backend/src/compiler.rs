@@ -699,29 +699,33 @@ impl<'a> FnCompiler<'a> {
                         gcd(b, a % b)
                     }
                 }
-                let block = gcd((align + 3) % 4 + 1, m1.ptr_size).min(m1.ptr_size);
+                let block = gcd((align + 3) % 4 + 1, m1.ptr_size).min(m1.ptr_size).min(4);
                 match block {
                     0 => {}
                     1 => {
+                        let mm1 = x86::Memory { ptr_size: 1, .. m1 };
+                        let mm2 = x86::Memory { ptr_size: 1, .. m2 };
                         let args = x86::TwoArgs::RegRm(
                             x86::Register::Dl,
-                            x86::Rm::Memory(m2),
+                            x86::Rm::Memory(mm2),
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
                         let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(m1),
+                            x86::Rm::Memory(mm1),
                             x86::Register::Dl,
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
                     }
                     2 | 3 => {
+                        let mm1 = x86::Memory { ptr_size: 2, .. m1 };
+                        let mm2 = x86::Memory { ptr_size: 2, .. m2 };
                         let args = x86::TwoArgs::RegRm(
                             x86::Register::Dx,
-                            x86::Rm::Memory(m2),
+                            x86::Rm::Memory(mm2),
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
                         let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(m1),
+                            x86::Rm::Memory(mm1),
                             x86::Register::Dx,
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
@@ -730,13 +734,15 @@ impl<'a> FnCompiler<'a> {
                         self.emit_move(x86::Rm::Memory(m1), x86::Rm::Memory(m2), align);
                     }
                     _ => {
+                        let mm1 = x86::Memory { ptr_size: 4, .. m1 };
+                        let mm2 = x86::Memory { ptr_size: 4, .. m2 };
                         let args = x86::TwoArgs::RegRm(
                             x86::Register::Edx,
-                            x86::Rm::Memory(m2),
+                            x86::Rm::Memory(mm2),
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
                         let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(m1),
+                            x86::Rm::Memory(mm1),
                             x86::Register::Edx,
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));

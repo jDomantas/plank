@@ -282,6 +282,7 @@ fn compile_x86<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> 
     if optimize {
         plank_ir::optimization::optimize(&mut ir);
     }
+    plank_x86_backend::fix_function_returns(&mut ir);
     let asm = plank_x86_backend::compile_program(&ir);
     plank_x86_backend::print_asm(output, &asm)?;
     Ok(())
