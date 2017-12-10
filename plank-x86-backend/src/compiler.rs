@@ -375,7 +375,7 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
     let stack_size = slot_sizes.values().cloned().sum();
     for i in (0..next_stack_slot).rev() {
         let mut prev = 0;
-        for j in 0..i {
+        for j in 0..(i + 1) {
             prev += slot_sizes[&j];
         }
         slot_sizes.insert(i, prev);
@@ -856,7 +856,7 @@ impl<'a> FnCompiler<'a> {
             Location::Stack(offset) => {
                 x86::Rm::Memory(x86::Memory {
                     register: x86::Register::Esp,
-                    offset: -(self.stack_size as i32) + offset as i32,
+                    offset: self.stack_size as i32 - self.backup_space as i32 - offset as i32,
                     ptr_size: size,
                 })
             }

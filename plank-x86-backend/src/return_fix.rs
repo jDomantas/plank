@@ -1,12 +1,22 @@
+use std::collections::HashMap;
 use plank_ir::ir::{self, Program, Function, Instruction, Reg, Layout, Value, BlockEnd};
 
+
+fn fresh_register(regs: &HashMap<Reg, Layout>) -> Reg {
+    for i in 0..regs.len() {
+        if !regs.contains_key(&Reg(i as u32)) {
+            return Reg(i as u32);
+        }
+    }
+    Reg(regs.len() as u32)
+}
 
 fn fix_function(f: &mut Function) {
     let output_address = if let Some(layout) = f.output_layout {
         if layout.atomic {
             None
         } else {
-            let reg = Reg(f.registers.len() as u32);
+            let reg = fresh_register(&f.registers);
             f.registers.insert(reg, Layout {
                 size: ir::POINTER_SIZE,
                 align: ir::POINTER_SIZE,
@@ -24,7 +34,7 @@ fn fix_function(f: &mut Function) {
             let initializer = match block.ops[i] {
                 Instruction::Call(r, _, ref mut params) |
                 Instruction::CallVirt(r, _, ref mut params) if !f.registers[&r].atomic => {
-                    let reg = Reg(f.registers.len() as u32);
+                    let reg = fresh_register(&f.registers);
                     f.registers.insert(reg, Layout {
                         size: ir::POINTER_SIZE,
                         align: ir::POINTER_SIZE,
