@@ -96,8 +96,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         let mut symbols_by_id = HashMap::new();
         for (index, (symbol, f)) in program.functions.iter().enumerate() {
             if f.start_block.is_some() ||
-                &*symbol.0 == "@plank_getc" ||
-                &*symbol.0 == "@plank_putc"
+                &*symbol.0 == "builtin_getc" ||
+                &*symbol.0 == "builtin_putc"
             {
                 symbol_ids.insert(symbol.clone(), index as u32);
                 symbols_by_id.insert(index as u32, symbol.clone());
@@ -401,7 +401,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 }
             }
             ir::Instruction::Call(dest, ref sym, ref params) => {
-                if "@plank_getc" == &*sym.0 {
+                if "builtin_getc" == &*sym.0 {
                     assert_eq!(params.len(), 0);
                     let mut buf = [0];
                     let result = match self.input.read(&mut buf)? {
@@ -436,7 +436,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 Ok(())
             }
             ir::Instruction::CallProc(ref sym, ref params) => {
-                if "@plank_putc" == &*sym.0 {
+                if "builtin_putc" == &*sym.0 {
                     assert_eq!(params.len(), 1);
                     let val = self.load_8bit(&params[0]);
                     self.output.write_all(&[val])?;

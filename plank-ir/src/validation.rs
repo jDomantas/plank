@@ -7,6 +7,7 @@ use ir::{BinaryOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Progr
 #[derive(Debug)]
 pub enum Error {
     BadLayout,
+    UnknownFunction(Symbol),
     UnknownRegister(Reg),
     UnknownBlock(BlockId),
     NonLiveRegUsage(Reg, Loc),
@@ -151,7 +152,8 @@ impl<'a> Context<'a> {
                 }
             }
             Instruction::CallProc(ref sym, ref params) => {
-                let callee = &self.functions[sym];
+                let callee = self.functions.get(sym)
+                    .ok_or_else(|| Error::UnknownFunction(sym.clone()))?;
                 if callee.output_layout.is_some() {
                     return Err(Error::BadCall(loc));
                 }

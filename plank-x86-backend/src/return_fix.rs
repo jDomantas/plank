@@ -36,9 +36,18 @@ fn fix_function(f: &mut Function) {
                 _ => None,
             };
             if let Some((param, out)) = initializer {
+                match block.ops[i].clone() {
+                    Instruction::Call(_, f, params) => {
+                        block.ops[i] = Instruction::CallProc(f, params);
+                    }
+                    Instruction::CallVirt(_, f, params) => {
+                        block.ops[i] = Instruction::CallProcVirt(f, params);
+                    }
+                    _ => panic!("shit"),
+                }
                 block.ops.insert(i + 1, Instruction::Drop(param));
-                block.ops.insert(i, Instruction::Init(out));
                 block.ops.insert(i, Instruction::TakeAddress(param, out, 0));
+                block.ops.insert(i, Instruction::Init(out));
             }
         }
         match (block.end.clone(), output_address) {

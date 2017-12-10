@@ -54,6 +54,7 @@ enum Stream {
 struct Params {
     command: Command,
     optimize: bool,
+    skip_prelude: bool,
     input: Stream,
     output: Stream,
 }
@@ -89,22 +90,22 @@ fn run() -> Result<()> {
         Stream::Std => {
             let stdout = io::stdout();
             let stdout = stdout.lock();
-            run_command(&input, &params.command, params.optimize, stdout)
+            run_command(&input, &params.command, params.optimize, params.skip_prelude, stdout)
         }
         Stream::File(ref name) => {
             let file = ::std::fs::File::create(name)?;
-            run_command(&input, &params.command, params.optimize, file)
+            run_command(&input, &params.command, params.optimize, params.skip_prelude, file)
         }
     }
 }
 
-fn run_command<W: Write>(input: &str, command: &Command, optimize: bool, output: W) -> Result<()> {
+fn run_command<W: Write>(input: &str, command: &Command, optimize: bool, skip_prelude: bool, output: W) -> Result<()> {
     match *command {
         Command::Lex => lex(input, output),
         Command::Parse => parse(input, output),
         Command::EmitIr => emit_ir(input, output, optimize),
         Command::Interpret => interpret(input, output, optimize),
-        Command::CompileX86 => compile_x86(input, output, optimize),
+        Command::CompileX86 => compile_x86(input, output, optimize, skip_prelude),
     }
 }
 
@@ -136,6 +137,9 @@ fn parse_params() -> Result<Params> {
             .long("optimize")
             .short("O")
             .help("Perform optimizations on IR"))
+        .arg(Arg::with_name("no-prelude")
+            .long("no-prelude")
+            .help("Don't emit asm prelude"))
         .arg(Arg::with_name("input")
             .index(1)
             .help("Set input file, uses stdin if none provided"))
@@ -171,10 +175,12 @@ fn parse_params() -> Result<Params> {
     };
     
     let optimize = matches.is_present("optimize");
+    let skip_prelude = matches.is_present("no-prelude");
 
     Ok(Params {
         command,
         optimize,
+        skip_prelude,
         input,
         output,
     })
@@ -272,7 +278,7 @@ fn interpret<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
     }
 }
 
-fn compile_x86<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
+fn compile_x86<W: Write>(source: &str, mut output: W, optimize: bool, skip_prelude: bool) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
@@ -284,6 +290,9 @@ fn compile_x86<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> 
     }
     plank_x86_backend::fix_function_returns(&mut ir);
     let asm = plank_x86_backend::compile_program(&ir);
+    if !skip_prelude {
+        plank_x86_backend::print_prelude(&mut output)?;
+    }
     plank_x86_backend::print_asm(output, &asm)?;
     Ok(())
 }

@@ -3,9 +3,67 @@ use std::io::prelude::*;
 use x86;
 
 
-pub fn print_asm<W: Write>(mut to: W, asm: &[x86::Instruction]) -> io::Result<()> {
-    for op in asm {
-        print_instruction(&mut to, op)?;
+pub fn print_prelude<W: Write>(mut to: W) -> io::Result<()> {
+    const PRELUDE: &'static str = "BITS 32
+GLOBAL _start
+SECTION .text
+
+_start:
+    call fn_umain
+    mov ebx, eax
+    mov eax, 1
+    int 0x80
+
+builtin_uputc:
+    push ebx
+    push ecx
+    mov eax, 4
+    mov ebx, 1
+    lea ecx, [esp + 12]
+    mov edx, 1
+    int 0x80
+    pop ecx
+    pop ebx
+    ret
+
+builtin_ugetc:
+    push ebx
+    push ecx
+    sub esp, 4
+    mov eax, 3
+    mov ebx, 2
+    lea ecx, [esp]
+    mov edx, 1
+    int 0x80
+    pop eax
+    pop ecx
+    pop ebx
+    ret
+";
+    writeln!(to, "{}", PRELUDE)
+}
+
+pub fn print_asm<W: Write>(mut to: W, asm: &x86::Program) -> io::Result<()> {
+    writeln!(to, "SECTION .text\n")?;
+    for f in &asm.functions {
+        for op in f {
+            print_instruction(&mut to, op)?;
+        }
+        writeln!(to)?;
+    }
+    writeln!(to, "SECTION .rodata\n")?;
+    for (i, s) in asm.strings.iter().enumerate() {
+        write!(to, "string_{} db ", i)?;
+        let mut first = true;
+        for ch in s {
+            if first {
+                write!(to, "{}", ch)?;
+                first = false;
+            } else {
+                write!(to, ", {}", ch)?;
+            }
+        }
+        writeln!(to)?;
     }
     Ok(())
 }
@@ -82,7 +140,13 @@ fn print_instruction<W: Write>(to: &mut W, i: &x86::Instruction) -> io::Result<(
         }
         x86::Instruction::Lea(reg, mem) => {
             write!(to, "    lea {}, ", reg_name(reg))?;
-            print_memory(to, mem)?;
+            if mem.offset > 0 {
+                write!(to, "[{} + {}]", reg_name(mem.register), mem.offset)?;
+            } else if mem.offset < 0 {
+                write!(to, "[{} - {}]", reg_name(mem.register), -mem.offset)?;
+            } else {
+                write!(to, "[{}]", reg_name(mem.register))?;
+            }
             writeln!(to)
         }
         x86::Instruction::Mov(ref args) => {
@@ -124,9 +188,6 @@ fn print_instruction<W: Write>(to: &mut W, i: &x86::Instruction) -> io::Result<(
             write!(to, "    push ")?;
             print_rm(to, rm)?;
             writeln!(to)
-        }
-        x86::Instruction::PushImm(_val) => {
-            unimplemented!()
         }
         x86::Instruction::Ret => {
             writeln!(to, "    ret")
@@ -181,9 +242,31 @@ fn print_immediate<W: Write>(to: &mut W, imm: &x86::Immediate) -> io::Result<()>
 
 fn print_label<W: Write>(to: &mut W, label: &x86::Label) -> io::Result<()> {
     match *label {
-        x86::Label::Named(ref name) => write!(to, "{}", name),
+        x86::Label::Named(ref name) => print_name(to, name),
         x86::Label::Unnamed(id) => write!(to, "label_{}", id),
+        x86::Label::String(id) => write!(to, "string_{}", id),
     }
+}
+
+fn print_name<W: Write>(to: &mut W, name: &str) -> io::Result<()> {
+    for ch in name.chars() {
+        match ch {
+            'a' ... 'z' |
+            'A' ... 'Z' |
+            '0' ... '9' => write!(to, "{}", ch)?,
+            '_' => write!(to, "_u")?,
+            ',' => write!(to, "_c")?,
+            '<' => write!(to, "_l")?,
+            '>' => write!(to, "_g")?,
+            ':' => write!(to, "_o")?,
+            '*' => write!(to, "_s")?,
+            '(' => write!(to, "_p")?,
+            ')' => write!(to, "_c")?,
+            '-' => write!(to, "_d")?,
+            c => panic!("bad label char: '{}', in label: '{}'", c, name),
+        }
+    }
+    Ok(())
 }
 
 fn print_rm<W: Write>(to: &mut W, rm: x86::Rm) -> io::Result<()> {
@@ -195,9 +278,9 @@ fn print_rm<W: Write>(to: &mut W, rm: x86::Rm) -> io::Result<()> {
 
 fn print_memory<W: Write>(to: &mut W, memory: x86::Memory) -> io::Result<()> {
     let ptr_name = match memory.ptr_size {
-        1 => "byte ptr",
-        2 => "word ptr",
-        4 => "dword ptr",
+        1 => "byte",
+        2 => "word",
+        4 => "dword",
         _ => panic!("bad ptr size: {}", memory.ptr_size),
     };
     if memory.offset > 0 {

@@ -13,8 +13,8 @@ impl Symbols {
         let mut names = HashMap::new();
         names.insert(::builtins::SIZE_OF, "size_of".into());
         names.insert(::builtins::ALIGN_OF, "align_of".into());
-        names.insert(::builtins::GETC, "@plank_getc".into());
-        names.insert(::builtins::PUTC, "@plank_putc".into());
+        names.insert(::builtins::GETC, "@getc".into());
+        names.insert(::builtins::PUTC, "@putc".into());
         names.insert(::builtins::SIZE_OF_TYPE_PARAM, "T".into());
         names.insert(::builtins::ALIGN_OF_TYPE_PARAM, "T".into());
         names.insert(::builtins::PUTC_PARAM, "ch".into());

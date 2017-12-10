@@ -350,11 +350,16 @@ impl<'a> Builder<'a> {
     }
 
     fn make_symbol(&mut self, id: cfg::Symbol, type_params: &[cfg::Type]) -> ir::Symbol {
+        match self.ctx.symbols.get_name(id) {
+            "@getc" => return ir::Symbol("builtin_getc".into()),
+            "@putc" => return ir::Symbol("builtin_putc".into()),
+            _ => {}
+        }
         let type_params = type_params
             .iter()
             .map(|ty| ty.replace(&self.type_params))
             .collect::<Vec<_>>();
-        let mut symbol: String = self.ctx.symbols.get_name(id).into();
+        let mut symbol: String = format!("fn_{}", self.ctx.symbols.get_name(id));
         if !type_params.is_empty() {
             symbol.push_str("::<");
             let mut first = true;
@@ -502,12 +507,17 @@ pub(crate) fn build_ir(program: &cfg::Program, ctx: &CompileCtx) -> ir::Program 
     let mut queue = HashMap::new();
     for (&id, f) in &program.functions {
         if f.type_params.is_empty() {
-            let symbol = ir::Symbol(ctx.symbols.get_name(id).to_string().into());
+            let symbol = ir::Symbol(format!("fn_{}", ctx.symbols.get_name(id)).into());
             queue.insert(symbol, (id, Vec::new()));
         }
     }
     while let Some(symbol) = queue.keys().next().cloned() {
         let (sym, types) = queue.remove(&symbol).unwrap();
+        let symbol = match &*symbol.0 {
+            "fn_@getc" => ir::Symbol("builtin_getc".into()),
+            "fn_@putc" => ir::Symbol("builtin_putc".into()),
+            s => ir::Symbol(s.into()),
+        };
         if functions.contains_key(&symbol) {
             continue;
         }

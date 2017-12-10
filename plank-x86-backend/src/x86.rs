@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::rc::Rc;
 
 
@@ -103,6 +101,7 @@ impl Condition {
 pub enum Label {
     Unnamed(u32),
     Named(Rc<str>),
+    String(u32),
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -129,7 +128,6 @@ pub enum Instruction {
     Neg(Rm),
     Lea(Register, Memory),
     Push(Rm),
-    PushImm(u64), // should be x86::Immediate instead of u64?
     Pop(Rm),
     Test(TwoArgs),
     Cmp(TwoArgs),
@@ -137,4 +135,10 @@ pub enum Instruction {
     CallVirt(Rm),
     Ret,
     Label(Label),
+}
+
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub functions: Vec<Vec<Instruction>>,
+    pub strings: Vec<Vec<u8>>,
 }

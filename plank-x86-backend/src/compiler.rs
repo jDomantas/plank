@@ -1,5 +1,3 @@
-// #![allow(unused)]
-
 use std::collections::{HashMap, HashSet};
 use plank_ir::analysis::{self, Loc};
 use plank_ir::ir::{Reg, Function, Instruction, Value, UnaryOp, BinaryOp, IntOp, Program, Block, BlockId, BlockEnd, Signedness, Size, BitOp};
@@ -128,6 +126,11 @@ fn generate_constraints(f: &Function) -> Constraints {
                 Instruction::Store(r, _, _) => {
                     constraints.not_register.insert(r);
                 }
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Add, _, _), _, Value::Reg(r2)) |
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Sub, _, _), _, Value::Reg(r2)) => {
+                    constraints.intersect.insert((r, r2));
+                    constraints.intersect.insert((r2, r));
+                }
                 _ => {}
             }
         }
@@ -184,17 +187,27 @@ fn generate_bonuses(f: &Function) -> Vec<Bonus> {
 #[derive(Default)]
 struct Emitter {
     next_label: u32,
-    output: Vec<x86::Instruction>,
+    next_string: u32,
+    functions: Vec<Vec<x86::Instruction>>,
+    strings: Vec<Vec<u8>>,
+    current_function: Vec<x86::Instruction>,
 }
 
 impl Emitter {
     fn emit(&mut self, i: x86::Instruction) {
-        self.output.push(i);
+        self.current_function.push(i);
     }
 
     fn make_label(&mut self) -> x86::Label {
         self.next_label += 1;
         x86::Label::Unnamed(self.next_label)
+    }
+
+    fn make_string(&mut self, value: &[u8]) -> x86::Immediate {
+        let string = self.next_string;
+        self.next_string += 1;
+        self.strings.push(value.to_owned());
+        x86::Immediate::Label(x86::Label::String(string))
     }
 }
 
@@ -417,7 +430,7 @@ impl<'a> FnCompiler<'a> {
         let block_labels = f
             .blocks
             .keys()
-            .map(|&id| (id, x86::Label::Unnamed(id.0)))// emitter.make_label()))
+            .map(|&id| (id, emitter.make_label()))
             .collect::<HashMap<_, _>>();
         FnCompiler {
             f,
@@ -432,6 +445,10 @@ impl<'a> FnCompiler<'a> {
     }
 
     fn emit_function_intro(&mut self) {
+        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ebx)));
+        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ecx)));
+        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Esi)));
+        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Edi)));
         if self.stack_size > 0 {
             let args = x86::TwoArgs::RmImm(
                 x86::Rm::Register(x86::Register::Esp),
@@ -439,6 +456,7 @@ impl<'a> FnCompiler<'a> {
             );
             self.emitter.emit(x86::Instruction::Sub(args));
         }
+        self.stack_size += 16;
     }
 
     fn go_to_block(&mut self, id: BlockId) -> BlockEnd {
@@ -526,6 +544,12 @@ impl<'a> FnCompiler<'a> {
                 }
                 Instruction::Call(reg, ref f, ref args) => {
                     let additional_stack = self.emit_call_args(args);
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
                     let f = x86::Immediate::Label(x86::Label::Named(f.0.clone()));
                     self.emitter.emit(x86::Instruction::Call(f));
                     if additional_stack > 0 {
@@ -545,6 +569,12 @@ impl<'a> FnCompiler<'a> {
                 }
                 Instruction::CallProc(ref f, ref args) => {
                     let additional_stack = self.emit_call_args(args);
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
                     let f = x86::Immediate::Label(x86::Label::Named(f.0.clone()));
                     self.emitter.emit(x86::Instruction::Call(f));
                     if additional_stack > 0 {
@@ -556,8 +586,16 @@ impl<'a> FnCompiler<'a> {
                 }
                 Instruction::CallProcVirt(ref f, ref args) => {
                     let additional_stack = self.emit_call_args(args);
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
                     if let Value::Reg(r) = *f {
+                        self.stack_size += additional_stack;
                         let f = self.to_rm(r);
+                        self.stack_size -= additional_stack;
                         self.emitter.emit(x86::Instruction::CallVirt(f));
                     } else {
                         let f = self.to_immediate(f);
@@ -572,8 +610,16 @@ impl<'a> FnCompiler<'a> {
                 }
                 Instruction::CallVirt(reg, ref f, ref args) => {
                     let additional_stack = self.emit_call_args(args);
+                    if additional_stack > 0 {
+                        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
+                            x86::Rm::Register(x86::Register::Esp),
+                            x86::Immediate::Constant(u64::from(additional_stack)),
+                        )));
+                    }
                     if let Value::Reg(r) = *f {
+                        self.stack_size += additional_stack;
                         let f = self.to_rm(r);
+                        self.stack_size -= additional_stack;
                         self.emitter.emit(x86::Instruction::CallVirt(f));
                     } else {
                         let f = self.to_immediate(f);
@@ -715,6 +761,11 @@ impl<'a> FnCompiler<'a> {
                             x86::Register::Dl,
                         );
                         self.emitter.emit(x86::Instruction::Mov(args));
+                        m1.ptr_size -= 1;
+                        m2.ptr_size -= 1;
+                        m1.offset += 1;
+                        m2.offset += 1;
+                        self.emit_move(x86::Rm::Memory(m2), x86::Rm::Memory(m1), align);
                     }
                     2 | 3 => {
                         let mm1 = x86::Memory { ptr_size: 2, .. m1 };
@@ -731,7 +782,9 @@ impl<'a> FnCompiler<'a> {
                         self.emitter.emit(x86::Instruction::Mov(args));
                         m1.ptr_size -= 2;
                         m2.ptr_size -= 2;
-                        self.emit_move(x86::Rm::Memory(m1), x86::Rm::Memory(m2), align);
+                        m1.offset += 2;
+                        m2.offset += 2;
+                        self.emit_move(x86::Rm::Memory(m2), x86::Rm::Memory(m1), align);
                     }
                     _ => {
                         let mm1 = x86::Memory { ptr_size: 4, .. m1 };
@@ -748,7 +801,9 @@ impl<'a> FnCompiler<'a> {
                         self.emitter.emit(x86::Instruction::Mov(args));
                         m1.ptr_size -= 4;
                         m2.ptr_size -= 4;
-                        self.emit_move(x86::Rm::Memory(m1), x86::Rm::Memory(m2), align);
+                        m1.offset += 4;
+                        m2.offset += 4;
+                        self.emit_move(x86::Rm::Memory(m2), x86::Rm::Memory(m1), align);
                     }
                 }
             }
@@ -781,7 +836,7 @@ impl<'a> FnCompiler<'a> {
             Location::Stack(offset) => {
                 x86::Rm::Memory(x86::Memory {
                     register: x86::Register::Esp,
-                    offset: offset as i32,
+                    offset: -(self.stack_size as i32) + offset as i32,
                     ptr_size: size,
                 })
             }
@@ -796,9 +851,9 @@ impl<'a> FnCompiler<'a> {
         }
     }
 
-    fn to_immediate(&self, val: &Value) -> x86::Immediate {
+    fn to_immediate(&mut self, val: &Value) -> x86::Immediate {
         match *val {
-            Value::Bytes(_) => unimplemented!("byte literals not yet"),
+            Value::Bytes(ref bytes) => self.emitter.make_string(bytes),
             Value::Int(val, _) => x86::Immediate::Constant(val),
             Value::Reg(_) => panic!("register cannot be immediate"),
             Value::Symbol(ref sym) => x86::Immediate::Label(x86::Label::Named(sym.0.clone())),
@@ -925,22 +980,34 @@ impl<'a> FnCompiler<'a> {
                         self.emit_assign(x86::Rm::Register(dest), val, 4);
                     }
                 }
+                self.stack_size -= 16;
                 if self.stack_size > 0 {
                     self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
                         x86::Rm::Register(x86::Register::Esp),
                         x86::Immediate::Constant(u64::from(self.stack_size)),
                     )));
                 }
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
                 self.emitter.emit(x86::Instruction::Ret);
+                self.stack_size += 16;
             }
             BlockEnd::ReturnProc => {
+                self.stack_size -= 16;
                 if self.stack_size > 0 {
                     self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
                         x86::Rm::Register(x86::Register::Esp),
                         x86::Immediate::Constant(u64::from(self.stack_size)),
                     )));
                 }
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
+                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
                 self.emitter.emit(x86::Instruction::Ret);
+                self.stack_size += 16;
             }
             BlockEnd::Unreachable => {
                 self.emitter.emit(x86::Instruction::Invalid);
@@ -954,7 +1021,7 @@ impl<'a> FnCompiler<'a> {
             x86::Rm::Memory(mem) => mem,
         };
         address.offset += offset as i32;
-        address.ptr_size = 1;
+        address.ptr_size = 4;
         match self.to_rm(to) {
             x86::Rm::Register(reg) => {
                 self.emitter.emit(x86::Instruction::Lea(
@@ -979,20 +1046,8 @@ impl<'a> FnCompiler<'a> {
     fn emit_unary_op(&mut self, to: Reg, op: UnaryOp, arg: &Value) {
         match op {
             UnaryOp::Negate(_, _) => {
-                let need_assign;
-                if let Value::Reg(r) = *arg {
-                    if self.locations[&to].is_same(self.locations[&r]) {
-                        need_assign = false;
-                    } else {
-                        need_assign = true;
-                    }
-                } else {
-                    need_assign = true;
-                }
                 let to = self.to_rm(to);
-                if need_assign {
-                    self.emit_assign(to, arg, 4);
-                }
+                self.emit_assign(to, arg, 4);
                 self.emitter.emit(x86::Instruction::Neg(to));
             }
         }
@@ -1009,13 +1064,7 @@ impl<'a> FnCompiler<'a> {
                     }
                     (a, b) => (a, b),
                 };
-                if let Value::Reg(r) = *a {
-                    if !dest.is_same(self.locations[&r]) {
-                        self.emit_assign(to, a, 4);
-                    }
-                } else {
-                    self.emit_assign(to, a, 4);
-                }
+                self.emit_assign(to, a, 4);
                 let args = if let Value::Reg(r) = *b {
                     let r = self.to_rm(r);
                     match (to, r) {
@@ -1082,6 +1131,11 @@ impl<'a> FnCompiler<'a> {
                         *c = cond;
                     }
                 }
+                let temp = match size {
+                    Size::Bit8 => x86::Register::Dl,
+                    Size::Bit16 => x86::Register::Dx,
+                    Size::Bit32 => x86::Register::Edx,
+                };
                 match (a, b) {
                     (&Value::Reg(a), &Value::Reg(b)) => {
                         let a = self.to_rm(a);
@@ -1094,11 +1148,7 @@ impl<'a> FnCompiler<'a> {
                                 x86::TwoArgs::RmReg(a, b)
                             }
                             (x86::Rm::Memory(a), x86::Rm::Memory(b)) => {
-                                let temp = match size {
-                                    Size::Bit8 => x86::Register::Dl,
-                                    Size::Bit16 => x86::Register::Dx,
-                                    Size::Bit32 => x86::Register::Edx,
-                                };
+                                
                                 let args = x86::TwoArgs::RegRm(
                                     temp,
                                     x86::Rm::Memory(b),
@@ -1120,11 +1170,6 @@ impl<'a> FnCompiler<'a> {
                         self.emitter.emit(x86::Instruction::Cmp(args));
                     }
                     (imma, immb) => {
-                        let temp = match size {
-                            Size::Bit8 => x86::Register::Dl,
-                            Size::Bit16 => x86::Register::Dx,
-                            Size::Bit32 => x86::Register::Edx,
-                        };
                         self.emit_assign(x86::Rm::Register(temp), imma, 4);
                         let args = x86::TwoArgs::RmImm(
                             x86::Rm::Register(temp),
@@ -1141,17 +1186,9 @@ impl<'a> FnCompiler<'a> {
             }
             BinaryOp::IntOp(IntOp::Add, _, size) |
             BinaryOp::IntOp(IntOp::Sub, _, size) => {
-                if let Value::Reg(r) = *a {
-                    if !self.locations[&r].is_same(self.locations[&to]) {
-                        let to = self.to_rm(to);
-                        self.emit_assign(to, a, 4);
-                    }
-                } else {
-                    let to = self.to_rm(to);
-                    self.emit_assign(to, a, 4);
-                }
+                let to = self.to_rm(to);
+                self.emit_assign(to, a, 4);
                 let args = if let Value::Reg(r) = *b {
-                    let to = self.to_rm(to);
                     let r = self.to_rm(r);
                     match (to, r) {
                         (x86::Rm::Register(to), _) => {
@@ -1179,7 +1216,7 @@ impl<'a> FnCompiler<'a> {
                     }
                 } else {
                     x86::TwoArgs::RmImm(
-                        self.to_rm(to),
+                        to,
                         self.to_immediate(b),
                     )
                 };
@@ -1264,7 +1301,7 @@ impl<'a> FnCompiler<'a> {
                         imm,
                     )));
                 }
-                let (op, from_dx) = match op {
+                let (op, from_ah) = match op {
                     BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) =>
                         (x86::Instruction::Div as fn(_) -> x86::Instruction, false),
                     BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) =>
@@ -1284,7 +1321,7 @@ impl<'a> FnCompiler<'a> {
                     self.emitter.emit(op(dl));
                 }
                 let to = self.to_rm(to);
-                let from = if from_dx { x86::Register::Dl } else { x86::Register::Al };
+                let from = if from_ah { x86::Register::Ah } else { x86::Register::Al };
                 self.emit_move(x86::Rm::Register(from), to, 4);
             }
             BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) |
@@ -1477,11 +1514,6 @@ impl<'a> FnCompiler<'a> {
                 Value::Undef => panic!("got undef"),
             }
         }
-        self.emitter.emit(x86::Instruction::Sub(x86::TwoArgs::RmImm(
-            x86::Rm::Register(x86::Register::Esp),
-            x86::Immediate::Constant(u64::from(total_size)),
-        )));
-        self.stack_size += total_size;
         let mut offset = 0;
         for arg in args {
             let to = match *arg {
@@ -1491,7 +1523,7 @@ impl<'a> FnCompiler<'a> {
                     offset += 4;
                     x86::Memory {
                         register: x86::Register::Esp,
-                        offset: (offset - 4) as i32,
+                        offset: (offset - 4) as i32 - total_size as i32,
                         ptr_size: 4,
                     }
                 }
@@ -1499,7 +1531,7 @@ impl<'a> FnCompiler<'a> {
                     offset += 4;
                     x86::Memory {
                         register: x86::Register::Esp,
-                        offset: (offset - 4) as i32,
+                        offset: (offset - 4) as i32 - total_size as i32,
                         ptr_size: 2,
                     }
                 }
@@ -1507,7 +1539,7 @@ impl<'a> FnCompiler<'a> {
                     offset += 4;
                     x86::Memory {
                         register: x86::Register::Esp,
-                        offset: (offset - 4) as i32,
+                        offset: (offset - 4) as i32 - total_size as i32,
                         ptr_size: 1,
                     }
                 }
@@ -1517,7 +1549,7 @@ impl<'a> FnCompiler<'a> {
                     offset += padded;
                     x86::Memory {
                         register: x86::Register::Esp,
-                        offset: (offset - padded) as i32,
+                        offset: (offset - padded) as i32 - total_size as i32,
                         ptr_size: size,
                     }
                 }
@@ -1554,13 +1586,18 @@ fn compile_function(f: &Function, emitter: &mut Emitter) {
     }
 }
 
-pub fn compile_program(program: &Program) -> Vec<x86::Instruction> {
+pub fn compile_program(program: &Program) -> x86::Program {
     let mut emitter = Emitter::default();
     for (name, f) in &program.functions {
         if f.start_block.is_some() {
             emitter.emit(x86::Instruction::Label(x86::Label::Named(name.0.clone())));
             compile_function(f, &mut emitter);
+            let f = ::std::mem::replace(&mut emitter.current_function, Vec::new());
+            emitter.functions.push(f);
         }
     }
-    emitter.output
+    x86::Program {
+        functions: emitter.functions,
+        strings: emitter.strings,
+    }
 }
