@@ -422,6 +422,7 @@ struct FnCompiler<'a> {
     emitter: &'a mut Emitter,
     stack_size: u32,
     referenced_blocks: HashSet<BlockId>,
+    backup_space: u32,
 }
 
 impl<'a> FnCompiler<'a> {
@@ -441,14 +442,32 @@ impl<'a> FnCompiler<'a> {
             emitter,
             stack_size,
             referenced_blocks: HashSet::new(),
+            backup_space: 0,
         }
     }
 
+    fn is_location_used(&self, loc: Location) -> bool {
+        self.locations.values().any(|l| l.is_same(loc))
+    }
+
     fn emit_function_intro(&mut self) {
-        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ebx)));
-        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ecx)));
-        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Esi)));
-        self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Edi)));
+        let mut backup = 0;
+        if self.is_location_used(Location::Ebx) {
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ebx)));
+            backup += 4;
+        }
+        if self.is_location_used(Location::Ecx) {
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ecx)));
+            backup += 4;
+        }
+        if self.is_location_used(Location::Esi) {
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Esi)));
+            backup += 4;
+        }
+        if self.is_location_used(Location::Edi) {
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Edi)));
+            backup += 4;
+        }
         if self.stack_size > 0 {
             let args = x86::TwoArgs::RmImm(
                 x86::Rm::Register(x86::Register::Esp),
@@ -456,7 +475,8 @@ impl<'a> FnCompiler<'a> {
             );
             self.emitter.emit(x86::Instruction::Sub(args));
         }
-        self.stack_size += 16;
+        self.stack_size += backup;
+        self.backup_space += backup;
     }
 
     fn go_to_block(&mut self, id: BlockId) -> BlockEnd {
@@ -980,38 +1000,47 @@ impl<'a> FnCompiler<'a> {
                         self.emit_assign(x86::Rm::Register(dest), val, 4);
                     }
                 }
-                self.stack_size -= 16;
+                self.stack_size -= self.backup_space;
                 if self.stack_size > 0 {
                     self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
                         x86::Rm::Register(x86::Register::Esp),
                         x86::Immediate::Constant(u64::from(self.stack_size)),
                     )));
                 }
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
+                self.emit_register_restores();
                 self.emitter.emit(x86::Instruction::Ret);
-                self.stack_size += 16;
+                self.stack_size += self.backup_space;
             }
             BlockEnd::ReturnProc => {
-                self.stack_size -= 16;
+                self.stack_size -= self.backup_space;
                 if self.stack_size > 0 {
                     self.emitter.emit(x86::Instruction::Add(x86::TwoArgs::RmImm(
                         x86::Rm::Register(x86::Register::Esp),
                         x86::Immediate::Constant(u64::from(self.stack_size)),
                     )));
                 }
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
-                self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
+                self.emit_register_restores();
                 self.emitter.emit(x86::Instruction::Ret);
-                self.stack_size += 16;
+                self.stack_size += self.backup_space;
             }
             BlockEnd::Unreachable => {
                 self.emitter.emit(x86::Instruction::Invalid);
             }
+        }
+    }
+
+    fn emit_register_restores(&mut self) {
+        if self.is_location_used(Location::Edi) {
+            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
+        }
+        if self.is_location_used(Location::Esi) {
+            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
+        }
+        if self.is_location_used(Location::Ecx) {
+            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
+        }
+        if self.is_location_used(Location::Ebx) {
+            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
         }
     }
 
