@@ -397,7 +397,10 @@ fn order_blocks(f: &Function) -> Vec<BlockId> {
         used.insert(block);
         let block = &f.blocks[&block];
         match block.end {
-            BlockEnd::Branch(_, a, _) |
+            BlockEnd::Branch(_, a, b) => {
+                walk_from(a, f, used, result);
+                walk_from(b, f, used, result);
+            }
             BlockEnd::Jump(a) => walk_from(a, f, used, result),
             _ => {}
         }
