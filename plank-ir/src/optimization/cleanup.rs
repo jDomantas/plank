@@ -1,5 +1,6 @@
-use std::collections::HashMap;
-use ir::{Program, Function, Block, BlockId, Instruction, BlockEnd};
+use std::collections::{HashMap, HashSet};
+use analysis::Loc;
+use ir::{Program, Function, Block, BlockId, Instruction, BlockEnd, Value, Reg};
 use super::Rewriter;
 
 
@@ -120,8 +121,92 @@ impl Rewriter for JoinBlocks {
     }
 }
 
+#[derive(Default)]
+struct RemoveUnusedRegs {
+    used: HashSet<Reg>,
+}
+
+impl RemoveUnusedRegs {
+    fn track(&mut self, reg: Reg) {
+        self.used.insert(reg);
+    }
+
+    fn track_val(&mut self, val: &Value) {
+        if let Value::Reg(r) = *val {
+            self.track(r);
+        }
+    }
+
+    fn track_values(&mut self, values: &[Value]) {
+        for val in values {
+            self.track_val(val);
+        }
+    }
+}
+
+impl Rewriter for RemoveUnusedRegs {
+    fn rewrite_function(&mut self, f: &mut Function) {
+        self.used.clear();
+        super::rewrite_function(self, f);
+        for &r in &f.parameters {
+            self.track(r);
+        }
+        f.registers.retain(|&r, _| self.used.contains(&r));
+    }
+
+    fn rewrite_instruction(&mut self, _loc: Loc, instr: &mut Instruction) {
+        match *instr {
+            Instruction::Assign(r, ref val) |
+            Instruction::CastAssign(r, ref val) |
+            Instruction::DerefLoad(r, ref val, _) |
+            Instruction::Store(r, _, ref val) |
+            Instruction::UnaryOp(r, _, ref val) => {
+                self.track(r);
+                self.track_val(val);
+            }
+            Instruction::BinaryOp(r, _, ref a, ref b) => {
+                self.track(r);
+                self.track_val(a);
+                self.track_val(b);
+            }
+            Instruction::Call(r, _, ref params) => {
+                self.track(r);
+                self.track_values(params);
+            }
+            Instruction::CallProc(_, ref params) => {
+                self.track_values(params);
+            }
+            Instruction::CallProcVirt(ref f, ref params) => {
+                self.track_val(f);
+                self.track_values(params);
+            }
+            Instruction::CallVirt(r, ref f, ref params) => {
+                self.track(r);
+                self.track_val(f);
+                self.track_values(params);
+            }
+            Instruction::DerefStore(ref a, _, ref b) => {
+                self.track_val(a);
+                self.track_val(b);
+            }
+            Instruction::Drop(r) |
+            Instruction::Init(r) => {
+                self.track(r);
+            }
+            Instruction::Load(r1, r2, _) |
+            Instruction::TakeAddress(r1, r2, _) => {
+                self.track(r1);
+                self.track(r2);
+            }
+            Instruction::Nop |
+            Instruction::Unreachable => {}
+        }
+    }
+}
+
 pub fn rewrite(program: &mut Program) {
     RemoveNops.rewrite_program(program);
     JoinBlocks::default().rewrite_program(program);
     ShortenUnreachable.rewrite_program(program);
+    RemoveUnusedRegs::default().rewrite_program(program);
 }
