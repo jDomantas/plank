@@ -4,6 +4,7 @@ mod dead_store_elimination;
 mod intermediate_removal;
 mod dead_drop_elimination;
 mod cleanup;
+mod arithmetic;
 
 use analysis::Loc;
 use ir::{Program, Function, BlockId, Block, Instruction};
@@ -48,6 +49,7 @@ pub fn optimize(program: &mut Program) {
     simplify_newtypes::rewrite(program);
     intermediate_removal::rewrite(program);
     constant_fold::rewrite(program);
+    arithmetic::rewrite(program);
     dead_store_elimination::rewrite(program);
     dead_drop_elimination::rewrite(program);
     cleanup::rewrite(program);
