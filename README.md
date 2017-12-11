@@ -4,15 +4,20 @@ This is an implementation of plank - a little programming language I am building
 
 Here is a simple guide to the language: [plank-language.md](./plank-language.md).
 
-Currently there is a compiler frontend that can generate plank IR, and a simple interpreter that can execute generated IR.
+Currently here you can find:
+* a compiler frontend that can generate plank IR
+* a few optimizations that work on IR
+* a simple interpreter that can execute IR
+* a simple compiler backend that converts IR to x86 assembly.
 
-This repository currently consists of 8 crates:
+This repository currently consists of 9 crates:
 
 * `plank-errors` - defines `Position` and `Span` types, handles error reporting and formatting.
 * `plank-syntax` - defines plank AST, and contains parser for plank source code.
 * `plank-frontend` - validates plank programs and converts AST to intermediate representation.
 * `plank-ir` - defines plank intermediate representation and contains optimizations.
 * `plank-interpreter` - a simple virtual machine for executing plank intermediate representation.
+* `plank-x86-backend` - generates x86 assembly.
 * `plank` - driver program that glues everything together.
 * `plank-server` - plank language server.
 * `tests` - a simple program that builds and runs tests.
@@ -67,7 +72,7 @@ By default (I think) cargo installs binaries to a place that is on your path, so
 
 ## Running tests
 
-Compiler and interpreter are tested by throwing programs at them and verifying that the outcome matches the expected one. The program that is responsible for that is in `tests` crate.
+Compiler and interpreter are tested by throwing programs at them and verifying that the outcome matches the expected one. The program that is responsible for that is in `tests` crate. x86 backend is not tested.
 
 You can run tests by running `cargo run -p tests` in repository root. More precisely, test runner expects to find the following directories:
 
@@ -75,4 +80,4 @@ You can run tests by running `cargo run -p tests` in repository root. More preci
 * `./tests/compile-fail` - programs that should not build
 * `./tests/pass` - programs that should produce correct output when ran with given input.
 
-Currently there are only a couple of test programs, but this will be improved over time.
+Currently there are only a couple of test programs, but this will be improved over time. Or maybe not. I probably won't work on this after the semester.
