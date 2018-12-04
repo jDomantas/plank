@@ -75,7 +75,7 @@ struct Vm<'a, R, W> {
 
 impl<'a, R: Read, W: Write> Vm<'a, R, W> {
     fn new(program: &'a Program, input: R, output: W) -> Result<Self, Error> {
-        let main_symbol = ir::Symbol("main".into());
+        let main_symbol = ir::Symbol("fn_main".into());
         let main = match program.functions.get(&main_symbol) {
             Some(f) => f,
             None => return Err(Error::MissingSymbol(main_symbol)),
