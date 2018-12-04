@@ -50,6 +50,15 @@ enum Stream {
     Std,
 }
 
+impl Stream {
+    fn is_std(&self) -> bool {
+        match self {
+            Stream::File(_) => false,
+            Stream::Std => true,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Params {
     command: Command,
@@ -86,25 +95,33 @@ fn main() {
 fn run() -> Result<()> {
     let params = parse_params()?;
     let input = read_input(&params.input)?;
+    let can_read_stdin = !params.input.is_std();
     match params.output {
         Stream::Std => {
             let stdout = io::stdout();
             let stdout = stdout.lock();
-            run_command(&input, &params.command, params.optimize, params.skip_prelude, stdout)
+            run_command(&input, &params.command, can_read_stdin, params.optimize, params.skip_prelude, stdout)
         }
         Stream::File(ref name) => {
             let file = ::std::fs::File::create(name)?;
-            run_command(&input, &params.command, params.optimize, params.skip_prelude, file)
+            run_command(&input, &params.command, can_read_stdin, params.optimize, params.skip_prelude, file)
         }
     }
 }
 
-fn run_command<W: Write>(input: &str, command: &Command, optimize: bool, skip_prelude: bool, output: W) -> Result<()> {
+fn run_command<W: Write>(
+    input: &str,
+    command: &Command,
+    can_read_stdin: bool,
+    optimize: bool,
+    skip_prelude: bool,
+    output: W,
+) -> Result<()> {
     match *command {
         Command::Lex => lex(input, output),
         Command::Parse => parse(input, output),
         Command::EmitIr => emit_ir(input, output, optimize),
-        Command::Interpret => interpret(input, output, optimize),
+        Command::Interpret => interpret(input, can_read_stdin, output, optimize),
         Command::CompileX86 => compile_x86(input, output, optimize, skip_prelude),
     }
 }
@@ -259,7 +276,7 @@ fn emit_ir<W: Write>(source: &str, mut output: W, optimize: bool) -> Result<()> 
     Ok(())
 }
 
-fn interpret<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
+fn interpret<W: Write>(source: &str, can_read_stdin: bool, output: W, optimize: bool) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
@@ -269,7 +286,16 @@ fn interpret<W: Write>(source: &str, output: W, optimize: bool) -> Result<()> {
     if optimize {
         plank_ir::optimization::optimize(&mut ir);
     }
-    let input = io::empty();
+    let stdin;
+    let mut stdin_lock;
+    let mut empty = io::empty();
+    let input: &mut dyn Read = if can_read_stdin {
+        stdin = io::stdin();
+        stdin_lock = stdin.lock();
+        &mut stdin_lock
+    } else {
+        &mut empty
+    };
     let exit_code = plank_interpreter::run_program(&ir, input, output)?;
     if exit_code == 0 {
         Ok(())
