@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use plank_syntax::position::{Span, Spanned};
 use ast::typed;
 pub use ast::typed::{Mutability, Signedness, Size, Symbol, Type};
-
+use plank_syntax::position::{Span, Spanned};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -108,13 +107,11 @@ pub enum UnaryOp {
     OffsetAddress(Type, Vec<usize>),
 }
 
-
 pub(crate) mod printer {
     #![allow(dead_code)]
 
     use super::*;
     use CompileCtx;
-
 
     fn write_int(
         f: &mut ::std::fmt::Formatter,

@@ -1,5 +1,5 @@
-use std::io::{self, Write};
 use ir;
+use std::io::{self, Write};
 
 pub fn emit_program<W: Write>(program: &ir::Program, mut out: W) -> io::Result<()> {
     for (name, func) in &program.functions {
@@ -27,11 +27,7 @@ fn emit_function<W: Write>(func: &ir::Function, out: &mut W) -> io::Result<()> {
     }
     writeln!(out)?;
     for (&reg, &layout) in &func.registers {
-        write!(
-            out,
-            "    register %{}: ",
-            reg.0,
-        )?;
+        write!(out, "    register %{}: ", reg.0,)?;
         emit_layout(layout, out)?;
         writeln!(out)?;
     }
@@ -162,7 +158,7 @@ fn emit_value<W: Write>(val: &ir::Value, out: &mut W) -> io::Result<()> {
         ir::Value::Bytes(ref bytes) => {
             write!(out, "\"")?;
             for &byte in bytes {
-                if byte < 32 || byte > 126 {
+                if !(32..=126).contains(&byte) {
                     write!(out, "\\x{:0>2x}", byte)?;
                 } else if byte == b'"' {
                     write!(out, "\\\"")?;

@@ -1,18 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use analysis::Loc;
-use ir::{Program, Function, Block, BlockId, Instruction, BlockEnd, Value, Reg};
 use super::Rewriter;
-
+use analysis::Loc;
+use ir::{Block, BlockEnd, BlockId, Function, Instruction, Program, Reg, Value};
+use std::collections::{HashMap, HashSet};
 
 struct RemoveNops;
 
 impl Rewriter for RemoveNops {
     fn rewrite_block(&mut self, _id: BlockId, block: &mut Block) {
-        block.ops.retain(|o| if let Instruction::Nop = *o {
-            false
-        } else {
-            true
-        });
+        block.ops.retain(|o| !matches!(*o, Instruction::Nop));
     }
 }
 
@@ -50,9 +45,7 @@ impl Rewriter for JoinBlocks {
                 BlockEnd::Jump(a) => {
                     *self.references.entry(a).or_insert(0) += 1;
                 }
-                BlockEnd::Return(_) |
-                BlockEnd::ReturnProc |
-                BlockEnd::Unreachable => {}
+                BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
             }
         }
         if let Some(block) = f.start_block {
@@ -94,9 +87,7 @@ impl Rewriter for JoinBlocks {
                         BlockEnd::Jump(a) => {
                             *self.references.get_mut(&a).unwrap() -= 1;
                         }
-                        BlockEnd::Return(_) |
-                        BlockEnd::ReturnProc |
-                        BlockEnd::Unreachable => {}
+                        BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
                     }
                     first.end = removed.end;
                 }
@@ -110,9 +101,7 @@ impl Rewriter for JoinBlocks {
                         BlockEnd::Jump(a) => {
                             *self.references.get_mut(&a).unwrap() -= 1;
                         }
-                        BlockEnd::Return(_) |
-                        BlockEnd::ReturnProc |
-                        BlockEnd::Unreachable => {}
+                        BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
                     }
                 }
                 Change::None => break,
@@ -156,11 +145,11 @@ impl Rewriter for RemoveUnusedRegs {
 
     fn rewrite_instruction(&mut self, _loc: Loc, instr: &mut Instruction) {
         match *instr {
-            Instruction::Assign(r, ref val) |
-            Instruction::CastAssign(r, ref val) |
-            Instruction::DerefLoad(r, ref val, _) |
-            Instruction::Store(r, _, ref val) |
-            Instruction::UnaryOp(r, _, ref val) => {
+            Instruction::Assign(r, ref val)
+            | Instruction::CastAssign(r, ref val)
+            | Instruction::DerefLoad(r, ref val, _)
+            | Instruction::Store(r, _, ref val)
+            | Instruction::UnaryOp(r, _, ref val) => {
                 self.track(r);
                 self.track_val(val);
             }
@@ -189,17 +178,14 @@ impl Rewriter for RemoveUnusedRegs {
                 self.track_val(a);
                 self.track_val(b);
             }
-            Instruction::Drop(r) |
-            Instruction::Init(r) => {
+            Instruction::Drop(r) | Instruction::Init(r) => {
                 self.track(r);
             }
-            Instruction::Load(r1, r2, _) |
-            Instruction::TakeAddress(r1, r2, _) => {
+            Instruction::Load(r1, r2, _) | Instruction::TakeAddress(r1, r2, _) => {
                 self.track(r1);
                 self.track(r2);
             }
-            Instruction::Nop |
-            Instruction::Unreachable => {}
+            Instruction::Nop | Instruction::Unreachable => {}
         }
     }
 }

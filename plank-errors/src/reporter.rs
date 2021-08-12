@@ -1,9 +1,8 @@
 //! Helpers to build and aggregate diagnostics.
 
+use position::Span;
 use std::cell::RefCell;
 use std::rc::Rc;
-use position::Span;
-
 
 /// Reporter aggregates and allows building diagnostics.
 ///

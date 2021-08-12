@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
 use ast::resolved::{Program, Symbol, Type};
+use std::collections::{HashMap, HashSet};
 use CompileCtx;
-
 
 type Pair = (Symbol, Symbol);
 
@@ -18,16 +17,11 @@ impl Solver {
         let nodes = (symbols.len() * symbols.len()) as u32;
         let indices = symbols
             .iter()
-            .flat_map(|&a| symbols
-                .iter()
-                .map(move |&b| (a, b)))
+            .flat_map(|&a| symbols.iter().map(move |&b| (a, b)))
             .enumerate()
             .map(|(index, pair)| (pair, index as u32))
             .collect();
-        let needed_visits = (0..nodes)
-            .into_iter()
-            .map(|i| (i, 1))
-            .collect();
+        let needed_visits = (0..nodes).into_iter().map(|i| (i, 1)).collect();
         let mut solver = Solver {
             node_index: indices,
             edges: HashMap::new(),
@@ -57,7 +51,10 @@ impl Solver {
     }
 
     fn add_edge(&mut self, from: u32, to: u32) {
-        self.edges.entry(from).or_insert_with(HashSet::new).insert(to);
+        self.edges
+            .entry(from)
+            .or_insert_with(HashSet::new)
+            .insert(to);
     }
 
     fn artificial_node(&mut self) -> u32 {
@@ -73,7 +70,7 @@ impl Solver {
         }
     }
 
-    fn add_rule<I: ExactSizeIterator<Item=Pair>>(&mut self, bounds: I, result: Pair) {
+    fn add_rule<I: ExactSizeIterator<Item = Pair>>(&mut self, bounds: I, result: Pair) {
         if bounds.len() == 0 {
             self.add_fact(result);
         } else {
@@ -114,18 +111,18 @@ impl Solver {
 
     fn add_struct(&mut self, program: &Program, root: Symbol, typ: &Type, acc: &mut HashSet<Pair>) {
         match *typ {
-            Type::Wildcard |
-            Type::I8 |
-            Type::U8 |
-            Type::I16 |
-            Type::U16 |
-            Type::I32 |
-            Type::U32 |
-            Type::Bool |
-            Type::Unit |
-            Type::Pointer(_, _) |
-            Type::Function(_, _) |
-            Type::Error => {}
+            Type::Wildcard
+            | Type::I8
+            | Type::U8
+            | Type::I16
+            | Type::U16
+            | Type::I32
+            | Type::U32
+            | Type::Bool
+            | Type::Unit
+            | Type::Pointer(_, _)
+            | Type::Function(_, _)
+            | Type::Error => {}
             Type::Concrete(sym, ref params) => {
                 let sym = *sym;
                 self.add_rule(acc.iter().cloned(), (root, sym));
@@ -149,7 +146,8 @@ impl Solver {
 }
 
 pub(crate) fn check_program(program: &mut Program, ctx: &mut CompileCtx) {
-    let symbols = program.structs
+    let symbols = program
+        .structs
         .values()
         .flat_map(|s| s.name.type_params.iter().map(|x| **x))
         .chain(program.structs.keys().cloned())
@@ -166,10 +164,7 @@ pub(crate) fn check_program(program: &mut Program, ctx: &mut CompileCtx) {
     solver.solve();
     for (&name, s) in &mut program.structs {
         if solver.is_recursive(name) {
-            let msg = format!(
-                "struct `{}` is recursive",
-                ctx.symbols.get_name(name),
-            );
+            let msg = format!("struct `{}` is recursive", ctx.symbols.get_name(name),);
             ctx.reporter
                 .error(msg, s.complete_span)
                 .span(s.complete_span)

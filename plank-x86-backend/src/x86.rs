@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
 pub enum Register {
     Eax,

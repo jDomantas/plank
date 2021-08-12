@@ -1,33 +1,31 @@
 #[macro_use]
 extern crate serde_derive;
+extern crate languageserver_types;
 extern crate serde;
 extern crate serde_json;
-extern crate languageserver_types;
 #[macro_use]
 extern crate log;
-extern crate simple_logging;
-extern crate url;
-extern crate plank_syntax;
 extern crate plank_errors;
 extern crate plank_frontend;
+extern crate plank_syntax;
+extern crate simple_logging;
+extern crate url;
 
-mod transport;
 mod jsonrpc;
+mod transport;
 
+use jsonrpc::{Response, RpcHandler};
+use languageserver_types as lst;
 use std::cell::RefCell;
 use std::io;
 use std::io::{BufRead, Write};
 use std::ops::DerefMut;
-use languageserver_types as lst;
-use url::Url;
-use jsonrpc::{RpcHandler, Response};
 use transport::Transport;
-
+use url::Url;
 
 fn main() {
-    simple_logging::log_to_stderr(log::LogLevelFilter::Info)
-        .expect("failed to initialize logging");
-    
+    simple_logging::log_to_stderr(log::LogLevelFilter::Info).expect("failed to initialize logging");
+
     let stdin = io::stdin();
     let stdin = stdin.lock();
     let stdout = io::stdout();
@@ -40,42 +38,51 @@ fn main() {
         Response::Success::<_, ()>(lst::InitializeResult {
             capabilities: lst::ServerCapabilities {
                 text_document_sync: Some(lst::TextDocumentSyncKind::Full),
-                .. Default::default()
+                ..Default::default()
             },
         })
     });
 
-    rpc.add_notification("initialized", |_: serde_json::Value| {
-    });
+    rpc.add_notification("initialized", |_: serde_json::Value| {});
 
-    rpc.add_notification("textDocument/didOpen", |params: lst::DidOpenTextDocumentParams| {
-        publish_diagnostics(
-            &params.text_document.text,
-            params.text_document.uri,
-            transport.borrow_mut().deref_mut(),
-        );
-    });
-
-    rpc.add_notification("textDocument/didSave", |_: lst::DidSaveTextDocumentParams| {
-    });
-
-    rpc.add_notification("textDocument/didClose", |_: lst::DidCloseTextDocumentParams| {
-    });
-
-    rpc.add_notification("textDocument/didChange", |params: lst::DidChangeTextDocumentParams| {
-        if params.content_changes.len() != 1 ||
-            params.content_changes[0].range.is_some() ||
-            params.content_changes[0].range_length.is_some()
-        {
-            debug!("got bad edit with `didChange` event");
-        } else {
+    rpc.add_notification(
+        "textDocument/didOpen",
+        |params: lst::DidOpenTextDocumentParams| {
             publish_diagnostics(
-                &params.content_changes[0].text,
+                &params.text_document.text,
                 params.text_document.uri,
                 transport.borrow_mut().deref_mut(),
             );
-        }
-    });
+        },
+    );
+
+    rpc.add_notification(
+        "textDocument/didSave",
+        |_: lst::DidSaveTextDocumentParams| {},
+    );
+
+    rpc.add_notification(
+        "textDocument/didClose",
+        |_: lst::DidCloseTextDocumentParams| {},
+    );
+
+    rpc.add_notification(
+        "textDocument/didChange",
+        |params: lst::DidChangeTextDocumentParams| {
+            if params.content_changes.len() != 1
+                || params.content_changes[0].range.is_some()
+                || params.content_changes[0].range_length.is_some()
+            {
+                debug!("got bad edit with `didChange` event");
+            } else {
+                publish_diagnostics(
+                    &params.content_changes[0].text,
+                    params.text_document.uri,
+                    transport.borrow_mut().deref_mut(),
+                );
+            }
+        },
+    );
 
     loop {
         let response = {
@@ -95,7 +102,9 @@ fn main() {
 }
 
 fn publish_diagnostics<R, W>(source: &str, doc: Url, transport: &mut Transport<R, W>)
-    where R: BufRead, W: Write
+where
+    R: BufRead,
+    W: Write,
 {
     let diagnostics = make_diagnostics(source);
     let params = lst::PublishDiagnosticsParams {
@@ -114,9 +123,10 @@ fn publish_diagnostics<R, W>(source: &str, doc: Url, transport: &mut Transport<R
         method: "textDocument/publishDiagnostics",
         params,
     };
-    let string = serde_json::to_string(&notification)
-        .expect("failed to serialize diagnostics");
-    transport.send_message(&string).expect("failed to write message");
+    let string = serde_json::to_string(&notification).expect("failed to serialize diagnostics");
+    transport
+        .send_message(&string)
+        .expect("failed to write message");
 }
 
 fn make_diagnostics(source: &str) -> Vec<lst::Diagnostic> {

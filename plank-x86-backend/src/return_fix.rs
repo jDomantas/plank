@@ -1,6 +1,5 @@
+use plank_ir::ir::{self, BlockEnd, Function, Instruction, Layout, Program, Reg, Value};
 use std::collections::HashMap;
-use plank_ir::ir::{self, Program, Function, Instruction, Reg, Layout, Value, BlockEnd};
-
 
 fn fresh_register(regs: &HashMap<Reg, Layout>) -> Reg {
     for i in 0..regs.len() {
@@ -17,11 +16,14 @@ fn fix_function(f: &mut Function) {
             None
         } else {
             let reg = fresh_register(&f.registers);
-            f.registers.insert(reg, Layout {
-                size: ir::POINTER_SIZE,
-                align: ir::POINTER_SIZE,
-                atomic: true,
-            });
+            f.registers.insert(
+                reg,
+                Layout {
+                    size: ir::POINTER_SIZE,
+                    align: ir::POINTER_SIZE,
+                    atomic: true,
+                },
+            );
             f.parameters.insert(0, reg);
             f.output_layout = None;
             Some(reg)
@@ -32,14 +34,19 @@ fn fix_function(f: &mut Function) {
     for block in f.blocks.values_mut() {
         for i in (0..block.ops.len()).rev() {
             let initializer = match block.ops[i] {
-                Instruction::Call(r, _, ref mut params) |
-                Instruction::CallVirt(r, _, ref mut params) if !f.registers[&r].atomic => {
+                Instruction::Call(r, _, ref mut params)
+                | Instruction::CallVirt(r, _, ref mut params)
+                    if !f.registers[&r].atomic =>
+                {
                     let reg = fresh_register(&f.registers);
-                    f.registers.insert(reg, Layout {
-                        size: ir::POINTER_SIZE,
-                        align: ir::POINTER_SIZE,
-                        atomic: true,
-                    });
+                    f.registers.insert(
+                        reg,
+                        Layout {
+                            size: ir::POINTER_SIZE,
+                            align: ir::POINTER_SIZE,
+                            atomic: true,
+                        },
+                    );
                     params.insert(0, Value::Reg(reg));
                     Some((reg, r))
                 }
@@ -62,7 +69,9 @@ fn fix_function(f: &mut Function) {
         }
         match (block.end.clone(), output_address) {
             (BlockEnd::Return(val), Some(reg)) => {
-                block.ops.push(Instruction::DerefStore(Value::Reg(reg), 0, val));
+                block
+                    .ops
+                    .push(Instruction::DerefStore(Value::Reg(reg), 0, val));
                 block.end = BlockEnd::ReturnProc;
             }
             _ => {}

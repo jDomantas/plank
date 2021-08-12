@@ -1,7 +1,6 @@
+use super::{initialized_register, Loc};
+use ir::{Block, BlockEnd, BlockId, Function, Instruction, Reg};
 use std::collections::{HashMap, HashSet};
-use ir::{Function, Reg, Block, BlockId, BlockEnd, Instruction};
-use super::{Loc, initialized_register};
-
 
 struct Liveness<'a> {
     function: &'a Function,
@@ -32,10 +31,7 @@ impl<'a> Liveness<'a> {
                 is_live = false;
             }
             if !is_live {
-                self.dead_locations.insert(Loc {
-                    block: id,
-                    pos,
-                });
+                self.dead_locations.insert(Loc { block: id, pos });
             }
             if initialized_register(instr) == Some(self.reg) {
                 is_live = true;
@@ -55,9 +51,7 @@ impl<'a> Liveness<'a> {
             BlockEnd::Jump(a) => {
                 self.walk_block(a, is_live);
             }
-            BlockEnd::Return(_) |
-            BlockEnd::ReturnProc |
-            BlockEnd::Unreachable => {}
+            BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
         }
     }
 }

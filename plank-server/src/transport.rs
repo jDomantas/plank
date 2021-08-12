@@ -2,7 +2,6 @@ use std::convert::From;
 use std::io;
 use std::io::prelude::*;
 
-
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
@@ -40,8 +39,8 @@ impl<R: BufRead, W: Write> Transport<R, W> {
             self.reader.read_line(&mut self.read_buffer)?;
             if self.read_buffer.starts_with(LENGTH_HEADER) {
                 let len_str = self.read_buffer.get(LENGTH_HEADER.len()..).unwrap().trim();
-                let length = str::parse::<u64>(len_str)
-                    .map_err(|_| Error::BadInput("bad length"))?;
+                let length =
+                    str::parse::<u64>(len_str).map_err(|_| Error::BadInput("bad length"))?;
                 content_length = Some(length);
             } else if self.read_buffer == "\r\n" {
                 break;
@@ -49,10 +48,11 @@ impl<R: BufRead, W: Write> Transport<R, W> {
                 return Err(Error::BadInput("unexpected eof"));
             }
         }
-        let content_length = content_length
-            .ok_or(Error::BadInput("no content length"))?;
+        let content_length = content_length.ok_or(Error::BadInput("no content length"))?;
         self.read_buffer.clear();
-        (&mut self.reader).take(content_length).read_line(&mut self.read_buffer)?;
+        (&mut self.reader)
+            .take(content_length)
+            .read_line(&mut self.read_buffer)?;
         Ok(self.read_buffer.clone())
     }
 
@@ -64,4 +64,3 @@ impl<R: BufRead, W: Write> Transport<R, W> {
         Ok(())
     }
 }
-

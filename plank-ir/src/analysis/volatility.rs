@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use ir::{Function, Reg, BlockId, BlockEnd, Instruction};
 use super::Loc;
-
+use ir::{BlockEnd, BlockId, Function, Instruction, Reg};
+use std::collections::{HashMap, HashSet};
 
 struct Volatility<'a> {
     function: &'a Function,
@@ -29,10 +28,7 @@ impl<'a> Volatility<'a> {
         let mut is_volatile = volatile_start;
         for (pos, instr) in block.ops.iter().enumerate() {
             if is_volatile {
-                self.volatile_locations.insert(Loc {
-                    block: id,
-                    pos,
-                });
+                self.volatile_locations.insert(Loc { block: id, pos });
             }
             if referenced_register(instr) == Some(self.reg) {
                 is_volatile = true;
@@ -57,9 +53,7 @@ impl<'a> Volatility<'a> {
             BlockEnd::Jump(a) => {
                 self.walk_block(a, is_volatile);
             }
-            BlockEnd::Return(_) |
-            BlockEnd::ReturnProc |
-            BlockEnd::Unreachable => {}
+            BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
         }
     }
 }

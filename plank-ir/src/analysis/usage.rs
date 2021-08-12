@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use ir::{Function, Instruction, Reg, Value, BlockEnd};
 use analysis::Loc;
-
+use ir::{BlockEnd, Function, Instruction, Reg, Value};
+use std::collections::{HashMap, HashSet};
 
 pub struct Context<'a> {
     f: &'a Function,
@@ -10,16 +9,12 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     pub fn new(f: &'a Function, volatile: &'a HashMap<Reg, HashSet<Loc>>) -> Self {
-        Context {
-            f,
-            volatile,
-        }
+        Context { f, volatile }
     }
 
     pub fn is_value_used(&self, loc: Loc, reg: Reg) -> bool {
         let mut visited = HashSet::new();
-        let mut frontier = Vec::new();
-        frontier.push(loc);
+        let mut frontier = vec![loc];
         while let Some(loc) = frontier.pop() {
             if visited.contains(&loc) {
                 continue;
@@ -32,34 +27,24 @@ impl<'a> Context<'a> {
                         if is_used_in_val(reg, val) {
                             return true;
                         }
-                        frontier.push(Loc {
-                            block: a,
-                            pos: 0,
-                        });
-                        frontier.push(Loc {
-                            block: b,
-                            pos: 0,
-                        });
+                        frontier.push(Loc { block: a, pos: 0 });
+                        frontier.push(Loc { block: b, pos: 0 });
                     }
                     BlockEnd::Jump(a) => {
-                        frontier.push(Loc {
-                            block: a,
-                            pos: 0,
-                        });
+                        frontier.push(Loc { block: a, pos: 0 });
                     }
                     BlockEnd::Return(ref val) => {
                         if is_used_in_val(reg, val) {
                             return true;
                         }
                     }
-                    BlockEnd::ReturnProc |
-                    BlockEnd::Unreachable => {}
+                    BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
                 }
             } else {
                 match block.ops[loc.pos] {
-                    Instruction::Assign(r, ref val) |
-                    Instruction::CastAssign(r, ref val) |
-                    Instruction::UnaryOp(r, _, ref val) => {
+                    Instruction::Assign(r, ref val)
+                    | Instruction::CastAssign(r, ref val)
+                    | Instruction::UnaryOp(r, _, ref val) => {
                         if is_used_in_val(reg, val) {
                             return true;
                         }
@@ -137,9 +122,9 @@ impl<'a> Context<'a> {
                             return true;
                         }
                     }
-                    Instruction::Drop(r) |
-                    Instruction::Init(r) |
-                    Instruction::TakeAddress(r, _, _) => {
+                    Instruction::Drop(r)
+                    | Instruction::Init(r)
+                    | Instruction::TakeAddress(r, _, _) => {
                         if r == reg {
                             continue;
                         }

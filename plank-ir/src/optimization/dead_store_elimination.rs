@@ -1,22 +1,17 @@
+use analysis::{self, usage, volatility, Loc};
 use ir::{Instruction, Program};
-use analysis::{self, Loc, volatility, usage};
-
 
 fn is_call(instr: &Instruction) -> bool {
-    match *instr {
-        Instruction::Call(..) |
-        Instruction::CallProc(..) |
-        Instruction::CallProcVirt(..) |
-        Instruction::CallVirt(..) => true,
-        _ => false,
-    }
+    matches!(
+        *instr,
+        Instruction::Call(..) | Instruction::CallProc(..) | Instruction::CallProcVirt(..)
+    )
 }
 
 pub fn rewrite(program: &mut Program) {
     loop {
         let mut changed_anything = false;
         for f in program.functions.values_mut() {
-
             let volatile = &volatility::volatile_locations(f);
             let mut to_remove = Vec::new();
             {
@@ -33,10 +28,7 @@ pub fn rewrite(program: &mut Program) {
                         };
                         if let Some(reg) = written {
                             if !ctx.is_value_used(loc, reg) {
-                                to_remove.push(Loc {
-                                    block: id,
-                                    pos,
-                                });
+                                to_remove.push(Loc { block: id, pos });
                             }
                         }
                     }

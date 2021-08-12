@@ -1,7 +1,9 @@
-use std::collections::{HashMap, HashSet};
 use analysis::{self, Loc};
-use ir::{Function, BinaryOp, BitOp, IntOp, UnaryOp, Signedness, Size, Program, Reg, Block, Instruction, Value, BlockEnd, BlockId};
-
+use ir::{
+    BinaryOp, BitOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Program, Reg,
+    Signedness, Size, UnaryOp, Value,
+};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 enum Val {
@@ -25,11 +27,13 @@ impl Val {
             (Val::Any, other) | (other, Val::Any) => other,
             (Val::Unknown, _) | (_, Val::Unknown) => Val::Unknown,
             (Val::Ref(a, oa), Val::Ref(b, ob)) if (a, oa) == (b, ob) => Val::Ref(a, oa),
-            (Val::Ir(a), Val::Ir(b)) => if a == b {
-                Val::Ir(a)
-            } else {
-                Val::Unknown
-            },
+            (Val::Ir(a), Val::Ir(b)) => {
+                if a == b {
+                    Val::Ir(a)
+                } else {
+                    Val::Unknown
+                }
+            }
             _ => Val::Unknown,
         }
     }
@@ -53,7 +57,10 @@ impl<'a> Context<'a> {
 
     fn dfs(&mut self, reg: Reg, block_id: BlockId, block: &Block, mut pos: usize) -> Val {
         loop {
-            let loc = Loc { block: block_id, pos };
+            let loc = Loc {
+                block: block_id,
+                pos,
+            };
             if self.visited.contains(&loc) {
                 return Val::Any;
             }
@@ -71,30 +78,38 @@ impl<'a> Context<'a> {
                 }
                 return total;
             } else {
-                let loc = Loc { block: block_id, pos: pos - 1 };
+                let loc = Loc {
+                    block: block_id,
+                    pos: pos - 1,
+                };
                 let op = &block.ops[pos - 1];
                 match *op {
-                    Instruction::Assign(r, ref val) |
-                    Instruction::CastAssign(r, ref val) if r == reg => return Val::from_ir(val),
-                    Instruction::BinaryOp(r, _, _, _) |
-                    Instruction::DerefLoad(r, _, _) |
-                    Instruction::Load(r, _, _) |
-                    Instruction::Store(r, _, _) if r == reg => return Val::Unknown,
-                    Instruction::Call(r, _, _) |
-                    Instruction::CallVirt(r, _, _) => {
+                    Instruction::Assign(r, ref val) | Instruction::CastAssign(r, ref val)
+                        if r == reg =>
+                    {
+                        return Val::from_ir(val)
+                    }
+                    Instruction::BinaryOp(r, _, _, _)
+                    | Instruction::DerefLoad(r, _, _)
+                    | Instruction::Load(r, _, _)
+                    | Instruction::Store(r, _, _)
+                        if r == reg =>
+                    {
+                        return Val::Unknown
+                    }
+                    Instruction::Call(r, _, _) | Instruction::CallVirt(r, _, _) => {
                         if r == reg || self.is_volatile_at(reg, loc) {
                             return Val::Unknown;
                         }
                     }
-                    Instruction::CallProc(_, _) |
-                    Instruction::CallProcVirt(_, _) |
-                    Instruction::DerefStore(_, _, _) => {
+                    Instruction::CallProc(_, _)
+                    | Instruction::CallProcVirt(_, _)
+                    | Instruction::DerefStore(_, _, _) => {
                         if self.is_volatile_at(reg, loc) {
                             return Val::Unknown;
                         }
                     }
-                    Instruction::Drop(r) |
-                    Instruction::Init(r) if r == reg => {
+                    Instruction::Drop(r) | Instruction::Init(r) if r == reg => {
                         return Val::Any;
                     }
                     Instruction::TakeAddress(r, r2, offset) => {
@@ -158,8 +173,7 @@ fn try_replace_val(val: &mut Value, ctx: &mut Context, loc: Loc) -> bool {
                 *val = v;
                 true
             }
-            Val::Ref(_, _) |
-            Val::Unknown => false
+            Val::Ref(_, _) | Val::Unknown => false,
         }
     } else {
         false
@@ -177,8 +191,8 @@ fn rewrite_function(f: &mut Function) {
                 let loc = Loc { block: id, pos };
                 let mut replace_with = None;
                 match *op {
-                    Instruction::Assign(_, ref mut val) |
-                    Instruction::CastAssign(_, ref mut val) => {
+                    Instruction::Assign(_, ref mut val)
+                    | Instruction::CastAssign(_, ref mut val) => {
                         if try_replace_val(val, ctx, loc) {
                             changed = true;
                         }
@@ -195,16 +209,16 @@ fn rewrite_function(f: &mut Function) {
                             }
                         }
                     }
-                    Instruction::Call(_, _, ref mut params) |
-                    Instruction::CallProc(_, ref mut params) => {
+                    Instruction::Call(_, _, ref mut params)
+                    | Instruction::CallProc(_, ref mut params) => {
                         for param in params {
                             if try_replace_val(param, ctx, loc) {
                                 changed = true;
                             }
                         }
                     }
-                    Instruction::CallVirt(_, ref mut f, ref mut params) |
-                    Instruction::CallProcVirt(ref mut f, ref mut params) => {
+                    Instruction::CallVirt(_, ref mut f, ref mut params)
+                    | Instruction::CallProcVirt(ref mut f, ref mut params) => {
                         if try_replace_val(f, ctx, loc) {
                             changed = true;
                         }
@@ -214,15 +228,14 @@ fn rewrite_function(f: &mut Function) {
                             }
                         }
                     }
-                    Instruction::DerefLoad(r, Value::Reg(r2), 0) => {
-                        match ctx.get_value(r2, loc) {
-                            Val::Any => replace_with = Some(Instruction::Unreachable),
-                            Val::Ir(v) => replace_with = Some(Instruction::DerefLoad(r, v, 0)),
-                            Val::Ref(r3, 0) => replace_with = Some(Instruction::Assign(r, Value::Reg(r3))),
-                            Val::Ref(_, _) |
-                            Val::Unknown => {}
+                    Instruction::DerefLoad(r, Value::Reg(r2), 0) => match ctx.get_value(r2, loc) {
+                        Val::Any => replace_with = Some(Instruction::Unreachable),
+                        Val::Ir(v) => replace_with = Some(Instruction::DerefLoad(r, v, 0)),
+                        Val::Ref(r3, 0) => {
+                            replace_with = Some(Instruction::Assign(r, Value::Reg(r3)))
                         }
-                    }
+                        Val::Ref(_, _) | Val::Unknown => {}
+                    },
                     Instruction::DerefStore(ref to, offset, ref mut val) => {
                         if try_replace_val(val, ctx, loc) {
                             changed = true;
@@ -231,22 +244,26 @@ fn rewrite_function(f: &mut Function) {
                             if offset == 0 {
                                 match ctx.get_value(r, loc) {
                                     Val::Any => replace_with = Some(Instruction::Unreachable),
-                                    Val::Ir(v) => replace_with = Some(Instruction::DerefStore(v, 0, val.clone())),
-                                    Val::Ref(r, 0) => replace_with = Some(Instruction::Assign(r, val.clone())),
-                                    Val::Ref(_, _) |
-                                    Val::Unknown => {}
+                                    Val::Ir(v) => {
+                                        replace_with =
+                                            Some(Instruction::DerefStore(v, 0, val.clone()))
+                                    }
+                                    Val::Ref(r, 0) => {
+                                        replace_with = Some(Instruction::Assign(r, val.clone()))
+                                    }
+                                    Val::Ref(_, _) | Val::Unknown => {}
                                 }
                             }
                         }
                     }
-                    Instruction::DerefLoad(_, _, _) |
-                    Instruction::Drop(_) |
-                    Instruction::Init(_) |
-                    Instruction::Nop |
-                    Instruction::Load(_, _, _) |
-                    Instruction::Store(_, _, _) |
-                    Instruction::TakeAddress(_, _, _) |
-                    Instruction::Unreachable => {}
+                    Instruction::DerefLoad(_, _, _)
+                    | Instruction::Drop(_)
+                    | Instruction::Init(_)
+                    | Instruction::Nop
+                    | Instruction::Load(_, _, _)
+                    | Instruction::Store(_, _, _)
+                    | Instruction::TakeAddress(_, _, _)
+                    | Instruction::Unreachable => {}
                     Instruction::UnaryOp(r, op, ref mut val) => {
                         if let Some(result) = eval_unary_op(op, val) {
                             replace_with = Some(Instruction::Assign(r, result));
@@ -260,17 +277,17 @@ fn rewrite_function(f: &mut Function) {
                     changed = true;
                 }
             }
-            let loc = Loc { block: id, pos: block.ops.len() };
+            let loc = Loc {
+                block: id,
+                pos: block.ops.len(),
+            };
             match block.end {
-                BlockEnd::Branch(ref mut val, _, _) |
-                BlockEnd::Return(ref mut val) => {
+                BlockEnd::Branch(ref mut val, _, _) | BlockEnd::Return(ref mut val) => {
                     if try_replace_val(val, ctx, loc) {
                         changed = true;
                     }
                 }
-                BlockEnd::Jump(_) |
-                BlockEnd::ReturnProc |
-                BlockEnd::Unreachable => {}
+                BlockEnd::Jump(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
             }
             if let BlockEnd::Branch(Value::Int(0, _), _, a) = block.end {
                 block.end = BlockEnd::Jump(a);
@@ -292,15 +309,9 @@ fn eval_binary_op(op: BinaryOp, a: &Value, b: &Value) -> Option<Value> {
         _ => return None,
     };
     match op {
-        BinaryOp::BitOp(BitOp::And, size) => {
-            Some(Value::Int(a & b, size))
-        }
-        BinaryOp::BitOp(BitOp::Or, size) => {
-            Some(Value::Int(a | b, size))
-        }
-        BinaryOp::BitOp(BitOp::Xor, size) => {
-            Some(Value::Int(a ^ b, size))
-        }
+        BinaryOp::BitOp(BitOp::And, size) => Some(Value::Int(a & b, size)),
+        BinaryOp::BitOp(BitOp::Or, size) => Some(Value::Int(a | b, size)),
+        BinaryOp::BitOp(BitOp::Xor, size) => Some(Value::Int(a ^ b, size)),
         BinaryOp::Eq => {
             let res = if a == b { 1 } else { 0 };
             Some(Value::Int(res, Size::Bit8))

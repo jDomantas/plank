@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use plank_syntax::position::Spanned;
 use ast::resolved::{Expr, Function, FunctionType, Program, Statement, Struct, Symbol, Type};
+use plank_syntax::position::Spanned;
+use std::collections::HashMap;
 use CompileCtx;
-
 
 pub(crate) fn check_type_params(program: &mut Program, ctx: &mut CompileCtx) {
     let mut ctx = Context::new(ctx);
@@ -79,16 +78,16 @@ impl<'a> Context<'a> {
 
     fn check_type(&mut self, typ: &mut Spanned<Type>) {
         match **typ {
-            Type::Unit |
-            Type::Bool |
-            Type::Error |
-            Type::I8 |
-            Type::I16 |
-            Type::I32 |
-            Type::U8 |
-            Type::U16 |
-            Type::U32 |
-            Type::Wildcard => return,
+            Type::Unit
+            | Type::Bool
+            | Type::Error
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::Wildcard => return,
             Type::Pointer(_, ref mut typ) => {
                 self.check_type(typ);
                 return;
@@ -126,9 +125,11 @@ impl<'a> Context<'a> {
 
     fn check_statement(&mut self, stmt: &mut Spanned<Statement>) {
         match **stmt {
-            Statement::Block(ref mut stmts) => for stmt in stmts {
-                self.check_statement(stmt);
-            },
+            Statement::Block(ref mut stmts) => {
+                for stmt in stmts {
+                    self.check_statement(stmt);
+                }
+            }
             Statement::Break | Statement::Continue | Statement::Error => {}
             Statement::Expr(ref mut expr) | Statement::Return(ref mut expr) => {
                 self.check_expr(expr)
@@ -214,18 +215,12 @@ fn make_error_message(kind: &str, name: &str, expected: usize, got: usize) -> St
     } else if expected % 10 == 1 && expected % 100 != 11 {
         format!(
             "{} `{}` expects {} type parameter, got {}",
-            kind,
-            name,
-            expected,
-            got,
+            kind, name, expected, got,
         )
     } else {
         format!(
             "{} `{}` expects {} type parameters, got {}",
-            kind,
-            name,
-            expected,
-            got,
+            kind, name, expected, got,
         )
     }
 }

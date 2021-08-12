@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use analysis::Loc;
-use ir::{Program, Reg, Function, Instruction, Value};
+use ir::{Function, Instruction, Program, Reg, Value};
 use optimization::{self as opt, Rewriter};
-
+use std::collections::HashMap;
 
 #[derive(Default)]
 struct Simplifier {
@@ -23,7 +22,8 @@ impl Simplifier {
 
 impl Rewriter for Simplifier {
     fn rewrite_function(&mut self, f: &mut Function) {
-        self.reg_size = f.registers
+        self.reg_size = f
+            .registers
             .iter()
             .map(|(&reg, &layout)| (reg, layout.size))
             .collect();

@@ -1,8 +1,7 @@
-use plank_syntax::position::Spanned;
 use ast::typed::{Expr, Function, Program, Statement, Type, TypedExpr};
+use plank_syntax::position::Spanned;
 use struct_layout::{LayoutEngine, LayoutResult};
 use CompileCtx;
-
 
 pub(crate) fn check_casts(program: &mut Program, ctx: &mut CompileCtx) {
     let layouts = LayoutEngine::new(&program.structs);
@@ -30,9 +29,11 @@ impl<'a> Context<'a> {
 
     fn check_statement(&mut self, stmt: &mut Spanned<Statement>) {
         match **stmt {
-            Statement::Block(ref mut stmts) => for stmt in stmts {
-                self.check_statement(stmt);
-            },
+            Statement::Block(ref mut stmts) => {
+                for stmt in stmts {
+                    self.check_statement(stmt);
+                }
+            }
             Statement::Break | Statement::Continue | Statement::Error => {}
             Statement::Expr(ref mut expr) | Statement::Return(ref mut expr) => {
                 self.check_expr(expr)

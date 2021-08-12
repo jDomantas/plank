@@ -4,8 +4,10 @@
 /// from zero.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 pub struct Position {
-    #[allow(missing_docs)] pub line: u32,
-    #[allow(missing_docs)] pub column: u32,
+    #[allow(missing_docs)]
+    pub line: u32,
+    #[allow(missing_docs)]
+    pub column: u32,
 }
 
 impl Position {
@@ -46,8 +48,10 @@ impl Position {
 /// inside the editor.
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub struct Span {
-    #[allow(missing_docs)] pub start: Position,
-    #[allow(missing_docs)] pub end: Position,
+    #[allow(missing_docs)]
+    pub start: Position,
+    #[allow(missing_docs)]
+    pub end: Position,
 }
 
 impl Span {

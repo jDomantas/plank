@@ -3,25 +3,25 @@ extern crate plank_ir;
 extern crate plank_syntax;
 
 mod ast {
+    pub mod cfg;
     pub mod resolved;
     pub mod typed;
-    pub mod cfg;
 }
-mod symbols;
+mod assign_check;
+mod build_cfg;
+mod build_ir;
+mod cast_check;
+mod dead_code;
+mod gen_constructors;
+mod literal_size_check;
 mod resolve_symbols;
+mod return_check;
+mod struct_check;
+mod struct_layout;
+mod symbols;
+mod type_check;
 mod type_param_check;
 mod wildcard_check;
-mod type_check;
-mod cast_check;
-mod build_cfg;
-mod dead_code;
-mod return_check;
-mod gen_constructors;
-mod struct_layout;
-mod build_ir;
-mod assign_check;
-mod struct_check;
-mod literal_size_check;
 
 mod builtins {
     use ast::resolved::Symbol;
@@ -38,7 +38,6 @@ mod builtins {
 use plank_errors::Reporter;
 use plank_syntax::ast::Program;
 use symbols::Symbols;
-
 
 struct CompileCtx {
     symbols: Symbols,

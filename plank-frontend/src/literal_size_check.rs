@@ -1,7 +1,8 @@
+use ast::typed::{
+    Expr, Literal, Number, Program, Signedness, Size, Statement, Type, TypedExpr, UnaryOp,
+};
 use plank_errors::position::Span;
-use ast::typed::{Program, Expr, TypedExpr, Statement, Literal, UnaryOp, Type, Signedness, Size, Number};
 use CompileCtx;
-
 
 struct Context<'a> {
     ctx: &'a mut CompileCtx,
@@ -23,23 +24,21 @@ impl<'a> Context<'a> {
                 };
                 n.value = check_literal(val, &expr.typ, expr.span, self.ctx) as u64;
             }
-            Expr::Unary(op, ref mut value) => {
-                match (*op, value.expr.as_mut()) {
-                    (UnaryOp::Minus, &mut Expr::Literal(Literal::Number(n))) => {
-                        let val = if n.value > ::std::i64::MAX as u64 {
-                            ::std::i64::MIN
-                        } else {
-                            -(n.value as i64)
-                        };
-                        let value = check_literal(val, &expr.typ, expr.span, self.ctx);
-                        replace_with = Some(Expr::Literal(Literal::Number(Number {
-                            value: value as u64,
-                            .. n
-                        })));
-                    }
-                    _ => self.check_expr(value),
+            Expr::Unary(op, ref mut value) => match (*op, value.expr.as_mut()) {
+                (UnaryOp::Minus, &mut Expr::Literal(Literal::Number(n))) => {
+                    let val = if n.value > ::std::i64::MAX as u64 {
+                        ::std::i64::MIN
+                    } else {
+                        -(n.value as i64)
+                    };
+                    let value = check_literal(val, &expr.typ, expr.span, self.ctx);
+                    replace_with = Some(Expr::Literal(Literal::Number(Number {
+                        value: value as u64,
+                        ..n
+                    })));
                 }
-            }
+                _ => self.check_expr(value),
+            },
             Expr::Binary(ref mut a, _, ref mut b) => {
                 self.check_expr(a);
                 self.check_expr(b);
@@ -50,11 +49,8 @@ impl<'a> Context<'a> {
                     self.check_expr(param);
                 }
             }
-            Expr::Cast(ref mut e, _) |
-            Expr::Field(ref mut e, _) => self.check_expr(e),
-            Expr::Error |
-            Expr::Name(_, _) |
-            Expr::Literal(_) => {}
+            Expr::Cast(ref mut e, _) | Expr::Field(ref mut e, _) => self.check_expr(e),
+            Expr::Error | Expr::Name(_, _) | Expr::Literal(_) => {}
         }
         if let Some(new_expr) = replace_with {
             *expr.expr = new_expr
@@ -68,13 +64,13 @@ impl<'a> Context<'a> {
                     self.check_statement(stmt);
                 }
             }
-            Statement::Break |
-            Statement::Continue |
-            Statement::Error |
-            Statement::Let(_, _, _, None) => {}
-            Statement::Expr(ref mut expr) |
-            Statement::Let(_, _, _, Some(ref mut expr)) |
-            Statement::Return(ref mut expr) => {
+            Statement::Break
+            | Statement::Continue
+            | Statement::Error
+            | Statement::Let(_, _, _, None) => {}
+            Statement::Expr(ref mut expr)
+            | Statement::Let(_, _, _, Some(ref mut expr))
+            | Statement::Return(ref mut expr) => {
                 self.check_expr(expr);
             }
             Statement::If(ref mut cond, ref mut then, ref mut else_) => {
@@ -98,7 +94,7 @@ impl<'a> Context<'a> {
 fn check_literal(value: i64, typ: &Type, span: Span, ctx: &mut CompileCtx) -> i64 {
     use self::Signedness::*;
     use self::Size::*;
-    use std::{i8, i16, i32, i64, u8, u16, u32};
+    use std::{i16, i32, i64, i8, u16, u32, u8};
     let (low, high) = match *typ {
         Type::Int(Signed, Bit8) => (i8::MIN as i64, i8::MAX as i64),
         Type::Int(Signed, Bit16) => (i16::MIN as i64, i16::MAX as i64),

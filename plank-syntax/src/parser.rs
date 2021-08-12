@@ -1,26 +1,33 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use ast::{
+    BinaryOp, CallParam, Expr, Field, FnParam, Function, FunctionType, Ident, ItemName, Literal,
+    Mutability, Program, Statement, Struct, Type, UnaryOp,
+};
 use plank_errors::Reporter;
-use ast::{BinaryOp, CallParam, Expr, Function, FunctionType, Ident, ItemName, Literal, Program,
-          Statement, Struct, Type, UnaryOp, Field, FnParam, Mutability};
 use position::{Position, Span, Spanned};
+use std::collections::{HashMap, HashSet, VecDeque};
 use tokens::{Keyword, Token, TokenKind};
-
 
 macro_rules! parse_infix {
     ($parser:expr, $tok:ident, $op:ident, $prec:ident, $left_assoc:expr) => {{
-        $parser.infix(TokenKind::Token(Token::$tok), &BinaryOpParser {
-            prec: Precedence::$prec,
-            op: BinaryOp::$op,
-            left_assoc: $left_assoc,
-        });
-    }}
+        $parser.infix(
+            TokenKind::Token(Token::$tok),
+            &BinaryOpParser {
+                prec: Precedence::$prec,
+                op: BinaryOp::$op,
+                left_assoc: $left_assoc,
+            },
+        );
+    }};
 }
 
 pub fn parse(tokens: Vec<Spanned<Token>>, reporter: Reporter) -> Program {
     let mut parser = Parser::new(tokens, reporter);
 
     parser.prefix(TokenKind::Literal, &LiteralParser);
-    parser.prefix(TokenKind::Token(Token::Keyword(Keyword::Unit)), &LiteralParser);
+    parser.prefix(
+        TokenKind::Token(Token::Keyword(Keyword::Unit)),
+        &LiteralParser,
+    );
     parser.prefix(TokenKind::Ident, &NameParser);
     parser.prefix(TokenKind::Token(Token::Ampersand), &AddressOfParser);
     parser.prefix(TokenKind::Token(Token::Plus), &UnaryOpParser(UnaryOp::Plus));
@@ -100,8 +107,8 @@ struct Parser<'a> {
     tokens: VecDeque<Spanned<Token>>,
     next_token: Option<Spanned<Token>>,
     prev_span: Option<Span>,
-    prefix_parsers: HashMap<TokenKind, &'a PrefixParser>,
-    infix_parsers: HashMap<TokenKind, &'a InfixParser>,
+    prefix_parsers: HashMap<TokenKind, &'a dyn PrefixParser>,
+    infix_parsers: HashMap<TokenKind, &'a dyn InfixParser>,
     last_line_completed: bool,
 }
 
@@ -156,12 +163,14 @@ impl<'a> Parser<'a> {
                 _ => true,
             });
         }
-        let mut expected = self.expected
+        let mut expected = self
+            .expected
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
         expected.sort();
-        let got = self.peek()
+        let got = self
+            .peek()
             .cloned()
             .map(|t| TokenKind::Token(t).to_string())
             .unwrap_or_else(|| "end of input".into());
@@ -181,12 +190,14 @@ impl<'a> Parser<'a> {
             }
         };
         let span = self.peek_span();
-        let builder = self.reporter
+        let builder = self
+            .reporter
             .error(format!("{}, got {}.", expected, got), span)
             .span_note(format!("unexpected {}", got), span);
         if let Some((span, msg)) = helper {
             builder.span_note(msg, span).build();
-        } else if !self.last_line_completed && self.prev_span.is_some()
+        } else if !self.last_line_completed
+            && self.prev_span.is_some()
             && self.prev_span.unwrap().end.line < self.peek_span().start.line
         {
             let last_pos = self.prev_span.unwrap().end;
@@ -270,7 +281,7 @@ impl<'a> Parser<'a> {
         self.last_line_completed = false;
         match self.next_token.take() {
             Some(tok) => {
-                self.expected = ::std::mem::replace(&mut self.expected2, HashSet::new());
+                self.expected = std::mem::take(&mut self.expected2);
                 self.next_token = self.tokens.pop_front();
                 self.prev_span = Some(Spanned::span(&tok));
                 Ok(tok)
@@ -322,9 +333,9 @@ impl<'a> Parser<'a> {
     fn synchronize_item(&mut self) {
         loop {
             match self.peek() {
-                Some(&Token::Keyword(Keyword::Struct)) |
-                Some(&Token::Keyword(Keyword::Extern)) |
-                None => {
+                Some(&Token::Keyword(Keyword::Struct))
+                | Some(&Token::Keyword(Keyword::Extern))
+                | None => {
                     return;
                 }
                 // don't stop on fn type - also check that after fn goes an ident
@@ -342,15 +353,15 @@ impl<'a> Parser<'a> {
     fn synchronize_statement(&mut self) -> ParseResult<()> {
         loop {
             match self.peek() {
-                Some(&Token::Keyword(Keyword::If)) |
-                Some(&Token::Keyword(Keyword::Loop)) |
-                Some(&Token::Keyword(Keyword::While)) |
-                Some(&Token::Keyword(Keyword::Break)) |
-                Some(&Token::Keyword(Keyword::Continue)) |
-                Some(&Token::Keyword(Keyword::Let)) |
-                Some(&Token::Keyword(Keyword::Return)) |
-                Some(&Token::LeftBrace) |
-                Some(&Token::RightBrace) => {
+                Some(&Token::Keyword(Keyword::If))
+                | Some(&Token::Keyword(Keyword::Loop))
+                | Some(&Token::Keyword(Keyword::While))
+                | Some(&Token::Keyword(Keyword::Break))
+                | Some(&Token::Keyword(Keyword::Continue))
+                | Some(&Token::Keyword(Keyword::Let))
+                | Some(&Token::Keyword(Keyword::Return))
+                | Some(&Token::LeftBrace)
+                | Some(&Token::RightBrace) => {
                     return Ok(());
                 }
                 Some(&Token::Keyword(Keyword::Fn)) => {
@@ -437,11 +448,13 @@ impl<'a> Parser<'a> {
         match self.parse_struct_fields() {
             Ok(fields) => {
                 let complete_span = start_span.merge(self.previous_span());
-                PartialResult::Ok(Struct { name, fields, complete_span })
+                PartialResult::Ok(Struct {
+                    name,
+                    fields,
+                    complete_span,
+                })
             }
-            Err(()) => {
-                PartialResult::Partial(Spanned::into_value(name.name))
-            }
+            Err(()) => PartialResult::Partial(Spanned::into_value(name.name)),
         }
     }
 
@@ -462,7 +475,11 @@ impl<'a> Parser<'a> {
         Ok(fields)
     }
 
-    fn parse_function(&mut self, start_span: Span, fn_type: FunctionType) -> PartialResult<Function, Ident> {
+    fn parse_function(
+        &mut self,
+        start_span: Span,
+        fn_type: FunctionType,
+    ) -> PartialResult<Function, Ident> {
         let name = match self.parse_item_name() {
             PartialResult::Ok(name) => name,
             PartialResult::Partial(name) => return PartialResult::Partial(name),
@@ -480,13 +497,13 @@ impl<'a> Parser<'a> {
                     body,
                 })
             }
-            Err(()) => {
-                PartialResult::Partial(Spanned::into_value(name.name))
-            }
+            Err(()) => PartialResult::Partial(Spanned::into_value(name.name)),
         }
     }
 
-    fn parse_function_end(&mut self) -> ParseResult<(Vec<FnParam>, Spanned<Type>, Option<Spanned<Statement>>)> {
+    fn parse_function_end(
+        &mut self,
+    ) -> ParseResult<(Vec<FnParam>, Spanned<Type>, Option<Spanned<Statement>>)> {
         self.expect(Token::LeftParen)?;
         let params = self.parse_function_params()?;
         let return_type = if self.check(Token::Arrow) {
@@ -515,7 +532,11 @@ impl<'a> Parser<'a> {
             let name = self.consume_ident()?;
             self.expect(Token::Colon)?;
             let typ = self.parse_type()?;
-            params.push(FnParam { mutability, name, typ });
+            params.push(FnParam {
+                mutability,
+                name,
+                typ,
+            });
             if self.check(Token::RightParen) {
                 break;
             }
@@ -538,8 +559,7 @@ impl<'a> Parser<'a> {
     fn parse_generic_params(&mut self) -> ParseResult<Vec<Spanned<Ident>>> {
         if self.check(Token::Less) {
             let open_span = self.previous_span();
-            let mut type_params = Vec::new();
-            type_params.push(self.consume_ident()?);
+            let mut type_params = vec![self.consume_ident()?];
             while self.check(Token::Comma) {
                 type_params.push(self.consume_ident()?);
             }
@@ -628,8 +648,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_params(&mut self) -> ParseResult<Vec<Spanned<Type>>> {
-        let mut types = Vec::new();
-        types.push(self.parse_type()?);
+        let mut types = vec![self.parse_type()?];
         while self.check(Token::Comma) {
             types.push(self.parse_type()?);
         }
@@ -782,7 +801,8 @@ impl<'a> Parser<'a> {
 
     fn pratt_parse(&mut self, prec: Precedence) -> ParseResult<Spanned<Expr>> {
         self.expected.insert(Expectation::Expression);
-        let mut expr = self.peek()
+        let mut expr = self
+            .peek()
             .map(|tok| tok.kind())
             .and_then(|tok| self.prefix_parsers.get(&tok).cloned())
             .ok_or_else(|| self.emit_error(None))?
@@ -844,12 +864,12 @@ impl Precedence {
 }
 
 trait PrefixParser {
-    fn parse(&self, &mut Parser) -> ParseResult<Spanned<Expr>>;
+    fn parse(&self, _: &mut Parser) -> ParseResult<Spanned<Expr>>;
 }
 
 trait InfixParser {
     fn precedence(&self) -> Precedence;
-    fn parse(&self, &mut Parser, lhs: Spanned<Expr>) -> ParseResult<Spanned<Expr>>;
+    fn parse(&self, _: &mut Parser, lhs: Spanned<Expr>) -> ParseResult<Spanned<Expr>>;
 }
 
 struct BinaryOpParser {
@@ -942,7 +962,9 @@ impl InfixParser for CastParser {
     }
 
     fn parse(&self, parser: &mut Parser, value: Spanned<Expr>) -> ParseResult<Spanned<Expr>> {
-        parser.expect(Token::Keyword(Keyword::As)).expect("expected `as`");
+        parser
+            .expect(Token::Keyword(Keyword::As))
+            .expect("expected `as`");
         let typ = parser.parse_type()?;
         let span = Spanned::span(&value).merge(Spanned::span(&typ));
         let expr = Expr::Cast(Box::new(value), typ);

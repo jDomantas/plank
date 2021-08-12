@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-use plank_syntax::position::{Span, Spanned};
-use ast::typed::{self as t, Mutability as Mut};
 use ast::cfg;
+use ast::typed::{self as t, Mutability as Mut};
+use plank_syntax::position::{Span, Spanned};
+use std::collections::HashMap;
 use CompileCtx;
-
 
 struct LoopDescr {
     start: cfg::BlockId,
@@ -21,8 +20,7 @@ enum LValue {
 impl LValue {
     fn add_field(&mut self, index: usize) {
         match *self {
-            LValue::Reg(_, _, ref mut fields) |
-            LValue::Deref(_, _, _, ref mut fields) => {
+            LValue::Reg(_, _, ref mut fields) | LValue::Deref(_, _, _, ref mut fields) => {
                 fields.push(index)
             }
             LValue::Error | LValue::Invalid => {}
@@ -121,8 +119,7 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(Mut::Const, _, _, _) |
-            LValue::Reg(Mut::Const, _, _) => {
+            LValue::Deref(Mut::Const, _, _, _) | LValue::Reg(Mut::Const, _, _) => {
                 self.ctx
                     .reporter
                     .error("cannot modify non-mut value", target_span)
@@ -146,18 +143,20 @@ impl<'a> Builder<'a> {
             }
             LValue::Reg(Mut::Mut, reg, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::FieldStore(
-                        Spanned::new(reg, target_span),
-                        fields,
-                        value,
-                    ),
+                    cfg::Instruction::FieldStore(Spanned::new(reg, target_span), fields, value),
                     op_span,
                 );
             }
         }
     }
 
-    fn emit_take_address(&mut self, target: cfg::Reg, value: Spanned<LValue>, op_span: Span, mutable: bool) {
+    fn emit_take_address(
+        &mut self,
+        target: cfg::Reg,
+        value: Spanned<LValue>,
+        op_span: Span,
+        mutable: bool,
+    ) {
         let value_span = Spanned::span(&value);
         match Spanned::into_value(value) {
             LValue::Invalid => {
@@ -168,8 +167,7 @@ impl<'a> Builder<'a> {
                     .build();
             }
             LValue::Error => {}
-            LValue::Deref(Mut::Const, _, _, _) |
-            LValue::Reg(Mut::Const, _, _) if mutable => {
+            LValue::Deref(Mut::Const, _, _, _) | LValue::Reg(Mut::Const, _, _) if mutable => {
                 let span = op_span.merge(value_span);
                 self.ctx
                     .reporter
@@ -179,10 +177,7 @@ impl<'a> Builder<'a> {
             }
             LValue::Deref(_, ref val, _, ref fields) if fields.is_empty() => {
                 self.emit_instruction(
-                    cfg::Instruction::Assign(
-                        target,
-                        Spanned::new(val.as_value(), value_span),
-                    ),
+                    cfg::Instruction::Assign(target, Spanned::new(val.as_value(), value_span)),
                     op_span,
                 );
                 self.drop_value(val, value_span);
@@ -200,11 +195,7 @@ impl<'a> Builder<'a> {
             }
             LValue::Reg(_, reg, fields) => {
                 self.emit_instruction(
-                    cfg::Instruction::TakeAddress(
-                        target,
-                        Spanned::new(reg, value_span),
-                        fields,
-                    ),
+                    cfg::Instruction::TakeAddress(target, Spanned::new(reg, value_span), fields),
                     op_span,
                 );
             }
@@ -303,11 +294,7 @@ impl<'a> Builder<'a> {
                 let after = self.new_block();
                 let link = cfg::BlockLink::Weak(body);
                 self.end_block(
-                    cfg::BlockEnd::Branch(
-                        Spanned::new(c.as_value(), cond.span),
-                        body,
-                        else_body,
-                    ),
+                    cfg::BlockEnd::Branch(Spanned::new(c.as_value(), cond.span), body, else_body),
                     link,
                 );
                 self.start_block(body);
@@ -328,11 +315,7 @@ impl<'a> Builder<'a> {
                 let after = self.new_block();
                 let link = cfg::BlockLink::Weak(body);
                 self.end_block(
-                    cfg::BlockEnd::Branch(
-                        Spanned::new(c.as_value(), cond.span),
-                        body,
-                        after,
-                    ),
+                    cfg::BlockEnd::Branch(Spanned::new(c.as_value(), cond.span), body, after),
                     link,
                 );
                 self.start_block(body);
@@ -381,9 +364,7 @@ impl<'a> Builder<'a> {
                 let new = self.new_block();
                 let link = cfg::BlockLink::Strong(new);
                 self.end_block(
-                    cfg::BlockEnd::Return(
-                        Spanned::new(value.as_value(), e.span),
-                    ),
+                    cfg::BlockEnd::Return(Spanned::new(value.as_value(), e.span)),
                     link,
                 );
                 self.start_block(new);
@@ -400,11 +381,7 @@ impl<'a> Builder<'a> {
                 let c = self.build_expr(cond);
                 let link = cfg::BlockLink::Weak(body_start);
                 self.end_block(
-                    cfg::BlockEnd::Branch(
-                        Spanned::new(c.as_value(), cond.span),
-                        body_start,
-                        after,
-                    ),
+                    cfg::BlockEnd::Branch(Spanned::new(c.as_value(), cond.span), body_start, after),
                     link,
                 );
                 self.start_block(body_start);
@@ -437,25 +414,27 @@ impl<'a> Builder<'a> {
                 }
                 t::BinaryOp::And => self.build_and(lhs, rhs),
                 t::BinaryOp::Or => self.build_or(lhs, rhs),
-                op => if let Some(op) = binop_to_instruction(op, &lhs.typ) {
-                    let built_lhs = self.build_expr(lhs);
-                    let built_rhs = self.build_expr(rhs);
-                    let result = self.new_register(e.typ.clone());
-                    self.emit_instruction(
-                        cfg::Instruction::BinaryOp(
-                            result,
-                            op,
-                            Spanned::new(built_lhs.as_value(), lhs.span),
-                            Spanned::new(built_rhs.as_value(), rhs.span),
-                        ),
-                        e.span,
-                    );
-                    self.drop_value(&built_lhs, lhs.span);
-                    self.drop_value(&built_rhs, rhs.span);
-                    RValue::Temp(cfg::Value::Reg(result))
-                } else {
-                    RValue::Temp(cfg::Value::Error)
-                },
+                op => {
+                    if let Some(op) = binop_to_instruction(op, &lhs.typ) {
+                        let built_lhs = self.build_expr(lhs);
+                        let built_rhs = self.build_expr(rhs);
+                        let result = self.new_register(e.typ.clone());
+                        self.emit_instruction(
+                            cfg::Instruction::BinaryOp(
+                                result,
+                                op,
+                                Spanned::new(built_lhs.as_value(), lhs.span),
+                                Spanned::new(built_rhs.as_value(), rhs.span),
+                            ),
+                            e.span,
+                        );
+                        self.drop_value(&built_lhs, lhs.span);
+                        self.drop_value(&built_rhs, rhs.span);
+                        RValue::Temp(cfg::Value::Reg(result))
+                    } else {
+                        RValue::Temp(cfg::Value::Error)
+                    }
+                }
             },
             t::Expr::Call(ref name, ref params) => {
                 let callee = self.build_expr(name);
@@ -497,11 +476,13 @@ impl<'a> Builder<'a> {
             }
             t::Expr::Literal(ref literal) => RValue::Temp(match *literal {
                 t::Literal::Unit => cfg::Value::Unit,
-                t::Literal::Bool(b) => if b {
-                    cfg::Value::Int(1, cfg::Size::Bit8)
-                } else {
-                    cfg::Value::Int(0, cfg::Size::Bit8)
-                },
+                t::Literal::Bool(b) => {
+                    if b {
+                        cfg::Value::Int(1, cfg::Size::Bit8)
+                    } else {
+                        cfg::Value::Int(0, cfg::Size::Bit8)
+                    }
+                }
                 t::Literal::Char(c) => cfg::Value::Int(u64::from(c), cfg::Size::Bit8),
                 t::Literal::Number(n) => {
                     let size = match e.typ {
@@ -523,11 +504,7 @@ impl<'a> Builder<'a> {
                 if let Some(reg) = self.var_registers.get(&name).cloned() {
                     RValue::Var(reg)
                 } else {
-                    let type_params = type_params
-                        .iter()
-                        .map(Spanned::value)
-                        .cloned()
-                        .collect();
+                    let type_params = type_params.iter().map(Spanned::value).cloned().collect();
                     RValue::Temp(cfg::Value::Symbol(name, type_params))
                 }
             }
@@ -564,10 +541,7 @@ impl<'a> Builder<'a> {
                 let value = self.build_expr(expr);
                 let result = self.new_register((**typ).clone());
                 self.emit_instruction(
-                    cfg::Instruction::CastAssign(
-                        result,
-                        Spanned::new(value.as_value(), expr.span),
-                    ),
+                    cfg::Instruction::CastAssign(result, Spanned::new(value.as_value(), expr.span)),
                     expr.span,
                 );
                 self.drop_value(&value, expr.span);
@@ -578,10 +552,10 @@ impl<'a> Builder<'a> {
 
     fn build_expr_lvalue(&mut self, e: &t::TypedExpr) -> LValue {
         match *e.expr {
-            t::Expr::Binary(_, _, _) |
-            t::Expr::Call(_, _) |
-            t::Expr::Literal(_) |
-            t::Expr::Cast(_, _) => LValue::Invalid,
+            t::Expr::Binary(_, _, _)
+            | t::Expr::Call(_, _)
+            | t::Expr::Literal(_)
+            | t::Expr::Cast(_, _) => LValue::Invalid,
             t::Expr::Error => LValue::Error,
             t::Expr::Field(ref expr, index) => {
                 let mut lvalue = self.build_expr_lvalue(expr);
@@ -629,10 +603,7 @@ impl<'a> Builder<'a> {
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
         self.emit_instruction(
-            cfg::Instruction::Assign(
-                result,
-                Spanned::new(built_rhs.as_value(), rhs.span),
-            ),
+            cfg::Instruction::Assign(result, Spanned::new(built_rhs.as_value(), rhs.span)),
             rhs.span,
         );
         self.drop_value(&built_rhs, rhs.span);
@@ -676,10 +647,7 @@ impl<'a> Builder<'a> {
         self.drop_value(&built_lhs, lhs.span);
         let built_rhs = self.build_expr(rhs);
         self.emit_instruction(
-            cfg::Instruction::Assign(
-                result,
-                Spanned::new(built_rhs.as_value(), rhs.span),
-            ),
+            cfg::Instruction::Assign(result, Spanned::new(built_rhs.as_value(), rhs.span)),
             rhs.span,
         );
         self.drop_value(&built_rhs, rhs.span);
@@ -737,7 +705,9 @@ fn unop_to_instruction(op: t::UnaryOp, arg_type: &t::Type) -> Option<cfg::UnaryO
         t::UnaryOp::Deref => Some(cfg::UnaryOp::DerefLoad),
         t::UnaryOp::Minus => int.map(|(sign, size)| cfg::UnaryOp::Negate(sign, size)),
         t::UnaryOp::Not => Some(cfg::UnaryOp::Not),
-        t::UnaryOp::Plus | t::UnaryOp::AddressOf | t::UnaryOp::MutAddressOf => panic!("invalid unary op"),
+        t::UnaryOp::Plus | t::UnaryOp::AddressOf | t::UnaryOp::MutAddressOf => {
+            panic!("invalid unary op")
+        }
     }
 }
 

@@ -1,6 +1,5 @@
-use std::{borrow, ops};
 pub use plank_errors::position::{Position, Span};
-
+use std::{borrow, ops};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct Spanned<T> {

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use ast::resolved::Symbol;
-
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Symbols {
