@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use ast::cfg::{Size, Symbol, Type};
 use ast::typed::Struct;
-
+use std::collections::HashMap;
 
 const POINTER_SIZE: u32 = ::plank_ir::ir::POINTER_SIZE;
 const FUNCTION_SIZE: u32 = ::plank_ir::ir::FUNCTION_SIZE;
@@ -66,7 +65,8 @@ impl<'a> LayoutEngine<'a> {
                     None => return LayoutResult::HasTypeParam,
                 };
                 debug_assert_eq!(params.len(), s.type_params.len());
-                let mapping = s.type_params
+                let mapping = s
+                    .type_params
                     .iter()
                     .cloned()
                     .zip(params.iter().cloned())
@@ -99,23 +99,25 @@ impl<'a> LayoutEngine<'a> {
 
     pub fn field_info(&self, ty: &Type, field: usize) -> (u32, Type) {
         match *ty {
-            Type::Unit |
-            Type::Bool |
-            Type::Error |
-            Type::Pointer(_, _) |
-            Type::Function(_, _) |
-            Type::Int(_, _) |
-            Type::Var(_) => panic!("no fields on type"),
+            Type::Unit
+            | Type::Bool
+            | Type::Error
+            | Type::Pointer(_, _)
+            | Type::Function(_, _)
+            | Type::Int(_, _)
+            | Type::Var(_) => panic!("no fields on type"),
             Type::Concrete(sym, ref params) => {
                 let s = &self.structs[&sym];
                 debug_assert_eq!(params.len(), s.type_params.len());
-                let mapping = s.type_params
+                let mapping = s
+                    .type_params
                     .iter()
                     .cloned()
                     .zip(params.iter().cloned())
                     .collect();
                 debug_assert!(field < s.fields.len());
-                let (size, last_size) = s.fields
+                let (size, last_size) = s
+                    .fields
                     .iter()
                     .take(field + 1)
                     .map(|field| field.typ.replace(&mapping))

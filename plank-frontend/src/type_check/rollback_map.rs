@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-
 pub struct Map<K, V> {
     committed: HashMap<K, V>,
     new: HashMap<K, V>,

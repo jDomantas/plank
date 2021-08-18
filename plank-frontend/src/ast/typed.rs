@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-use std::rc::Rc;
+pub use ast::resolved::{Mutability, Symbol};
 pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp};
 use plank_syntax::position::{Span, Spanned};
-pub use ast::resolved::{Mutability, Symbol};
-
+use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -36,7 +35,12 @@ pub enum Statement {
     Break,
     Continue,
     Return(TypedExpr),
-    Let(Mutability, Spanned<Symbol>, Spanned<Type>, Option<TypedExpr>),
+    Let(
+        Mutability,
+        Spanned<Symbol>,
+        Spanned<Type>,
+        Option<TypedExpr>,
+    ),
     Block(Vec<Spanned<Statement>>),
     Expr(TypedExpr),
     Error,
@@ -61,16 +65,18 @@ impl Type {
     pub fn replace(&self, mapping: &HashMap<Symbol, Type>) -> Type {
         match *self {
             Type::Bool | Type::Error | Type::Int(_, _) | Type::Var(_) | Type::Unit => self.clone(),
-            Type::Concrete(sym, ref params) => if let Some(typ) = mapping.get(&sym).cloned() {
-                typ
-            } else {
-                let params = params
-                    .iter()
-                    .map(|ty| ty.replace(mapping))
-                    .collect::<Vec<_>>()
-                    .into();
-                Type::Concrete(sym, params)
-            },
+            Type::Concrete(sym, ref params) => {
+                if let Some(typ) = mapping.get(&sym).cloned() {
+                    typ
+                } else {
+                    let params = params
+                        .iter()
+                        .map(|ty| ty.replace(mapping))
+                        .collect::<Vec<_>>()
+                        .into();
+                    Type::Concrete(sym, params)
+                }
+            }
             Type::Function(ref params, ref out) => {
                 let params = params
                     .iter()
@@ -89,14 +95,13 @@ impl Type {
 
     pub fn is_atomic(&self) -> bool {
         match *self {
-            Type::Bool |
-            Type::Function(_, _) |
-            Type::Int(_, _) |
-            Type::Pointer(_, _) |
-            Type::Unit => true,
+            Type::Bool
+            | Type::Function(_, _)
+            | Type::Int(_, _)
+            | Type::Pointer(_, _)
+            | Type::Unit => true,
             Type::Concrete(_, _) => false,
-            Type::Error |
-            Type::Var(_) => panic!("cannot say atomicity of {:?}", self),
+            Type::Error | Type::Var(_) => panic!("cannot say atomicity of {:?}", self),
         }
     }
 }

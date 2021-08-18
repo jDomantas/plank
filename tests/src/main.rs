@@ -1,16 +1,15 @@
 extern crate plank_errors;
-extern crate plank_syntax;
 extern crate plank_frontend;
-extern crate plank_ir;
 extern crate plank_interpreter;
+extern crate plank_ir;
+extern crate plank_syntax;
 
 mod test_parser;
 
+use plank_errors::reporter::Diagnostic;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use plank_errors::reporter::Diagnostic;
-
 
 enum BuildError {
     Fail(Vec<Diagnostic>),
@@ -21,9 +20,8 @@ fn build_code(source: &str) -> Result<plank_ir::Program, BuildError> {
     let reporter = plank_errors::Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
-    let ir = plank_frontend::compile(&program, reporter.clone()).map_err(|()| {
-        BuildError::Fail(reporter.get_diagnostics())
-    })?;
+    let ir = plank_frontend::compile(&program, reporter.clone())
+        .map_err(|()| BuildError::Fail(reporter.get_diagnostics()))?;
     if let Err((sym, err)) = plank_ir::validate_ir(&ir) {
         return Err(BuildError::BadIr(sym.clone(), err));
     }
@@ -71,7 +69,10 @@ fn interpret_program(program: plank_ir::Program, input: Vec<u8>, output: Vec<u8>
     let mut actual_output = Vec::new();
     match plank_interpreter::run_program(&program, &mut input, &mut actual_output) {
         Ok(0) if actual_output == output => TestResult::Ok,
-        Ok(0) => TestResult::IoMismatch { expected: output, got: actual_output },
+        Ok(0) => TestResult::IoMismatch {
+            expected: output,
+            got: actual_output,
+        },
         Ok(code) => TestResult::InterpreterExit(code),
         Err(e) => TestResult::InterpreterError(e),
     }
@@ -83,27 +84,21 @@ fn run_test(source: &str) -> TestResult {
         Err(e) => return TestResult::MalformedTest(e),
     };
     match expectation {
-        test_parser::Expectation::BuildErrors(errors) => {
-            match build_code(source) {
-                Ok(_) => TestResult::BadBuildPass(errors),
-                Err(BuildError::Fail(got)) => match_build_errors(errors, got),
-                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
-            }
-        }
-        test_parser::Expectation::Io { input, output} => {
-            match build_code(source) {
-                Ok(program) => interpret_program(program, input, output),
-                Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
-                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
-            }
-        }
-        test_parser::Expectation::BuildSuccess => {
-            match build_code(source) {
-                Ok(_) => TestResult::Ok,
-                Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
-                Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
-            }
-        }
+        test_parser::Expectation::BuildErrors(errors) => match build_code(source) {
+            Ok(_) => TestResult::BadBuildPass(errors),
+            Err(BuildError::Fail(got)) => match_build_errors(errors, got),
+            Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
+        },
+        test_parser::Expectation::Io { input, output } => match build_code(source) {
+            Ok(program) => interpret_program(program, input, output),
+            Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
+            Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
+        },
+        test_parser::Expectation::BuildSuccess => match build_code(source) {
+            Ok(_) => TestResult::Ok,
+            Err(BuildError::Fail(e)) => TestResult::BuildFail(e),
+            Err(BuildError::BadIr(sym, err)) => TestResult::IrValidationFail(sym, err),
+        },
     }
 }
 
@@ -176,7 +171,10 @@ fn report_results(results: &[(String, String, TestResult)]) {
                 plank_errors::printer::print_diagnostics(source, got);
                 println!();
             }
-            TestResult::IoMismatch { ref expected, ref got } => {
+            TestResult::IoMismatch {
+                ref expected,
+                ref got,
+            } => {
                 println!("========================================");
                 println!("test {}", name);
                 println!("wrong output");

@@ -1,14 +1,13 @@
+mod arithmetic;
+mod cleanup;
 mod constant_fold;
-mod simplify_newtypes;
+mod dead_drop_elimination;
 mod dead_store_elimination;
 mod intermediate_removal;
-mod dead_drop_elimination;
-mod cleanup;
-mod arithmetic;
+mod simplify_newtypes;
 
 use analysis::Loc;
-use ir::{Program, Function, BlockId, Block, Instruction};
-
+use ir::{Block, BlockId, Function, Instruction, Program};
 
 trait Rewriter {
     fn rewrite_program(&mut self, program: &mut Program) {
@@ -40,7 +39,10 @@ fn rewrite_function<R: Rewriter + ?Sized>(r: &mut R, f: &mut Function) {
 
 fn rewrite_block<R: Rewriter + ?Sized>(r: &mut R, id: BlockId, block: &mut Block) {
     for (index, i) in block.ops.iter_mut().enumerate() {
-        let loc = Loc { block: id, pos: index };
+        let loc = Loc {
+            block: id,
+            pos: index,
+        };
         r.rewrite_instruction(loc, i);
     }
 }

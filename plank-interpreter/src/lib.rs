@@ -1,9 +1,8 @@
 extern crate plank_ir;
 
+use plank_ir::{ir, Program};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use plank_ir::{ir, Program};
-
 
 #[derive(Debug)]
 pub enum Error {
@@ -38,7 +37,11 @@ impl ::std::fmt::Display for Error {
     }
 }
 
-pub fn run_program<R: Read, W: Write>(program: &Program, input: R, output: W) -> Result<i32, Error> {
+pub fn run_program<R: Read, W: Write>(
+    program: &Program,
+    input: R,
+    output: W,
+) -> Result<i32, Error> {
     plank_ir::validate_ir(program).expect("invalid ir");
     Vm::new(program, input, output)?.run()
 }
@@ -95,9 +98,9 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         let mut symbol_ids = HashMap::new();
         let mut symbols_by_id = HashMap::new();
         for (index, (symbol, f)) in program.functions.iter().enumerate() {
-            if f.start_block.is_some() ||
-                &*symbol.0 == "builtin_getc" ||
-                &*symbol.0 == "builtin_putc"
+            if f.start_block.is_some()
+                || &*symbol.0 == "builtin_getc"
+                || &*symbol.0 == "builtin_putc"
             {
                 symbol_ids.insert(symbol.clone(), index as u32);
                 symbols_by_id.insert(index as u32, symbol.clone());
@@ -133,7 +136,10 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
         &self.current_frame.function.blocks[&self.current_frame.current_block]
     }
 
-    fn allocate_registers(&mut self, registers: &HashMap<ir::Reg, ir::Layout>) -> HashMap<ir::Reg, u32> {
+    fn allocate_registers(
+        &mut self,
+        registers: &HashMap<ir::Reg, ir::Layout>,
+    ) -> HashMap<ir::Reg, u32> {
         let mut result = HashMap::new();
         for (&reg, &layout) in registers {
             let at = self.memory.len() as u32;
@@ -249,40 +255,38 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 assert_eq!(al, bl);
                 self.mem_cmp(a, b, al)
             }
-            (Value::AddressRange(a, al), Value::Byte(b)) |
-            (Value::Byte(b), Value::AddressRange(a, al)) => {
+            (Value::AddressRange(a, al), Value::Byte(b))
+            | (Value::Byte(b), Value::AddressRange(a, al)) => {
                 assert_eq!(al, 1);
                 self.memory[a as usize] == b
             }
-            (Value::AddressRange(a, al), Value::Word(b)) |
-            (Value::Word(b), Value::AddressRange(a, al)) => {
+            (Value::AddressRange(a, al), Value::Word(b))
+            | (Value::Word(b), Value::AddressRange(a, al)) => {
                 assert_eq!(al, 2);
-                self.memory[a as usize + 0] == (b & 0xFF) as u8 && 
-                self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
+                self.memory[a as usize + 0] == (b & 0xFF) as u8
+                    && self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
             }
-            (Value::AddressRange(a, al), Value::DoubleWord(b)) |
-            (Value::DoubleWord(b), Value::AddressRange(a, al)) => {
+            (Value::AddressRange(a, al), Value::DoubleWord(b))
+            | (Value::DoubleWord(b), Value::AddressRange(a, al)) => {
                 assert_eq!(al, 4);
-                self.memory[a as usize + 0] == (b & 0xFF) as u8 && 
-                self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8 &&
-                self.memory[a as usize + 2] == ((b >> 16) & 0xFF) as u8 &&
-                self.memory[a as usize + 3] == ((b >> 24) & 0xFF) as u8
+                self.memory[a as usize + 0] == (b & 0xFF) as u8
+                    && self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
+                    && self.memory[a as usize + 2] == ((b >> 16) & 0xFF) as u8
+                    && self.memory[a as usize + 3] == ((b >> 24) & 0xFF) as u8
             }
-            (Value::FromAddress(a), Value::Byte(b)) |
-            (Value::Byte(b), Value::FromAddress(a)) => {
+            (Value::FromAddress(a), Value::Byte(b)) | (Value::Byte(b), Value::FromAddress(a)) => {
                 self.memory[a as usize] == b
             }
-            (Value::FromAddress(a), Value::Word(b)) |
-            (Value::Word(b), Value::FromAddress(a)) => {
-                self.memory[a as usize + 0] == (b & 0xFF) as u8 && 
-                self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
+            (Value::FromAddress(a), Value::Word(b)) | (Value::Word(b), Value::FromAddress(a)) => {
+                self.memory[a as usize + 0] == (b & 0xFF) as u8
+                    && self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
             }
-            (Value::FromAddress(a), Value::DoubleWord(b)) |
-            (Value::DoubleWord(b), Value::FromAddress(a)) => {
-                self.memory[a as usize + 0] == (b & 0xFF) as u8 && 
-                self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8 &&
-                self.memory[a as usize + 2] == ((b >> 16) & 0xFF) as u8 &&
-                self.memory[a as usize + 3] == ((b >> 24) & 0xFF) as u8
+            (Value::FromAddress(a), Value::DoubleWord(b))
+            | (Value::DoubleWord(b), Value::FromAddress(a)) => {
+                self.memory[a as usize + 0] == (b & 0xFF) as u8
+                    && self.memory[a as usize + 1] == ((b >> 8) & 0xFF) as u8
+                    && self.memory[a as usize + 2] == ((b >> 16) & 0xFF) as u8
+                    && self.memory[a as usize + 3] == ((b >> 24) & 0xFF) as u8
             }
             (Value::Byte(a), Value::Byte(b)) => a == b,
             (Value::Word(a), Value::Word(b)) => a == b,
@@ -330,8 +334,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
 
     fn run_op(&mut self, i: &ir::Instruction) -> Result<(), Error> {
         match *i {
-            ir::Instruction::Assign(reg, ref val) |
-            ir::Instruction::CastAssign(reg, ref val) => {
+            ir::Instruction::Assign(reg, ref val) | ir::Instruction::CastAssign(reg, ref val) => {
                 let (to, len) = self.register_address(reg);
                 let val = self.read_value(val)?;
                 self.write_value(to, Some(len), val);
@@ -432,7 +435,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     current_op: 0,
                     return_address: Some(ret),
                 };
-                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                self.frames
+                    .push(::std::mem::replace(&mut self.current_frame, frame));
                 Ok(())
             }
             ir::Instruction::CallProc(ref sym, ref params) => {
@@ -460,7 +464,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     current_op: 0,
                     return_address: None,
                 };
-                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                self.frames
+                    .push(::std::mem::replace(&mut self.current_frame, frame));
                 Ok(())
             }
             ir::Instruction::CallVirt(dest, ref val, ref params) => {
@@ -496,7 +501,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     current_op: 0,
                     return_address: Some(ret),
                 };
-                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                self.frames
+                    .push(::std::mem::replace(&mut self.current_frame, frame));
                 Ok(())
             }
             ir::Instruction::CallProcVirt(ref val, ref params) => {
@@ -525,7 +531,8 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                     current_op: 0,
                     return_address: None,
                 };
-                self.frames.push(::std::mem::replace(&mut self.current_frame, frame));
+                self.frames
+                    .push(::std::mem::replace(&mut self.current_frame, frame));
                 Ok(())
             }
             ir::Instruction::DerefLoad(dest, ref address, offset) => {
@@ -540,9 +547,7 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                 self.write_value(address, None, value);
                 Ok(())
             }
-            ir::Instruction::Drop(_) |
-            ir::Instruction::Init(_) |
-            ir::Instruction::Nop => Ok(()),
+            ir::Instruction::Drop(_) | ir::Instruction::Init(_) | ir::Instruction::Nop => Ok(()),
             ir::Instruction::Load(dest, reg, offset) => {
                 let (to, len) = self.register_address(dest);
                 let (from, _) = self.register_address(reg);
@@ -611,13 +616,15 @@ impl<'a, R: Read, W: Write> Vm<'a, R, W> {
                         self.write_value(to, Some(len), val);
                         match self.frames.pop() {
                             Some(frame) => self.current_frame = frame,
-                            None => return Ok({
-                                let b1 = (self.memory[0] as u32) << 0;
-                                let b2 = (self.memory[1] as u32) << 8;
-                                let b3 = (self.memory[2] as u32) << 16;
-                                let b4 = (self.memory[3] as u32) << 24;
-                                (b1 | b2 | b3 | b4) as i32
-                            }),
+                            None => {
+                                return Ok({
+                                    let b1 = (self.memory[0] as u32) << 0;
+                                    let b2 = (self.memory[1] as u32) << 8;
+                                    let b3 = (self.memory[2] as u32) << 16;
+                                    let b4 = (self.memory[3] as u32) << 24;
+                                    (b1 | b2 | b3 | b4) as i32
+                                })
+                            }
                         }
                     }
                     ir::BlockEnd::ReturnProc => {
@@ -645,57 +652,33 @@ fn int_op_32(op: ir::IntOp, sign: ir::Signedness, a: u32, b: u32) -> Result<Valu
     match (op, sign) {
         (ir::IntOp::Add, _) => Ok(Value::DoubleWord(a.wrapping_add(b))),
         (ir::IntOp::Sub, _) => Ok(Value::DoubleWord(a.wrapping_sub(b))),
-        (ir::IntOp::Greater, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a > b) as u8))
-        }
+        (ir::IntOp::Greater, ir::Signedness::Unsigned) => Ok(Value::Byte((a > b) as u8)),
         (ir::IntOp::Greater, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i32 > b as i32) as u8))
         }
-        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a >= b) as u8))
-        }
+        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a >= b) as u8)),
         (ir::IntOp::GreaterEq, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i32 >= b as i32) as u8))
         }
-        (ir::IntOp::Less, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a < b) as u8))
-        }
-        (ir::IntOp::Less, ir::Signedness::Signed) => {
-            Ok(Value::Byte(((a as i32) < b as i32) as u8))
-        }
-        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a <= b) as u8))
-        }
+        (ir::IntOp::Less, ir::Signedness::Unsigned) => Ok(Value::Byte((a < b) as u8)),
+        (ir::IntOp::Less, ir::Signedness::Signed) => Ok(Value::Byte(((a as i32) < b as i32) as u8)),
+        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a <= b) as u8)),
         (ir::IntOp::LessEq, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i32 <= b as i32) as u8))
         }
-        (ir::IntOp::Mul, ir::Signedness::Unsigned) => {
-            Ok(Value::DoubleWord(a.wrapping_mul(b)))
-        }
+        (ir::IntOp::Mul, ir::Signedness::Unsigned) => Ok(Value::DoubleWord(a.wrapping_mul(b))),
         (ir::IntOp::Mul, ir::Signedness::Signed) => {
             Ok(Value::DoubleWord((a as i32).wrapping_mul(b as i32) as u32))
         }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) => {
-            Ok(Value::DoubleWord(a / b))
-        }
-        (ir::IntOp::Div, ir::Signedness::Signed) if b as i32 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Div, ir::Signedness::Unsigned) => Ok(Value::DoubleWord(a / b)),
+        (ir::IntOp::Div, ir::Signedness::Signed) if b as i32 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Div, ir::Signedness::Signed) => {
             Ok(Value::DoubleWord((a as i32).wrapping_div(b as i32) as u32))
         }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) => {
-            Ok(Value::DoubleWord(a % b))
-        }
-        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i32 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) => Ok(Value::DoubleWord(a % b)),
+        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i32 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Mod, ir::Signedness::Signed) => {
             Ok(Value::DoubleWord((a as i32).wrapping_rem(b as i32) as u32))
         }
@@ -706,57 +689,33 @@ fn int_op_16(op: ir::IntOp, sign: ir::Signedness, a: u16, b: u16) -> Result<Valu
     match (op, sign) {
         (ir::IntOp::Add, _) => Ok(Value::Word(a.wrapping_add(b))),
         (ir::IntOp::Sub, _) => Ok(Value::Word(a.wrapping_sub(b))),
-        (ir::IntOp::Greater, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a > b) as u8))
-        }
+        (ir::IntOp::Greater, ir::Signedness::Unsigned) => Ok(Value::Byte((a > b) as u8)),
         (ir::IntOp::Greater, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i16 > b as i16) as u8))
         }
-        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a >= b) as u8))
-        }
+        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a >= b) as u8)),
         (ir::IntOp::GreaterEq, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i16 >= b as i16) as u8))
         }
-        (ir::IntOp::Less, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a < b) as u8))
-        }
-        (ir::IntOp::Less, ir::Signedness::Signed) => {
-            Ok(Value::Byte(((a as i16) < b as i16) as u8))
-        }
-        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a <= b) as u8))
-        }
+        (ir::IntOp::Less, ir::Signedness::Unsigned) => Ok(Value::Byte((a < b) as u8)),
+        (ir::IntOp::Less, ir::Signedness::Signed) => Ok(Value::Byte(((a as i16) < b as i16) as u8)),
+        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a <= b) as u8)),
         (ir::IntOp::LessEq, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i16 <= b as i16) as u8))
         }
-        (ir::IntOp::Mul, ir::Signedness::Unsigned) => {
-            Ok(Value::Word(a.wrapping_mul(b)))
-        }
+        (ir::IntOp::Mul, ir::Signedness::Unsigned) => Ok(Value::Word(a.wrapping_mul(b))),
         (ir::IntOp::Mul, ir::Signedness::Signed) => {
             Ok(Value::Word((a as i16).wrapping_mul(b as i16) as u16))
         }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) => {
-            Ok(Value::Word(a / b))
-        }
-        (ir::IntOp::Div, ir::Signedness::Signed) if b as i16 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Div, ir::Signedness::Unsigned) => Ok(Value::Word(a / b)),
+        (ir::IntOp::Div, ir::Signedness::Signed) if b as i16 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Div, ir::Signedness::Signed) => {
             Ok(Value::Word((a as i16).wrapping_div(b as i16) as u16))
         }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) => {
-            Ok(Value::Word(a % b))
-        }
-        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i16 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) => Ok(Value::Word(a % b)),
+        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i16 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Mod, ir::Signedness::Signed) => {
             Ok(Value::Word((a as i16).wrapping_rem(b as i16) as u16))
         }
@@ -767,57 +726,29 @@ fn int_op_8(op: ir::IntOp, sign: ir::Signedness, a: u8, b: u8) -> Result<Value, 
     match (op, sign) {
         (ir::IntOp::Add, _) => Ok(Value::Byte(a.wrapping_add(b))),
         (ir::IntOp::Sub, _) => Ok(Value::Byte(a.wrapping_sub(b))),
-        (ir::IntOp::Greater, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a > b) as u8))
-        }
-        (ir::IntOp::Greater, ir::Signedness::Signed) => {
-            Ok(Value::Byte((a as i8 > b as i8) as u8))
-        }
-        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a >= b) as u8))
-        }
+        (ir::IntOp::Greater, ir::Signedness::Unsigned) => Ok(Value::Byte((a > b) as u8)),
+        (ir::IntOp::Greater, ir::Signedness::Signed) => Ok(Value::Byte((a as i8 > b as i8) as u8)),
+        (ir::IntOp::GreaterEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a >= b) as u8)),
         (ir::IntOp::GreaterEq, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i8 >= b as i8) as u8))
         }
-        (ir::IntOp::Less, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a < b) as u8))
-        }
-        (ir::IntOp::Less, ir::Signedness::Signed) => {
-            Ok(Value::Byte(((a as i8) < b as i8) as u8))
-        }
-        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte((a <= b) as u8))
-        }
-        (ir::IntOp::LessEq, ir::Signedness::Signed) => {
-            Ok(Value::Byte((a as i8 <= b as i8) as u8))
-        }
-        (ir::IntOp::Mul, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte(a.wrapping_mul(b)))
-        }
+        (ir::IntOp::Less, ir::Signedness::Unsigned) => Ok(Value::Byte((a < b) as u8)),
+        (ir::IntOp::Less, ir::Signedness::Signed) => Ok(Value::Byte(((a as i8) < b as i8) as u8)),
+        (ir::IntOp::LessEq, ir::Signedness::Unsigned) => Ok(Value::Byte((a <= b) as u8)),
+        (ir::IntOp::LessEq, ir::Signedness::Signed) => Ok(Value::Byte((a as i8 <= b as i8) as u8)),
+        (ir::IntOp::Mul, ir::Signedness::Unsigned) => Ok(Value::Byte(a.wrapping_mul(b))),
         (ir::IntOp::Mul, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i8).wrapping_mul(b as i8) as u8))
         }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Div, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte(a / b))
-        }
-        (ir::IntOp::Div, ir::Signedness::Signed) if b as i8 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Div, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Div, ir::Signedness::Unsigned) => Ok(Value::Byte(a / b)),
+        (ir::IntOp::Div, ir::Signedness::Signed) if b as i8 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Div, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i8).wrapping_div(b as i8) as u8))
         }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => {
-            Err(Error::DivisionByZero)
-        }
-        (ir::IntOp::Mod, ir::Signedness::Unsigned) => {
-            Ok(Value::Byte(a % b))
-        }
-        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i8 == 0 => {
-            Err(Error::DivisionByZero)
-        }
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) if b == 0 => Err(Error::DivisionByZero),
+        (ir::IntOp::Mod, ir::Signedness::Unsigned) => Ok(Value::Byte(a % b)),
+        (ir::IntOp::Mod, ir::Signedness::Signed) if b as i8 == 0 => Err(Error::DivisionByZero),
         (ir::IntOp::Mod, ir::Signedness::Signed) => {
             Ok(Value::Byte((a as i8).wrapping_rem(b as i8) as u8))
         }
@@ -850,19 +781,18 @@ fn bit_op_8(op: ir::BitOp, a: u8, b: u8) -> Value {
 
 fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem: &mut Vec<u8>) {
     match *i {
-        ir::Instruction::Assign(_, ir::Value::Bytes(ref s)) |
-        ir::Instruction::CastAssign(_, ir::Value::Bytes(ref s)) |
-        ir::Instruction::DerefLoad(_, ir::Value::Bytes(ref s), _) |
-        ir::Instruction::Store(_, _, ir::Value::Bytes(ref s)) |
-        ir::Instruction::UnaryOp(_, _, ir::Value::Bytes(ref s)) => {
+        ir::Instruction::Assign(_, ir::Value::Bytes(ref s))
+        | ir::Instruction::CastAssign(_, ir::Value::Bytes(ref s))
+        | ir::Instruction::DerefLoad(_, ir::Value::Bytes(ref s), _)
+        | ir::Instruction::Store(_, _, ir::Value::Bytes(ref s))
+        | ir::Instruction::UnaryOp(_, _, ir::Value::Bytes(ref s)) => {
             if !strings.contains_key(s) {
                 let at = mem.len() as u32;
                 mem.extend(s.iter().cloned());
                 strings.insert(s.clone(), at);
             }
         }
-        ir::Instruction::Call(_, _, ref params) |
-        ir::Instruction::CallProc(_, ref params) => {
+        ir::Instruction::Call(_, _, ref params) | ir::Instruction::CallProc(_, ref params) => {
             for param in params {
                 if let ir::Value::Bytes(ref s) = *param {
                     if !strings.contains_key(s) {
@@ -873,8 +803,8 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
                 }
             }
         }
-        ir::Instruction::CallVirt(_, ref val, ref params) |
-        ir::Instruction::CallProcVirt(ref val, ref params) => {
+        ir::Instruction::CallVirt(_, ref val, ref params)
+        | ir::Instruction::CallProcVirt(ref val, ref params) => {
             if let ir::Value::Bytes(ref s) = *val {
                 if !strings.contains_key(s) {
                     let at = mem.len() as u32;
@@ -892,8 +822,8 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
                 }
             }
         }
-        ir::Instruction::BinaryOp(_, _, ref a, ref b) |
-        ir::Instruction::DerefStore(ref a, _, ref b) => {
+        ir::Instruction::BinaryOp(_, _, ref a, ref b)
+        | ir::Instruction::DerefStore(ref a, _, ref b) => {
             if let ir::Value::Bytes(ref s) = *a {
                 if !strings.contains_key(s) {
                     let at = mem.len() as u32;
@@ -913,19 +843,22 @@ fn collect_strings(i: &ir::Instruction, strings: &mut HashMap<Vec<u8>, u32>, mem
     }
 }
 
-fn validate_symbol_refs(i: &ir::Instruction, symbol_ids: &HashMap<ir::Symbol, u32>) -> Result<(), Error> {
+fn validate_symbol_refs(
+    i: &ir::Instruction,
+    symbol_ids: &HashMap<ir::Symbol, u32>,
+) -> Result<(), Error> {
     match *i {
-        ir::Instruction::Assign(_, ir::Value::Symbol(ref s)) |
-        ir::Instruction::CastAssign(_, ir::Value::Symbol(ref s)) |
-        ir::Instruction::DerefLoad(_, ir::Value::Symbol(ref s), _) |
-        ir::Instruction::Store(_, _, ir::Value::Symbol(ref s)) |
-        ir::Instruction::UnaryOp(_, _, ir::Value::Symbol(ref s)) => {
+        ir::Instruction::Assign(_, ir::Value::Symbol(ref s))
+        | ir::Instruction::CastAssign(_, ir::Value::Symbol(ref s))
+        | ir::Instruction::DerefLoad(_, ir::Value::Symbol(ref s), _)
+        | ir::Instruction::Store(_, _, ir::Value::Symbol(ref s))
+        | ir::Instruction::UnaryOp(_, _, ir::Value::Symbol(ref s)) => {
             if !symbol_ids.contains_key(s) {
                 return Err(Error::MissingSymbol(s.clone()));
             }
         }
-        ir::Instruction::Call(_, ref s, ref params) |
-        ir::Instruction::CallProc(ref s, ref params) => {
+        ir::Instruction::Call(_, ref s, ref params)
+        | ir::Instruction::CallProc(ref s, ref params) => {
             if !symbol_ids.contains_key(s) {
                 return Err(Error::MissingSymbol(s.clone()));
             }
@@ -937,8 +870,8 @@ fn validate_symbol_refs(i: &ir::Instruction, symbol_ids: &HashMap<ir::Symbol, u3
                 }
             }
         }
-        ir::Instruction::CallVirt(_, ref val, ref params) |
-        ir::Instruction::CallProcVirt(ref val, ref params) => {
+        ir::Instruction::CallVirt(_, ref val, ref params)
+        | ir::Instruction::CallProcVirt(ref val, ref params) => {
             if let ir::Value::Symbol(ref s) = *val {
                 if !symbol_ids.contains_key(s) {
                     return Err(Error::MissingSymbol(s.clone()));
@@ -952,8 +885,8 @@ fn validate_symbol_refs(i: &ir::Instruction, symbol_ids: &HashMap<ir::Symbol, u3
                 }
             }
         }
-        ir::Instruction::BinaryOp(_, _, ref a, ref b) |
-        ir::Instruction::DerefStore(ref a, _, ref b) => {
+        ir::Instruction::BinaryOp(_, _, ref a, ref b)
+        | ir::Instruction::DerefStore(ref a, _, ref b) => {
             if let ir::Value::Symbol(ref s) = *a {
                 if !symbol_ids.contains_key(s) {
                     return Err(Error::MissingSymbol(s.clone()));

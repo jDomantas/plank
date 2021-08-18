@@ -1,8 +1,7 @@
+use ast::resolved::{Function, Program, Struct, Type};
 use plank_errors::reporter::Builder;
 use plank_syntax::position::{Span, Spanned};
-use ast::resolved::{Function, Program, Struct, Type};
 use CompileCtx;
-
 
 pub(crate) fn check_for_wildcards(program: &Program, ctx: &mut CompileCtx) {
     let mut ctx = Context::new(ctx);
@@ -53,15 +52,15 @@ impl<'a> Context<'a> {
 
     fn check_type(&mut self, typ: &Spanned<Type>) {
         match **typ {
-            Type::Unit |
-            Type::Bool |
-            Type::Error |
-            Type::I8 |
-            Type::I16 |
-            Type::I32 |
-            Type::U8 |
-            Type::U16 |
-            Type::U32 => {}
+            Type::Unit
+            | Type::Bool
+            | Type::Error
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::U8
+            | Type::U16
+            | Type::U32 => {}
             Type::Pointer(_, ref typ) => self.check_type(typ),
             Type::Function(ref params, ref out) => {
                 for param in params {
@@ -69,9 +68,11 @@ impl<'a> Context<'a> {
                 }
                 self.check_type(out);
             }
-            Type::Concrete(_, ref params) => for param in params {
-                self.check_type(param);
-            },
+            Type::Concrete(_, ref params) => {
+                for param in params {
+                    self.check_type(param);
+                }
+            }
             Type::Wildcard => self.report_error(Spanned::span(typ)),
         }
     }

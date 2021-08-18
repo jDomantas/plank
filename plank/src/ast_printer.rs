@@ -1,5 +1,7 @@
-use plank_syntax::ast::{Program, Statement, Expr, Function, Struct, Ident, FnParam, Field, Type, FunctionType, BinaryOp, UnaryOp, CallParam, Literal, Signedness, Size, Mutability};
-
+use plank_syntax::ast::{
+    BinaryOp, CallParam, Expr, Field, FnParam, Function, FunctionType, Ident, Literal, Mutability,
+    Program, Signedness, Size, Statement, Struct, Type, UnaryOp,
+};
 
 #[derive(Copy, Clone)]
 enum ListFormat {
@@ -77,8 +79,7 @@ impl LispFormatter {
                 self.next_indent += 1;
                 self.list_stack.push(format);
             }
-            Some(ListFormat::Multiline(_)) |
-            None => {
+            Some(ListFormat::Multiline(_)) | None => {
                 // either in already multiline list,
                 // or in global scope which is multiline by default
             }

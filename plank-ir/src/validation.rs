@@ -1,8 +1,9 @@
-use std::collections::{HashMap, HashSet};
 use analysis::Loc;
-use ir::{BinaryOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Program, Reg, Symbol,
-         UnaryOp, Value};
-
+use ir::{
+    BinaryOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Program, Reg, Symbol,
+    UnaryOp, Value,
+};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub enum Error {
@@ -37,12 +38,12 @@ impl<'a> Context<'a> {
 
     fn validate(&self) -> Result<(), Error> {
         if let Some(layout) = self.function.output_layout {
-            if layout.size <= 0 {
+            if layout.size == 0 {
                 return Err(Error::BadLayout);
             }
         }
         for &layout in self.function.registers.values() {
-            if layout.size <= 0 {
+            if layout.size == 0 {
                 return Err(Error::BadLayout);
             }
         }
@@ -64,10 +65,16 @@ impl<'a> Context<'a> {
 
     fn validate_block(&self, id: BlockId, block: &Block) -> Result<(), Error> {
         for (index, op) in block.ops.iter().enumerate() {
-            let loc = Loc { block: id, pos: index };
+            let loc = Loc {
+                block: id,
+                pos: index,
+            };
             self.validate_instruction(op, loc)?;
         }
-        let loc = Loc { block: id, pos: block.ops.len() };
+        let loc = Loc {
+            block: id,
+            pos: block.ops.len(),
+        };
         match block.end {
             BlockEnd::Branch(ref val, a, b) => {
                 assert_equal(self.value_size(val), 1, loc)?;
@@ -107,31 +114,35 @@ impl<'a> Context<'a> {
 
     fn validate_instruction(&self, i: &Instruction, loc: Loc) -> Result<(), Error> {
         match *i {
-            Instruction::Assign(reg, ref val) |
-            Instruction::CastAssign(reg, ref val) => {
+            Instruction::Assign(reg, ref val) | Instruction::CastAssign(reg, ref val) => {
                 self.assert_live_val(val, loc)?;
                 assert_equal(self.register_size(reg), self.value_size(val), loc)?;
             }
-            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Greater, _, size), ref a, ref b) |
-            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::GreaterEq, _, size), ref a, ref b) |
-            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Less, _, size), ref a, ref b) |
-            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::LessEq, _, size), ref a, ref b) => {
+            Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Greater, _, size), ref a, ref b)
+            | Instruction::BinaryOp(
+                dest,
+                BinaryOp::IntOp(IntOp::GreaterEq, _, size),
+                ref a,
+                ref b,
+            )
+            | Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::Less, _, size), ref a, ref b)
+            | Instruction::BinaryOp(dest, BinaryOp::IntOp(IntOp::LessEq, _, size), ref a, ref b) => {
                 self.assert_live_val(a, loc)?;
                 self.assert_live_val(b, loc)?;
                 assert_equal(self.register_size(dest), 1, loc)?;
                 assert_equal(self.value_size(a), size.in_bytes(), loc)?;
                 assert_equal(self.value_size(b), size.in_bytes(), loc)?;
             }
-            Instruction::BinaryOp(dest, BinaryOp::BitOp(_, size), ref a, ref b) |
-            Instruction::BinaryOp(dest, BinaryOp::IntOp(_, _, size), ref a, ref b) => {
+            Instruction::BinaryOp(dest, BinaryOp::BitOp(_, size), ref a, ref b)
+            | Instruction::BinaryOp(dest, BinaryOp::IntOp(_, _, size), ref a, ref b) => {
                 self.assert_live_val(a, loc)?;
                 self.assert_live_val(b, loc)?;
                 assert_equal(self.register_size(dest), size.in_bytes(), loc)?;
                 assert_equal(self.value_size(a), size.in_bytes(), loc)?;
                 assert_equal(self.value_size(b), size.in_bytes(), loc)?;
             }
-            Instruction::BinaryOp(dest, BinaryOp::Eq, ref a, ref b) |
-            Instruction::BinaryOp(dest, BinaryOp::Neq, ref a, ref b) => {
+            Instruction::BinaryOp(dest, BinaryOp::Eq, ref a, ref b)
+            | Instruction::BinaryOp(dest, BinaryOp::Neq, ref a, ref b) => {
                 self.assert_live_val(a, loc)?;
                 self.assert_live_val(b, loc)?;
                 assert_equal(self.register_size(dest), 1, loc)?;
@@ -152,7 +163,9 @@ impl<'a> Context<'a> {
                 }
             }
             Instruction::CallProc(ref sym, ref params) => {
-                let callee = self.functions.get(sym)
+                let callee = self
+                    .functions
+                    .get(sym)
                     .ok_or_else(|| Error::UnknownFunction(sym.clone()))?;
                 if callee.output_layout.is_some() {
                     return Err(Error::BadCall(loc));
@@ -164,8 +177,8 @@ impl<'a> Context<'a> {
                     assert_equal(self.value_size(val), reg_size, loc)?;
                 }
             }
-            Instruction::CallVirt(_, ref address, ref params) |
-            Instruction::CallProcVirt(ref address, ref params) => {
+            Instruction::CallVirt(_, ref address, ref params)
+            | Instruction::CallProcVirt(ref address, ref params) => {
                 assert_equal(self.value_size(address), ::ir::POINTER_SIZE, loc)?;
                 for val in params {
                     self.assert_live_val(val, loc)?;
@@ -183,8 +196,7 @@ impl<'a> Context<'a> {
                     return Err(Error::ZeroSizedVal(loc));
                 }
             }
-            Instruction::Drop(reg) |
-            Instruction::Init(reg) => {
+            Instruction::Drop(reg) | Instruction::Init(reg) => {
                 if !self.function.registers.contains_key(&reg) {
                     return Err(Error::UnknownRegister(reg));
                 }
@@ -255,11 +267,7 @@ impl<'a> Context<'a> {
     fn assert_live(&self, reg: Reg, loc: Loc) -> Result<(), Error> {
         self.live_locations
             .get(&reg)
-            .and_then(|locs| if locs.contains(&loc) {
-                Some(())
-            } else {
-                None
-            })
+            .and_then(|locs| if locs.contains(&loc) { Some(()) } else { None })
             .ok_or(Error::NonLiveRegUsage(reg, loc))
     }
 }

@@ -59,8 +59,20 @@ fn decode_bytes(mut from: &str) -> Result<Vec<u8>, ()> {
                 if from.chars().skip(1).next() != Some('x') {
                     return Err(());
                 }
-                let b1 = from.chars().skip(2).next().ok_or(())?.to_digit(16).ok_or(())? as u8;
-                let b2 = from.chars().skip(3).next().ok_or(())?.to_digit(16).ok_or(())? as u8;
+                let b1 = from
+                    .chars()
+                    .skip(2)
+                    .next()
+                    .ok_or(())?
+                    .to_digit(16)
+                    .ok_or(())? as u8;
+                let b2 = from
+                    .chars()
+                    .skip(3)
+                    .next()
+                    .ok_or(())?
+                    .to_digit(16)
+                    .ok_or(())? as u8;
                 result.push((b1 << 4) + b2);
                 from = &from[4..];
             }
@@ -82,8 +94,8 @@ fn get_io(source: &str, name: &'static str) -> Result<Option<Vec<u8>>, ParseErro
     for line in source.lines() {
         if let Some((index, _)) = line.match_indices(&pattern).next() {
             let from = index + pattern.len();
-            let bytes = decode_bytes(&line[from..])
-                .map_err(|()| ParseError::MalformedBinary(name))?;
+            let bytes =
+                decode_bytes(&line[from..]).map_err(|()| ParseError::MalformedBinary(name))?;
             if annotation.is_some() {
                 return Err(ParseError::DuplicateBinary(name));
             }

@@ -1,8 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use ast::cfg::{Block, BlockEnd, BlockId, Function, Instruction, Program, Reg, Value};
 use plank_syntax::position::Spanned;
-use ast::cfg::{Program, Function, Block, Reg, Instruction, Value, BlockId, BlockEnd};
+use std::collections::{HashMap, HashSet};
 use CompileCtx;
-
 
 struct Context<'a> {
     ctx: &'a mut CompileCtx,
@@ -26,20 +25,20 @@ impl<'a> Context<'a> {
     fn store_assigns(&mut self, id: BlockId, block: &Block) {
         for (index, op) in block.ops.iter().enumerate() {
             match **op {
-                Instruction::Init(reg) |
-                Instruction::Assign(reg, _) |
-                Instruction::BinaryOp(reg, _, _, _) |
-                Instruction::Call(reg, _, _) |
-                Instruction::UnaryOp(reg, _, _) |
-                Instruction::TakeAddress(reg, _, _) |
-                Instruction::CastAssign(reg, _) => {
+                Instruction::Init(reg)
+                | Instruction::Assign(reg, _)
+                | Instruction::BinaryOp(reg, _, _, _)
+                | Instruction::Call(reg, _, _)
+                | Instruction::UnaryOp(reg, _, _)
+                | Instruction::TakeAddress(reg, _, _)
+                | Instruction::CastAssign(reg, _) => {
                     self.assign_position.entry((reg, id)).or_insert(index);
                 }
-                Instruction::Error |
-                Instruction::Drop(_) |
-                Instruction::DerefStore(_, _, _, _) |
-                Instruction::FieldStore(_, _, _) |
-                Instruction::StartStatement => {}
+                Instruction::Error
+                | Instruction::Drop(_)
+                | Instruction::DerefStore(_, _, _, _)
+                | Instruction::FieldStore(_, _, _)
+                | Instruction::StartStatement => {}
             }
         }
     }
@@ -47,9 +46,9 @@ impl<'a> Context<'a> {
     fn check_block(&mut self, id: BlockId, block: &Block) {
         for (index, op) in block.ops.iter().enumerate() {
             match **op {
-                Instruction::Assign(_, ref val) |
-                Instruction::UnaryOp(_, _, ref val) |
-                Instruction::CastAssign(_, ref val) => {
+                Instruction::Assign(_, ref val)
+                | Instruction::UnaryOp(_, _, ref val)
+                | Instruction::CastAssign(_, ref val) => {
                     self.check_value(val, id, index);
                 }
                 Instruction::FieldStore(reg, _, ref val) => {
@@ -57,8 +56,8 @@ impl<'a> Context<'a> {
                     let reg = Spanned::map(reg, Value::Reg);
                     self.check_value(&reg, id, index);
                 }
-                Instruction::DerefStore(ref a, _, _, ref b) |
-                Instruction::BinaryOp(_, _, ref a, ref b) => {
+                Instruction::DerefStore(ref a, _, _, ref b)
+                | Instruction::BinaryOp(_, _, ref a, ref b) => {
                     self.check_value(a, id, index);
                     self.check_value(b, id, index);
                 }
@@ -72,21 +71,21 @@ impl<'a> Context<'a> {
                     let val = Spanned::map(reg, Value::Reg);
                     self.check_value(&val, id, index);
                 }
-                Instruction::Error |
-                Instruction::StartStatement |
-                Instruction::Drop(_) |
-                Instruction::Init(_) => {}
+                Instruction::Error
+                | Instruction::StartStatement
+                | Instruction::Drop(_)
+                | Instruction::Init(_) => {}
             }
         }
     }
 
     fn check_value(&mut self, value: &Spanned<Value>, block: BlockId, pos: usize) {
         match **value {
-            Value::Int(_, _) |
-            Value::Symbol(_, _) |
-            Value::Bytes(_) |
-            Value::Unit |
-            Value::Error => {}
+            Value::Int(_, _)
+            | Value::Symbol(_, _)
+            | Value::Bytes(_)
+            | Value::Unit
+            | Value::Error => {}
             Value::Reg(reg) if self.reported_regs.contains(&reg) => {}
             Value::Reg(reg) => {
                 let assign_pos = self.assign_position.get(&(reg, block)).cloned();
@@ -103,11 +102,7 @@ impl<'a> Context<'a> {
                     let name = self.ctx.symbols.get_name(var_symbol);
                     let msg = format!("var `{}` might be uninitialized here", name);
                     let span = Spanned::span(value);
-                    self.ctx
-                        .reporter
-                        .error(msg, span)
-                        .span(span)
-                        .build();
+                    self.ctx.reporter.error(msg, span).span(span).build();
                     self.reported_regs.insert(reg);
                 }
             }
@@ -137,7 +132,12 @@ impl<'a> Context<'a> {
         for (&id, block) in &self.function.blocks {
             self.store_assigns(id, block);
         }
-        let parameters = self.function.parameters.iter().cloned().collect::<HashSet<_>>();
+        let parameters = self
+            .function
+            .parameters
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         if let Some(block) = self.function.start_block {
             for &reg in self.function.registers.keys() {
                 if !parameters.contains(&reg) {

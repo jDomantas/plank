@@ -1,19 +1,18 @@
 extern crate clap;
 extern crate plank_errors;
-extern crate plank_syntax;
 extern crate plank_frontend;
-extern crate plank_ir;
 extern crate plank_interpreter;
+extern crate plank_ir;
+extern crate plank_syntax;
 extern crate plank_x86_backend;
 
 mod ast_printer;
 
+use plank_errors::Reporter;
 use std::convert::From;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use plank_errors::Reporter;
-
 
 #[derive(Debug)]
 enum Error {
@@ -100,11 +99,25 @@ fn run() -> Result<()> {
         Stream::Std => {
             let stdout = io::stdout();
             let stdout = stdout.lock();
-            run_command(&input, &params.command, can_read_stdin, params.optimize, params.skip_prelude, stdout)
+            run_command(
+                &input,
+                &params.command,
+                can_read_stdin,
+                params.optimize,
+                params.skip_prelude,
+                stdout,
+            )
         }
         Stream::File(ref name) => {
             let file = ::std::fs::File::create(name)?;
-            run_command(&input, &params.command, can_read_stdin, params.optimize, params.skip_prelude, file)
+            run_command(
+                &input,
+                &params.command,
+                can_read_stdin,
+                params.optimize,
+                params.skip_prelude,
+                file,
+            )
         }
     }
 }
@@ -130,41 +143,59 @@ fn parse_params() -> Result<Params> {
     use clap::{App, Arg};
 
     let matches = App::new("Plank compiler")
-        .arg(Arg::with_name("lex")
-            .long("lex")
-            .help("List tokens in input")
-            .conflicts_with_all(&["parse", "emit-ir", "interpret", "emit-asm"]))
-        .arg(Arg::with_name("parse")
-            .long("parse")
-            .help("Parse input")
-            .conflicts_with_all(&["lex", "emit-ir", "interpret", "emit-asm"]))
-        .arg(Arg::with_name("emit-ir")
-            .long("emit-ir")
-            .help("Compile to plank IR")
-            .conflicts_with_all(&["lex", "parse", "interpret", "emit-asm"]))
-        .arg(Arg::with_name("interpret")
-            .long("interpret")
-            .help("Compile to IR and interpret")
-            .conflicts_with_all(&["lex", "parse", "emit-ir", "emit-asm"]))
-        .arg(Arg::with_name("emit-asm")
-            .long("emit-asm")
-            .help("Compile to x86 assembly")
-            .conflicts_with_all(&["lex", "parse", "emit-ir", "interpret"]))
-        .arg(Arg::with_name("optimize")
-            .long("optimize")
-            .short("O")
-            .help("Perform optimizations on IR"))
-        .arg(Arg::with_name("no-prelude")
-            .long("no-prelude")
-            .help("Don't emit asm prelude"))
-        .arg(Arg::with_name("input")
-            .index(1)
-            .help("Set input file, uses stdin if none provided"))
-        .arg(Arg::with_name("output")
-            .short("o")
-            .long("output")
-            .takes_value(true)
-            .help("Set output file, uses stdout if none provided"))
+        .arg(
+            Arg::with_name("lex")
+                .long("lex")
+                .help("List tokens in input")
+                .conflicts_with_all(&["parse", "emit-ir", "interpret", "emit-asm"]),
+        )
+        .arg(
+            Arg::with_name("parse")
+                .long("parse")
+                .help("Parse input")
+                .conflicts_with_all(&["lex", "emit-ir", "interpret", "emit-asm"]),
+        )
+        .arg(
+            Arg::with_name("emit-ir")
+                .long("emit-ir")
+                .help("Compile to plank IR")
+                .conflicts_with_all(&["lex", "parse", "interpret", "emit-asm"]),
+        )
+        .arg(
+            Arg::with_name("interpret")
+                .long("interpret")
+                .help("Compile to IR and interpret")
+                .conflicts_with_all(&["lex", "parse", "emit-ir", "emit-asm"]),
+        )
+        .arg(
+            Arg::with_name("emit-asm")
+                .long("emit-asm")
+                .help("Compile to x86 assembly")
+                .conflicts_with_all(&["lex", "parse", "emit-ir", "interpret"]),
+        )
+        .arg(
+            Arg::with_name("optimize")
+                .long("optimize")
+                .short("O")
+                .help("Perform optimizations on IR"),
+        )
+        .arg(
+            Arg::with_name("no-prelude")
+                .long("no-prelude")
+                .help("Don't emit asm prelude"),
+        )
+        .arg(
+            Arg::with_name("input")
+                .index(1)
+                .help("Set input file, uses stdin if none provided"),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .takes_value(true)
+                .help("Set output file, uses stdout if none provided"),
+        )
         .get_matches();
     let default_command = Command::Interpret;
     let command = if matches.is_present("lex") {
@@ -190,7 +221,7 @@ fn parse_params() -> Result<Params> {
         Some(path) => Stream::File(Path::new(path).to_owned()),
         None => Stream::Std,
     };
-    
+
     let optimize = matches.is_present("optimize");
     let skip_prelude = matches.is_present("no-prelude");
 
@@ -276,7 +307,12 @@ fn emit_ir<W: Write>(source: &str, mut output: W, optimize: bool) -> Result<()> 
     Ok(())
 }
 
-fn interpret<W: Write>(source: &str, can_read_stdin: bool, output: W, optimize: bool) -> Result<()> {
+fn interpret<W: Write>(
+    source: &str,
+    can_read_stdin: bool,
+    output: W,
+    optimize: bool,
+) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());
@@ -304,7 +340,12 @@ fn interpret<W: Write>(source: &str, can_read_stdin: bool, output: W, optimize: 
     }
 }
 
-fn compile_x86<W: Write>(source: &str, mut output: W, optimize: bool, skip_prelude: bool) -> Result<()> {
+fn compile_x86<W: Write>(
+    source: &str,
+    mut output: W,
+    optimize: bool,
+    skip_prelude: bool,
+) -> Result<()> {
     let reporter = Reporter::new();
     let tokens = plank_syntax::lex(source, reporter.clone());
     let program = plank_syntax::parse(tokens, reporter.clone());

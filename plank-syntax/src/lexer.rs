@@ -1,9 +1,8 @@
-use std::str::Chars;
+use ast::{Signedness, Size};
 use plank_errors::Reporter;
 use position::{Position, Span, Spanned};
+use std::str::Chars;
 use tokens::{Keyword, Number, Token};
-use ast::{Signedness, Size};
-
 
 pub fn lex(source: &str, reporter: Reporter) -> Vec<Spanned<Token>> {
     let mut lexer = Lexer::new(source, reporter);
@@ -132,9 +131,11 @@ impl<'a> Lexer<'a> {
                         _ => break,
                     }
                 },
-                Some('/') => if self.consume() == Some('*') {
-                    depth += 1;
-                },
+                Some('/') => {
+                    if self.consume() == Some('*') {
+                        depth += 1;
+                    }
+                }
                 None => {
                     self.reporter
                         .error("unterminated block comment", opener_span)
@@ -227,9 +228,9 @@ impl<'a> Lexer<'a> {
                         Some('"') => string.push(b'"'),
                         Some('n') => string.push(b'\n'),
                         Some('x') => {
-                            let byte = self.consume_hex_digit().and_then(
-                                |high| self.consume_hex_digit().map(|low| (high << 4) | low),
-                            );
+                            let byte = self.consume_hex_digit().and_then(|high| {
+                                self.consume_hex_digit().map(|low| (high << 4) | low)
+                            });
                             match byte {
                                 Some(byte) => string.push(byte),
                                 None => {
@@ -261,7 +262,7 @@ impl<'a> Lexer<'a> {
                 }
                 Some(ch) => {
                     let ch = ch as u32;
-                    if 32 <= ch && ch < 127 {
+                    if (32..127).contains(&ch) {
                         string.push(ch as u8);
                         self.advance();
                     } else {
@@ -332,18 +333,20 @@ impl<'a> Lexer<'a> {
                 Some('>') => self.test_second('=', Token::Greater, Token::GreaterEqual),
                 Some('-') => self.test_second('>', Token::Minus, Token::Arrow),
                 Some('=') => self.test_second('=', Token::Assign, Token::Equal),
-                Some('/') => if let Some(tok) = self.slash_or_comment() {
-                    tok
-                } else {
-                    continue;
-                },
+                Some('/') => {
+                    if let Some(tok) = self.slash_or_comment() {
+                        tok
+                    } else {
+                        continue;
+                    }
+                }
                 Some('"') => self.lex_string(),
                 Some('\'') => self.lex_char(),
                 Some(ch) => {
                     let tok = self.single_char(Token::Error);
                     if !self.previous_error {
                         let codepoint = ch as u32;
-                        let msg = if 32 <= codepoint && codepoint < 127 {
+                        let msg = if (32..127).contains(&codepoint) {
                             format!("unknown char: `{}`", ch)
                         } else {
                             format!("unknown char (codepoint: {})", codepoint)
@@ -377,10 +380,10 @@ impl<'a> Lexer<'a> {
 fn is_ident_char(ch: char) -> bool {
     ch as u32 <= 0x7f && {
         let byte = ch as u8;
-        (byte >= b'a' && byte <= b'z')
-        || (byte >= b'A' && byte <= b'Z')
-        || (byte >= b'0' && byte <= b'9')
-        || byte == b'_'
+        (b'a'..=b'z').contains(&byte)
+            || (b'A'..=b'Z').contains(&byte)
+            || (b'0'..=b'9').contains(&byte)
+            || byte == b'_'
     }
 }
 
@@ -434,7 +437,7 @@ impl ::std::fmt::Display for ParseNumberError {
 fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
     fn is_letter(c: char) -> bool {
         let byte = c as u8;
-        (byte >= b'a' && byte <= b'z') || (byte >= b'A' && byte <= b'Z')
+        (b'a'..=b'z').contains(&byte) || (b'A'..=b'Z').contains(&byte)
     }
     match s.find(is_letter) {
         Some(index) => {
@@ -452,18 +455,12 @@ fn parse_number(s: &str) -> Result<Number, ParseNumberError> {
                 "u32" => (Signedness::Unsigned, Size::Bit32),
                 _ => return Err(ParseNumberError::InvalidSuffix),
             });
-            Ok(Number {
-                value,
-                typ,
-            })
+            Ok(Number { value, typ })
         }
         None => {
             // no suffix, parse simple number
             let value = parse_simple_number(s)?;
-            Ok(Number {
-                value,
-                typ: None,
-            })
+            Ok(Number { value, typ: None })
         }
     }
 }

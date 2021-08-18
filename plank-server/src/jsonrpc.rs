@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use languageserver_types as lst;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json::{self, Value as JsonValue};
-
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Request {
@@ -17,7 +16,7 @@ struct Request {
 pub struct ErrorResponse<T> {
     code: i64,
     message: String,
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<T>,
 }
 
@@ -73,7 +72,11 @@ impl<T> ErrorResponse<T> {
 
 impl<T: Serialize> ErrorResponse<T> {
     fn serialize_error(self) -> ErrorResponse<JsonValue> {
-        let ErrorResponse { code, message, data } = self;
+        let ErrorResponse {
+            code,
+            message,
+            data,
+        } = self;
         let data = if let Some(value) = data {
             match serde_json::to_value(&value) {
                 Ok(value) => Some(value),
@@ -97,9 +100,9 @@ impl<T: Serialize> ErrorResponse<T> {
 #[derive(Serialize)]
 struct RawResponse<T, E> {
     jsonrpc: &'static str,
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<T>,
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<ErrorResponse<E>>,
     id: Option<lst::NumberOrString>,
 }
@@ -126,8 +129,7 @@ impl<T: Serialize, E: Serialize> RawResponse<T, E> {
     fn serialize(&self) -> JsonValue {
         serde_json::to_value(&self).unwrap_or_else(|_| {
             let err = RawResponse::<(), ()>::err(ErrorResponse::internal_error(), None);
-            serde_json::to_value(&err)
-                .expect("failed to serialize basic response")
+            serde_json::to_value(&err).expect("failed to serialize basic response")
         })
     }
 }
@@ -149,17 +151,13 @@ impl<T, E> Response<T, E> {
 impl<T: Serialize, E: Serialize> Response<T, E> {
     fn into_raw(self, id: Option<lst::NumberOrString>) -> RawResponse<T, E> {
         match self {
-            Response::Success(value) => {
-                RawResponse::ok(value, id)
-            }
-            Response::Error(err) => {
-                RawResponse::err(err, id)
-            }
+            Response::Success(value) => RawResponse::ok(value, id),
+            Response::Error(err) => RawResponse::err(err, id),
         }
     }
 }
 
-type CallHandler<'a, T, E> = Box<Fn(JsonValue) -> Option<Response<T, E>> + 'a>;
+type CallHandler<'a, T, E> = Box<dyn Fn(JsonValue) -> Option<Response<T, E>> + 'a>;
 
 #[derive(Default)]
 pub struct RpcHandler<'a> {
@@ -172,23 +170,21 @@ impl<'a> RpcHandler<'a> {
     }
 
     pub fn add_method<S, F, T, U, E>(&mut self, name: S, handle: F)
-        where
-            F: Fn(T) -> Response<U, E> + 'a,
-            T: DeserializeOwned,
-            U: Serialize,
-            E: Serialize,
-            S: Into<String>
+    where
+        F: Fn(T) -> Response<U, E> + 'a,
+        T: DeserializeOwned,
+        U: Serialize,
+        E: Serialize,
+        S: Into<String>,
     {
-        self.add_handler(name, move |input| {
-            handle(input).map(Some)
-        });
+        self.add_handler(name, move |input| handle(input).map(Some));
     }
 
     pub fn add_notification<S, F, T>(&mut self, name: S, handle: F)
-        where
-            F: Fn(T) + 'a,
-            T: DeserializeOwned,
-            S: Into<String>
+    where
+        F: Fn(T) + 'a,
+        T: DeserializeOwned,
+        S: Into<String>,
     {
         self.add_handler::<_, _, _, (), ()>(name, move |input| {
             handle(input);
@@ -197,12 +193,12 @@ impl<'a> RpcHandler<'a> {
     }
 
     fn add_handler<S, F, T, U, E>(&mut self, name: S, handle: F)
-        where
-            F: Fn(T) -> Response<Option<U>, E> + 'a,
-            T: DeserializeOwned,
-            U: Serialize,
-            E: Serialize,
-            S: Into<String>
+    where
+        F: Fn(T) -> Response<Option<U>, E> + 'a,
+        T: DeserializeOwned,
+        U: Serialize,
+        E: Serialize,
+        S: Into<String>,
     {
         let handle = move |params| {
             let params = match serde_json::from_value::<T>(params) {
@@ -217,12 +213,8 @@ impl<'a> RpcHandler<'a> {
                     let json = serde_json::to_value(&response).unwrap();
                     Some(Response::Success(json))
                 }
-                Response::Success(None) => {
-                    None
-                }
-                Response::Error(err) => {
-                    Some(Response::Error(err.serialize_error()))
-                }
+                Response::Success(None) => None,
+                Response::Error(err) => Some(Response::Error(err.serialize_error())),
             }
         };
         self.handlers.insert(name.into(), Box::new(handle));
@@ -257,8 +249,9 @@ impl<'a> RpcHandler<'a> {
                 self.handle_request(value).map(|r| r.serialize())
             }
         };
-        response.map(|value| serde_json::to_string(&value)
-            .expect("failed to serialize json value to string"))
+        response.map(|value| {
+            serde_json::to_string(&value).expect("failed to serialize json value to string")
+        })
     }
 
     fn handle_request(&mut self, request: JsonValue) -> Option<RawResponse<JsonValue, JsonValue>> {
@@ -280,7 +273,10 @@ impl<'a> RpcHandler<'a> {
                 error!("handler not found for: '{}'", request.method);
                 // only reply to requests, not notifications
                 if request.id.is_some() {
-                    Some(RawResponse::err(ErrorResponse::method_not_found(), request.id))
+                    Some(RawResponse::err(
+                        ErrorResponse::method_not_found(),
+                        request.id,
+                    ))
                 } else {
                     None
                 }

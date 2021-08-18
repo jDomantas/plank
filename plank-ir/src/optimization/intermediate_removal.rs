@@ -1,6 +1,5 @@
 use analysis::{self, Loc};
-use ir::{Program, Function, Instruction, BlockId, Value};
-
+use ir::{BlockId, Function, Instruction, Program, Value};
 
 struct Fix {
     block: BlockId,
@@ -16,7 +15,10 @@ fn inspect_function(f: &Function) -> Vec<Fix> {
             if let Some(reg) = analysis::initialized_register(op) {
                 match block.ops.get(pos + 1) {
                     Some(&Instruction::Assign(_, Value::Reg(r2))) if r2 == reg => {
-                        let loc = Loc { block: id, pos: pos + 2 };
+                        let loc = Loc {
+                            block: id,
+                            pos: pos + 2,
+                        };
                         if !ctx.is_value_used(loc, r2) {
                             fixes.push(Fix {
                                 block: id,
@@ -42,16 +44,16 @@ fn rewrite_function(f: &mut Function) {
         };
         block.ops[fix.init_at + 1] = Instruction::Nop;
         match block.ops[fix.init_at] {
-            Instruction::Assign(ref mut r, _) |
-            Instruction::BinaryOp(ref mut r, _, _, _) |
-            Instruction::Call(ref mut r, _, _) |
-            Instruction::CallVirt(ref mut r, _, _) |
-            Instruction::CastAssign(ref mut r, _) |
-            Instruction::DerefLoad(ref mut r, _, _) |
-            Instruction::Init(ref mut r) |
-            Instruction::Load(ref mut r, _, _) |
-            Instruction::TakeAddress(ref mut r, _, _) |
-            Instruction::UnaryOp(ref mut r, _, _) => *r = reg,
+            Instruction::Assign(ref mut r, _)
+            | Instruction::BinaryOp(ref mut r, _, _, _)
+            | Instruction::Call(ref mut r, _, _)
+            | Instruction::CallVirt(ref mut r, _, _)
+            | Instruction::CastAssign(ref mut r, _)
+            | Instruction::DerefLoad(ref mut r, _, _)
+            | Instruction::Init(ref mut r)
+            | Instruction::Load(ref mut r, _, _)
+            | Instruction::TakeAddress(ref mut r, _, _)
+            | Instruction::UnaryOp(ref mut r, _, _) => *r = reg,
             _ => panic!("invalid fix"),
         }
     }

@@ -2,7 +2,6 @@ use std::io;
 use std::io::prelude::*;
 use x86;
 
-
 pub fn print_prelude<W: Write>(mut to: W) -> io::Result<()> {
     const PRELUDE: &'static str = "BITS 32
 GLOBAL _start
@@ -251,9 +250,7 @@ fn print_label<W: Write>(to: &mut W, label: &x86::Label) -> io::Result<()> {
 fn print_name<W: Write>(to: &mut W, name: &str) -> io::Result<()> {
     for ch in name.chars() {
         match ch {
-            'a' ... 'z' |
-            'A' ... 'Z' |
-            '0' ... '9' => write!(to, "{}", ch)?,
+            'a'..='z' | 'A'..='Z' | '0'..='9' => write!(to, "{}", ch)?,
             '_' => write!(to, "_u")?,
             ',' => write!(to, "_c")?,
             '<' => write!(to, "_l")?,
@@ -284,9 +281,21 @@ fn print_memory<W: Write>(to: &mut W, memory: x86::Memory) -> io::Result<()> {
         _ => panic!("bad ptr size: {}", memory.ptr_size),
     };
     if memory.offset > 0 {
-        write!(to, "{} [{} + {}]", ptr_name, reg_name(memory.register), memory.offset)
+        write!(
+            to,
+            "{} [{} + {}]",
+            ptr_name,
+            reg_name(memory.register),
+            memory.offset
+        )
     } else if memory.offset < 0 {
-        write!(to, "{} [{} - {}]", ptr_name, reg_name(memory.register), -memory.offset)
+        write!(
+            to,
+            "{} [{} - {}]",
+            ptr_name,
+            reg_name(memory.register),
+            -memory.offset
+        )
     } else {
         write!(to, "{} [{}]", ptr_name, reg_name(memory.register))
     }

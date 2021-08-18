@@ -1,8 +1,7 @@
-use std::collections::{HashMap, HashSet};
-use analysis::{self, Loc};
-use ir::{Function, Instruction, BlockId, BlockEnd, Program, Reg};
 use super::Rewriter;
-
+use analysis::{self, Loc};
+use ir::{BlockEnd, BlockId, Function, Instruction, Program, Reg};
+use std::collections::{HashMap, HashSet};
 
 struct Liveness<'a> {
     function: &'a Function,
@@ -30,10 +29,7 @@ impl<'a> Liveness<'a> {
         let mut is_live = live_start;
         for (pos, instr) in block.ops.iter().enumerate() {
             if is_live {
-                self.live_locations.insert(Loc {
-                    block: id,
-                    pos,
-                });
+                self.live_locations.insert(Loc { block: id, pos });
             }
             if analysis::initialized_register(instr) == Some(self.reg) {
                 is_live = true;
@@ -58,9 +54,7 @@ impl<'a> Liveness<'a> {
             BlockEnd::Jump(a) => {
                 self.walk_block(a, is_live);
             }
-            BlockEnd::Return(_) |
-            BlockEnd::ReturnProc |
-            BlockEnd::Unreachable => {}
+            BlockEnd::Return(_) | BlockEnd::ReturnProc | BlockEnd::Unreachable => {}
         }
     }
 }
@@ -104,6 +98,8 @@ impl Rewriter for Context {
 }
 
 pub fn rewrite(program: &mut Program) {
-    let mut ctx = Context { live: HashMap::new() };
+    let mut ctx = Context {
+        live: HashMap::new(),
+    };
     ctx.rewrite_program(program);
 }

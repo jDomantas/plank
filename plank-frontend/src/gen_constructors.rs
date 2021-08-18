@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use plank_syntax::position::Spanned;
 use ast::cfg::{Block, BlockEnd, BlockId, BlockLink, Function, Instruction, Program, Reg, Value};
 use ast::typed::{self as t, Struct};
-
+use plank_syntax::position::Spanned;
+use std::collections::HashMap;
 
 fn generate_constructor(s: &Struct) -> Function {
     let mut ops = Vec::new();

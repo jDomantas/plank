@@ -1,7 +1,6 @@
 use analysis::Loc;
-use ir::{Program, Instruction, Value, BinaryOp, IntOp};
+use ir::{BinaryOp, Instruction, IntOp, Program, Value};
 use optimization::Rewriter;
-
 
 struct Simplifier;
 
@@ -39,11 +38,8 @@ impl Rewriter for Simplifier {
 
 fn is_immediate(val: &Value) -> bool {
     match *val {
-        Value::Bytes(_) |
-        Value::Int(_, _) |
-        Value::Symbol(_) => true,
-        Value::Reg(_) |
-        Value::Undef => false,
+        Value::Bytes(_) | Value::Int(_, _) | Value::Symbol(_) => true,
+        Value::Reg(_) | Value::Undef => false,
     }
 }
 

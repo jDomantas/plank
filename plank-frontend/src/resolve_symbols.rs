@@ -1,10 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::Entry;
+use ast::resolved::{self as r, Symbol};
 use plank_syntax::ast as p;
 use plank_syntax::position::{Position, Span, Spanned};
-use ast::resolved::{self as r, Symbol};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use CompileCtx;
-
 
 pub(crate) fn resolve_program(program: &p::Program, ctx: &mut CompileCtx) -> r::Program {
     let mut resolver = Resolver::new(ctx);
@@ -154,7 +153,8 @@ impl<'a> Resolver<'a> {
             Entry::Vacant(entry) => {
                 // symbol might have already be defined for struct,
                 // so check for that
-                let symbol = self.global_structs
+                let symbol = self
+                    .global_structs
                     .get(name)
                     .map(|&(s, _)| s)
                     .unwrap_or(self.ctx.symbols.new_symbol(name));
@@ -394,7 +394,8 @@ impl<'a> Resolver<'a> {
                     .span(span)
                     .build();
             }
-            if let p::Type::I32 = *f.return_type {} else {
+            if let p::Type::I32 = *f.return_type {
+            } else {
                 self.ctx
                     .reporter
                     .error("`main` must return `i32`", span)
@@ -439,7 +440,8 @@ impl<'a> Resolver<'a> {
             }
             p::Statement::Let(mutability, ref name, ref typ, ref value) => {
                 let name_span = Spanned::span(name);
-                let typ = typ.as_ref()
+                let typ = typ
+                    .as_ref()
                     .map(|t| self.resolve_type(t))
                     .unwrap_or_else(|| Spanned::new(r::Type::Wildcard, name_span));
                 let value = value.as_ref().map(|value| self.resolve_expr(value));
@@ -540,7 +542,8 @@ impl<'a> Resolver<'a> {
                     s => s,
                 };
                 if let Some(f) = self.global_functions.get(name_str) {
-                    let positions = f.param_names
+                    let positions = f
+                        .param_names
                         .iter()
                         .cloned()
                         .enumerate()
@@ -582,8 +585,7 @@ impl<'a> Resolver<'a> {
                             // bad param name
                             let msg = format!(
                                 "`{}` does not have a parameter named `{}`",
-                                fn_name,
-                                ident.0,
+                                fn_name, ident.0,
                             );
                             let span = Spanned::span(ident);
                             self.ctx.reporter.error(msg, span).span(span).build();
@@ -750,13 +752,11 @@ fn make_builtin_putc() -> r::Function {
             name: Spanned::new(::builtins::PUTC, dummy_span),
             type_params: Vec::new(),
         },
-        params: vec![
-            r::FnParam {
-                mutability: r::Mutability::Const,
-                name: Spanned::new(::builtins::PUTC_PARAM, dummy_span),
-                typ: Spanned::new(r::Type::U8, dummy_span),
-            },
-        ],
+        params: vec![r::FnParam {
+            mutability: r::Mutability::Const,
+            name: Spanned::new(::builtins::PUTC_PARAM, dummy_span),
+            typ: Spanned::new(r::Type::U8, dummy_span),
+        }],
         return_type: Spanned::new(r::Type::Unit, dummy_span),
         body: None,
         fn_type: r::FunctionType::Normal,

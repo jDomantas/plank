@@ -1,8 +1,7 @@
-use std::collections::{HashSet, VecDeque};
-use plank_syntax::position::Spanned;
 use ast::cfg::{Block, BlockEnd, Function, Instruction, Program, Type, Value};
+use plank_syntax::position::Spanned;
+use std::collections::{HashSet, VecDeque};
 use CompileCtx;
-
 
 fn has_error_statement(block: &Block) -> bool {
     for op in &block.ops {
@@ -58,7 +57,6 @@ fn check_function(f: &mut Function, ctx: &mut CompileCtx) {
         }
     }
 }
-
 
 pub(crate) fn check_returns(program: &mut Program, ctx: &mut CompileCtx) {
     for f in program.functions.values_mut() {

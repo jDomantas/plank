@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-use plank_ir::ir;
 use ast::cfg;
+use plank_ir::ir;
+use std::collections::HashMap;
 use struct_layout::LayoutEngine;
 use CompileCtx;
-
 
 struct Builder<'a> {
     layouts: &'a LayoutEngine<'a>,
@@ -50,7 +49,8 @@ impl<'a> Builder<'a> {
     }
 
     fn build(&mut self) -> ir::Function {
-        let parameters = self.function
+        let parameters = self
+            .function
             .parameters
             .iter()
             .filter_map(|r| {
@@ -130,23 +130,27 @@ impl<'a> Builder<'a> {
             }
             cfg::BlockEnd::Error => panic!("cannot build ir with errors"),
             cfg::BlockEnd::Jump(id) => ir::BlockEnd::Jump(ir::BlockId(id.0)),
-            cfg::BlockEnd::Return(ref val) => if self.is_zero_sized_value(val) {
-                ir::BlockEnd::ReturnProc
-            } else {
-                ir::BlockEnd::Return(self.convert_value(val))
-            },
+            cfg::BlockEnd::Return(ref val) => {
+                if self.is_zero_sized_value(val) {
+                    ir::BlockEnd::ReturnProc
+                } else {
+                    ir::BlockEnd::Return(self.convert_value(val))
+                }
+            }
         };
         ir::Block { ops, end }
     }
 
     fn build_instruction(&mut self, i: &cfg::Instruction) -> Option<ir::Instruction> {
         match *i {
-            cfg::Instruction::Assign(to, ref val) => if self.is_zero_sized(to) {
-                None
-            } else {
-                let val = self.convert_value(val);
-                Some(ir::Instruction::Assign(ir::Reg(to.0), val))
-            },
+            cfg::Instruction::Assign(to, ref val) => {
+                if self.is_zero_sized(to) {
+                    None
+                } else {
+                    let val = self.convert_value(val);
+                    Some(ir::Instruction::Assign(ir::Reg(to.0), val))
+                }
+            }
             cfg::Instruction::BinaryOp(dest, cfg::BinaryOp::Eq, ref a, _)
                 if self.is_zero_sized_value(a) =>
             {
@@ -166,42 +170,44 @@ impl<'a> Builder<'a> {
                 let op = convert_binop(op);
                 Some(ir::Instruction::BinaryOp(ir::Reg(dest.0), op, a, b))
             }
-            cfg::Instruction::Call(dest, ref callee, ref params) => {
-                match **callee {
-                    cfg::Value::Symbol(sym, ref types) => {
-                        let f = self.make_symbol(sym, types);
-                        let params = params
-                            .iter()
-                            .filter_map(|p| if !self.is_zero_sized_value(p) {
+            cfg::Instruction::Call(dest, ref callee, ref params) => match **callee {
+                cfg::Value::Symbol(sym, ref types) => {
+                    let f = self.make_symbol(sym, types);
+                    let params = params
+                        .iter()
+                        .filter_map(|p| {
+                            if !self.is_zero_sized_value(p) {
                                 Some(self.convert_value(p))
                             } else {
                                 None
-                            })
-                            .collect();
-                        Some(if self.is_zero_sized(dest) {
-                            ir::Instruction::CallProc(f, params)
-                        } else {
-                            ir::Instruction::Call(ir::Reg(dest.0), f, params)
+                            }
                         })
-                    }
-                    ref val => {
-                        let f = self.convert_value(val);
-                        let params = params
-                            .iter()
-                            .filter_map(|p| if !self.is_zero_sized_value(p) {
-                                Some(self.convert_value(p))
-                            } else {
-                                None
-                            })
-                            .collect();
-                        Some(if self.is_zero_sized(dest) {
-                            ir::Instruction::CallProcVirt(f, params)
-                        } else {
-                            ir::Instruction::CallVirt(ir::Reg(dest.0), f, params)
-                        })
-                    }
+                        .collect();
+                    Some(if self.is_zero_sized(dest) {
+                        ir::Instruction::CallProc(f, params)
+                    } else {
+                        ir::Instruction::Call(ir::Reg(dest.0), f, params)
+                    })
                 }
-            }
+                ref val => {
+                    let f = self.convert_value(val);
+                    let params = params
+                        .iter()
+                        .filter_map(|p| {
+                            if !self.is_zero_sized_value(p) {
+                                Some(self.convert_value(p))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    Some(if self.is_zero_sized(dest) {
+                        ir::Instruction::CallProcVirt(f, params)
+                    } else {
+                        ir::Instruction::CallVirt(ir::Reg(dest.0), f, params)
+                    })
+                }
+            },
             cfg::Instruction::DerefStore(ref address, ref typ, ref fields, ref value) => {
                 if self.is_zero_sized_value(value) {
                     None
@@ -216,16 +222,20 @@ impl<'a> Builder<'a> {
                     Some(ir::Instruction::DerefStore(address, offset, value))
                 }
             }
-            cfg::Instruction::Drop(reg) => if self.is_zero_sized(reg) {
-                None
-            } else {
-                Some(ir::Instruction::Drop(ir::Reg(reg.0)))
-            },
-            cfg::Instruction::Init(reg) => if self.is_zero_sized(reg) {
-                None
-            } else {
-                Some(ir::Instruction::Init(ir::Reg(reg.0)))
-            },
+            cfg::Instruction::Drop(reg) => {
+                if self.is_zero_sized(reg) {
+                    None
+                } else {
+                    Some(ir::Instruction::Drop(ir::Reg(reg.0)))
+                }
+            }
+            cfg::Instruction::Init(reg) => {
+                if self.is_zero_sized(reg) {
+                    None
+                } else {
+                    Some(ir::Instruction::Init(ir::Reg(reg.0)))
+                }
+            }
             cfg::Instruction::FieldStore(dest, ref fields, ref value) => {
                 if self.is_zero_sized_value(value) {
                     None
@@ -287,17 +297,19 @@ impl<'a> Builder<'a> {
                 dest,
                 cfg::UnaryOp::FieldLoad(ref typ, ref fields),
                 ref val,
-            ) => if self.is_zero_sized(dest) {
-                None
-            } else {
-                let dest = ir::Reg(dest.0);
-                let offset = self.find_offset(typ, fields);
-                let val = match self.convert_value(val) {
-                    ir::Value::Reg(reg) => reg,
-                    _ => panic!("cannot load field from non-reg"),
-                };
-                Some(ir::Instruction::Load(dest, val, offset))
-            },
+            ) => {
+                if self.is_zero_sized(dest) {
+                    None
+                } else {
+                    let dest = ir::Reg(dest.0);
+                    let offset = self.find_offset(typ, fields);
+                    let val = match self.convert_value(val) {
+                        ir::Value::Reg(reg) => reg,
+                        _ => panic!("cannot load field from non-reg"),
+                    };
+                    Some(ir::Instruction::Load(dest, val, offset))
+                }
+            }
             cfg::Instruction::UnaryOp(dest, cfg::UnaryOp::Not, ref val) => {
                 debug_assert!(!self.is_zero_sized(dest));
                 let dest = ir::Reg(dest.0);
@@ -324,12 +336,14 @@ impl<'a> Builder<'a> {
                 Some(ir::Instruction::BinaryOp(dest, op, val, arg))
             }
             cfg::Instruction::Error => panic!("cannot build ir with errors"),
-            cfg::Instruction::CastAssign(to, ref val) => if self.is_zero_sized(to) {
-                None
-            } else {
-                let val = self.convert_value(val);
-                Some(ir::Instruction::CastAssign(ir::Reg(to.0), val))
-            },
+            cfg::Instruction::CastAssign(to, ref val) => {
+                if self.is_zero_sized(to) {
+                    None
+                } else {
+                    let val = self.convert_value(val);
+                    Some(ir::Instruction::CastAssign(ir::Reg(to.0), val))
+                }
+            }
         }
     }
 
@@ -341,9 +355,7 @@ impl<'a> Builder<'a> {
     fn is_zero_sized_value(&self, value: &cfg::Value) -> bool {
         match *value {
             cfg::Value::Unit => true,
-            cfg::Value::Bytes(_) |
-            cfg::Value::Int(_, _) |
-            cfg::Value::Symbol(_, _) => false,
+            cfg::Value::Bytes(_) | cfg::Value::Int(_, _) | cfg::Value::Symbol(_, _) => false,
             cfg::Value::Reg(reg) => self.is_zero_sized(reg),
             cfg::Value::Error => panic!("cannot build ir with errors"),
         }

@@ -1,6 +1,5 @@
-use std::fmt;
 pub use ast::Number;
-
+use std::fmt;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Token {
@@ -155,55 +154,54 @@ pub enum TokenKind {
 
 impl TokenKind {
     pub fn is_operator(&self) -> bool {
-        match *self {
-            TokenKind::Token(Token::Less) |
-            TokenKind::Token(Token::LessEqual) |
-            TokenKind::Token(Token::Greater) |
-            TokenKind::Token(Token::GreaterEqual) |
-            TokenKind::Token(Token::Equal) |
-            TokenKind::Token(Token::NotEqual) |
-            TokenKind::Token(Token::Plus) |
-            TokenKind::Token(Token::Minus) |
-            TokenKind::Token(Token::Star) |
-            TokenKind::Token(Token::Slash) |
-            TokenKind::Token(Token::Percent) |
-            TokenKind::Token(Token::And) |
-            TokenKind::Token(Token::Or) |
-            TokenKind::Token(Token::Assign) => true,
-            _ => false,
-        }
+        matches!(
+            *self,
+            TokenKind::Token(Token::Less)
+                | TokenKind::Token(Token::LessEqual)
+                | TokenKind::Token(Token::Greater)
+                | TokenKind::Token(Token::GreaterEqual)
+                | TokenKind::Token(Token::Equal)
+                | TokenKind::Token(Token::NotEqual)
+                | TokenKind::Token(Token::Plus)
+                | TokenKind::Token(Token::Minus)
+                | TokenKind::Token(Token::Star)
+                | TokenKind::Token(Token::Slash)
+                | TokenKind::Token(Token::Percent)
+                | TokenKind::Token(Token::And)
+                | TokenKind::Token(Token::Or)
+                | TokenKind::Token(Token::Assign)
+        )
     }
 
     pub fn can_start_expression(&self) -> bool {
-        match *self {
-            TokenKind::Ident |
-            TokenKind::Literal |
-            TokenKind::Token(Token::Plus) |
-            TokenKind::Token(Token::Minus) |
-            TokenKind::Token(Token::Star) |
-            TokenKind::Token(Token::Ampersand) |
-            TokenKind::Token(Token::LeftParen) |
-            TokenKind::Token(Token::Not) => true,
-            _ => false,
-        }
+        matches!(
+            *self,
+            TokenKind::Ident
+                | TokenKind::Literal
+                | TokenKind::Token(Token::Plus)
+                | TokenKind::Token(Token::Minus)
+                | TokenKind::Token(Token::Star)
+                | TokenKind::Token(Token::Ampersand)
+                | TokenKind::Token(Token::LeftParen)
+                | TokenKind::Token(Token::Not)
+        )
     }
 
     pub fn can_start_type(&self) -> bool {
-        match *self {
-            TokenKind::Token(Token::Keyword(Keyword::Unit)) |
-            TokenKind::Token(Token::Star) |
-            TokenKind::Token(Token::Keyword(Keyword::Fn)) |
-            TokenKind::Token(Token::Underscore) |
-            TokenKind::Token(Token::Keyword(Keyword::I8)) |
-            TokenKind::Token(Token::Keyword(Keyword::I16)) |
-            TokenKind::Token(Token::Keyword(Keyword::I32)) |
-            TokenKind::Token(Token::Keyword(Keyword::U8)) |
-            TokenKind::Token(Token::Keyword(Keyword::U16)) |
-            TokenKind::Token(Token::Keyword(Keyword::U32)) |
-            TokenKind::Token(Token::Keyword(Keyword::Bool)) |
-            TokenKind::Ident => true,
-            _ => false,
-        }
+        matches!(
+            *self,
+            TokenKind::Token(Token::Keyword(Keyword::Unit))
+                | TokenKind::Token(Token::Star)
+                | TokenKind::Token(Token::Keyword(Keyword::Fn))
+                | TokenKind::Token(Token::Underscore)
+                | TokenKind::Token(Token::Keyword(Keyword::I8))
+                | TokenKind::Token(Token::Keyword(Keyword::I16))
+                | TokenKind::Token(Token::Keyword(Keyword::I32))
+                | TokenKind::Token(Token::Keyword(Keyword::U8))
+                | TokenKind::Token(Token::Keyword(Keyword::U16))
+                | TokenKind::Token(Token::Keyword(Keyword::U32))
+                | TokenKind::Token(Token::Keyword(Keyword::Bool))
+        )
     }
 }
 

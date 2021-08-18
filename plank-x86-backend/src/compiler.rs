@@ -1,8 +1,10 @@
-use std::collections::{HashMap, HashSet};
 use plank_ir::analysis::{self, Loc};
-use plank_ir::ir::{Reg, Function, Instruction, Value, UnaryOp, BinaryOp, IntOp, Program, Block, BlockId, BlockEnd, Signedness, Size, BitOp};
+use plank_ir::ir::{
+    BinaryOp, BitOp, Block, BlockEnd, BlockId, Function, Instruction, IntOp, Program, Reg,
+    Signedness, Size, UnaryOp, Value,
+};
+use std::collections::{HashMap, HashSet};
 use x86;
-
 
 #[derive(Default, Debug, Clone)]
 struct Constraints {
@@ -25,12 +27,12 @@ fn can_be_flag(reg: Reg, f: &Function, live: &HashSet<Loc>) -> bool {
                 pos: index,
             };
             match *op {
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Greater, _, _), _, _) |
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::GreaterEq, _, _), _, _) |
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Less, _, _), _, _) |
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::LessEq, _, _), _, _) |
-                Instruction::BinaryOp(r, BinaryOp::Eq, _, _) |
-                Instruction::BinaryOp(r, BinaryOp::Neq, _, _) => {
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Greater, _, _), _, _)
+                | Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::GreaterEq, _, _), _, _)
+                | Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Less, _, _), _, _)
+                | Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::LessEq, _, _), _, _)
+                | Instruction::BinaryOp(r, BinaryOp::Eq, _, _)
+                | Instruction::BinaryOp(r, BinaryOp::Neq, _, _) => {
                     if r == reg {
                         if got_assign {
                             return false;
@@ -40,15 +42,15 @@ fn can_be_flag(reg: Reg, f: &Function, live: &HashSet<Loc>) -> bool {
                         return false;
                     }
                 }
-                Instruction::Assign(r, _) |
-                Instruction::Call(r, _, _) |
-                Instruction::CallVirt(r, _, _) |
-                Instruction::CastAssign(r, _) |
-                Instruction::DerefLoad(r, _, _) |
-                Instruction::Load(r, _, _) |
-                Instruction::Store(r, _, _) |
-                Instruction::TakeAddress(r, _, _) |
-                Instruction::UnaryOp(r, _, _) => {
+                Instruction::Assign(r, _)
+                | Instruction::Call(r, _, _)
+                | Instruction::CallVirt(r, _, _)
+                | Instruction::CastAssign(r, _)
+                | Instruction::DerefLoad(r, _, _)
+                | Instruction::Load(r, _, _)
+                | Instruction::Store(r, _, _)
+                | Instruction::TakeAddress(r, _, _)
+                | Instruction::UnaryOp(r, _, _) => {
                     if r == reg {
                         return false;
                     }
@@ -56,18 +58,18 @@ fn can_be_flag(reg: Reg, f: &Function, live: &HashSet<Loc>) -> bool {
                         return false;
                     }
                 }
-                Instruction::CallProc(_, _) |
-                Instruction::CallProcVirt(_, _) |
-                Instruction::DerefStore(_, _, _) |
-                Instruction::BinaryOp(_, _, _, _) => {
+                Instruction::CallProc(_, _)
+                | Instruction::CallProcVirt(_, _)
+                | Instruction::DerefStore(_, _, _)
+                | Instruction::BinaryOp(_, _, _, _) => {
                     if live.contains(&loc) {
                         return false;
                     }
                 }
-                Instruction::Drop(_) |
-                Instruction::Init(_) |
-                Instruction::Nop |
-                Instruction::Unreachable => {}
+                Instruction::Drop(_)
+                | Instruction::Init(_)
+                | Instruction::Nop
+                | Instruction::Unreachable => {}
             }
         }
         let loc = Loc {
@@ -121,13 +123,13 @@ fn generate_constraints(f: &Function) -> Constraints {
     for block in f.blocks.values() {
         for op in &block.ops {
             match *op {
-                Instruction::TakeAddress(_, r, _) |
-                Instruction::Load(_, r, _) |
-                Instruction::Store(r, _, _) => {
+                Instruction::TakeAddress(_, r, _)
+                | Instruction::Load(_, r, _)
+                | Instruction::Store(r, _, _) => {
                     constraints.not_register.insert(r);
                 }
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Add, _, _), _, Value::Reg(r2)) |
-                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Sub, _, _), _, Value::Reg(r2)) => {
+                Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Add, _, _), _, Value::Reg(r2))
+                | Instruction::BinaryOp(r, BinaryOp::IntOp(IntOp::Sub, _, _), _, Value::Reg(r2)) => {
                     constraints.intersect.insert((r, r2));
                     constraints.intersect.insert((r2, r));
                 }
@@ -226,12 +228,8 @@ impl Location {
     fn is_same(&self, other: Location) -> bool {
         use self::Location::*;
         match (*self, other) {
-            (Ebx, Ebx) |
-            (Ecx, Ecx) |
-            (Esi, Esi) |
-            (Edi, Edi) => true,
-            (Stack(x), Stack(y)) |
-            (Param(x), Param(y)) => x == y,
+            (Ebx, Ebx) | (Ecx, Ecx) | (Esi, Esi) | (Edi, Edi) => true,
+            (Stack(x), Stack(y)) | (Param(x), Param(y)) => x == y,
             (Flags(_), Flags(_)) => true,
             (_, _) => false,
         }
@@ -241,13 +239,8 @@ impl Location {
 impl Location {
     fn is_register(&self) -> bool {
         match *self {
-            Location::Ebx |
-            Location::Ecx |
-            Location::Esi |
-            Location::Edi => true,
-            Location::Flags(_) |
-            Location::Stack(_) |
-            Location::Param(_) => false,
+            Location::Ebx | Location::Ecx | Location::Esi | Location::Edi => true,
+            Location::Flags(_) | Location::Stack(_) | Location::Param(_) => false,
         }
     }
 
@@ -311,8 +304,8 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
             if loc.is_register() && constraints.not_register.contains(&reg) {
                 continue;
             }
-            if (loc.is_same(Location::Ebx) || loc.is_same(Location::Ecx)) &&
-                (size != 1 && size != 2 && size != 4)
+            if (loc.is_same(Location::Ebx) || loc.is_same(Location::Ecx))
+                && (size != 1 && size != 2 && size != 4)
             {
                 continue;
             }
@@ -321,9 +314,9 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
             }
             let mut is_ok = true;
             for &other in f.registers.keys() {
-                if other != reg &&
-                    constraints.intersect.contains(&(reg, other)) &&
-                    locations.get(&other).map(|l| l.is_same(loc)) == Some(true)
+                if other != reg
+                    && constraints.intersect.contains(&(reg, other))
+                    && locations.get(&other).map(|l| l.is_same(loc)) == Some(true)
                 {
                     is_ok = false;
                     break;
@@ -389,7 +382,12 @@ fn allocate_locations(f: &Function) -> (HashMap<Reg, Location>, u32) {
 }
 
 fn order_blocks(f: &Function) -> Vec<BlockId> {
-    fn walk_from(block: BlockId, f: &Function, used: &mut HashSet<BlockId>, result: &mut Vec<BlockId>) {
+    fn walk_from(
+        block: BlockId,
+        f: &Function,
+        used: &mut HashSet<BlockId>,
+        result: &mut Vec<BlockId>,
+    ) {
         if used.contains(&block) {
             return;
         }
@@ -456,19 +454,27 @@ impl<'a> FnCompiler<'a> {
     fn emit_function_intro(&mut self) {
         let mut backup = 0;
         if self.is_location_used(Location::Ebx) {
-            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ebx)));
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(
+                x86::Register::Ebx,
+            )));
             backup += 4;
         }
         if self.is_location_used(Location::Ecx) {
-            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Ecx)));
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(
+                x86::Register::Ecx,
+            )));
             backup += 4;
         }
         if self.is_location_used(Location::Esi) {
-            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Esi)));
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(
+                x86::Register::Esi,
+            )));
             backup += 4;
         }
         if self.is_location_used(Location::Edi) {
-            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(x86::Register::Edi)));
+            self.emitter.emit(x86::Instruction::Push(x86::Rm::Register(
+                x86::Register::Edi,
+            )));
             backup += 4;
         }
         if self.stack_size > 0 {
@@ -486,15 +492,13 @@ impl<'a> FnCompiler<'a> {
         let block = &self.f.blocks[&id];
         for op in &block.ops {
             match *op {
-                Instruction::Init(_) |
-                Instruction::Drop(_) |
-                Instruction::Nop => {}
+                Instruction::Init(_) | Instruction::Drop(_) | Instruction::Nop => {}
                 _ => return BlockEnd::Jump(id),
             }
         }
         match block.end {
             BlockEnd::Jump(to) => self.go_to_block(to),
-            ref other => other.clone(), 
+            ref other => other.clone(),
         }
     }
 
@@ -502,9 +506,7 @@ impl<'a> FnCompiler<'a> {
         let block = &self.f.blocks[&id];
         for op in &block.ops {
             match *op {
-                Instruction::Init(_) |
-                Instruction::Drop(_) |
-                Instruction::Nop => {}
+                Instruction::Init(_) | Instruction::Drop(_) | Instruction::Nop => {}
                 _ => {
                     self.referenced_blocks.insert(id);
                     return self.block_labels[&id].clone();
@@ -523,14 +525,11 @@ impl<'a> FnCompiler<'a> {
     fn emit_block(&mut self, block: &Block) {
         for op in &block.ops {
             match *op {
-                Instruction::Drop(_) |
-                Instruction::Init(_) |
-                Instruction::Nop => {}
+                Instruction::Drop(_) | Instruction::Init(_) | Instruction::Nop => {}
                 Instruction::Unreachable => {
                     self.emitter.emit(x86::Instruction::Invalid);
                 }
-                Instruction::Assign(to, ref val) |
-                Instruction::CastAssign(to, ref val) => {
+                Instruction::Assign(to, ref val) | Instruction::CastAssign(to, ref val) => {
                     let to = self.to_rm(to);
                     self.emit_assign(to, val, 4);
                 }
@@ -679,35 +678,39 @@ impl<'a> FnCompiler<'a> {
                     let (to, align) = match *val {
                         Value::Reg(r) => {
                             let layout = self.f.registers[&r];
-                            (x86::Memory {
-                                register: x86::Register::Eax,
-                                offset: offset as i32,
-                                ptr_size: layout.size,
-                            }, layout.align)
+                            (
+                                x86::Memory {
+                                    register: x86::Register::Eax,
+                                    offset: offset as i32,
+                                    ptr_size: layout.size,
+                                },
+                                layout.align,
+                            )
                         }
-                        Value::Bytes(_) |
-                        Value::Symbol(_) |
-                        Value::Int(_, Size::Bit32) => {
-                            (x86::Memory {
+                        Value::Bytes(_) | Value::Symbol(_) | Value::Int(_, Size::Bit32) => (
+                            x86::Memory {
                                 register: x86::Register::Eax,
                                 offset: offset as i32,
                                 ptr_size: 4,
-                            }, 4)
-                        }
-                        Value::Int(_, Size::Bit16) => {
-                            (x86::Memory {
+                            },
+                            4,
+                        ),
+                        Value::Int(_, Size::Bit16) => (
+                            x86::Memory {
                                 register: x86::Register::Eax,
                                 offset: offset as i32,
                                 ptr_size: 2,
-                            }, 2)
-                        }
-                        Value::Int(_, Size::Bit8) => {
-                            (x86::Memory {
+                            },
+                            2,
+                        ),
+                        Value::Int(_, Size::Bit8) => (
+                            x86::Memory {
                                 register: x86::Register::Eax,
                                 offset: offset as i32,
                                 ptr_size: 1,
-                            }, 1)
-                        }
+                            },
+                            1,
+                        ),
                         Value::Undef => panic!("got undef value"),
                     };
                     let to = x86::Rm::Memory(to);
@@ -723,10 +726,7 @@ impl<'a> FnCompiler<'a> {
             let from = self.to_rm(from);
             self.emit_move(from, to, align);
         } else {
-            let args = x86::TwoArgs::RmImm(
-                to,
-                self.to_immediate(from),
-            );
+            let args = x86::TwoArgs::RmImm(to, self.to_immediate(from));
             self.emitter.emit(x86::Instruction::Mov(args));
         }
     }
@@ -734,26 +734,17 @@ impl<'a> FnCompiler<'a> {
     fn emit_move(&mut self, from: x86::Rm, to: x86::Rm, align: u32) {
         match (to, from) {
             (x86::Rm::Memory(mem), x86::Rm::Register(reg)) => {
-                let args = x86::TwoArgs::RmReg(
-                    x86::Rm::Memory(mem),
-                    reg,
-                );
+                let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mem), reg);
                 self.emitter.emit(x86::Instruction::Mov(args));
             }
             (x86::Rm::Register(r1), x86::Rm::Register(r2)) => {
                 if r1 != r2 {
-                    let args = x86::TwoArgs::RmReg(
-                        x86::Rm::Register(r1),
-                        r2,
-                    );
+                    let args = x86::TwoArgs::RmReg(x86::Rm::Register(r1), r2);
                     self.emitter.emit(x86::Instruction::Mov(args));
                 }
             }
             (x86::Rm::Register(reg), x86::Rm::Memory(mem)) => {
-                let args = x86::TwoArgs::RegRm(
-                    reg,
-                    x86::Rm::Memory(mem),
-                );
+                let args = x86::TwoArgs::RegRm(reg, x86::Rm::Memory(mem));
                 self.emitter.emit(x86::Instruction::Mov(args));
             }
             (x86::Rm::Memory(mut m1), x86::Rm::Memory(mut m2)) => {
@@ -768,21 +759,17 @@ impl<'a> FnCompiler<'a> {
                         gcd(b, a % b)
                     }
                 }
-                let block = gcd((align + 3) % 4 + 1, m1.ptr_size).min(m1.ptr_size).min(4);
+                let block = gcd((align + 3) % 4 + 1, m1.ptr_size)
+                    .min(m1.ptr_size)
+                    .min(4);
                 match block {
                     0 => {}
                     1 => {
-                        let mm1 = x86::Memory { ptr_size: 1, .. m1 };
-                        let mm2 = x86::Memory { ptr_size: 1, .. m2 };
-                        let args = x86::TwoArgs::RegRm(
-                            x86::Register::Dl,
-                            x86::Rm::Memory(mm2),
-                        );
+                        let mm1 = x86::Memory { ptr_size: 1, ..m1 };
+                        let mm2 = x86::Memory { ptr_size: 1, ..m2 };
+                        let args = x86::TwoArgs::RegRm(x86::Register::Dl, x86::Rm::Memory(mm2));
                         self.emitter.emit(x86::Instruction::Mov(args));
-                        let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(mm1),
-                            x86::Register::Dl,
-                        );
+                        let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mm1), x86::Register::Dl);
                         self.emitter.emit(x86::Instruction::Mov(args));
                         m1.ptr_size -= 1;
                         m2.ptr_size -= 1;
@@ -791,17 +778,11 @@ impl<'a> FnCompiler<'a> {
                         self.emit_move(x86::Rm::Memory(m2), x86::Rm::Memory(m1), align);
                     }
                     2 | 3 => {
-                        let mm1 = x86::Memory { ptr_size: 2, .. m1 };
-                        let mm2 = x86::Memory { ptr_size: 2, .. m2 };
-                        let args = x86::TwoArgs::RegRm(
-                            x86::Register::Dx,
-                            x86::Rm::Memory(mm2),
-                        );
+                        let mm1 = x86::Memory { ptr_size: 2, ..m1 };
+                        let mm2 = x86::Memory { ptr_size: 2, ..m2 };
+                        let args = x86::TwoArgs::RegRm(x86::Register::Dx, x86::Rm::Memory(mm2));
                         self.emitter.emit(x86::Instruction::Mov(args));
-                        let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(mm1),
-                            x86::Register::Dx,
-                        );
+                        let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mm1), x86::Register::Dx);
                         self.emitter.emit(x86::Instruction::Mov(args));
                         m1.ptr_size -= 2;
                         m2.ptr_size -= 2;
@@ -810,17 +791,11 @@ impl<'a> FnCompiler<'a> {
                         self.emit_move(x86::Rm::Memory(m2), x86::Rm::Memory(m1), align);
                     }
                     _ => {
-                        let mm1 = x86::Memory { ptr_size: 4, .. m1 };
-                        let mm2 = x86::Memory { ptr_size: 4, .. m2 };
-                        let args = x86::TwoArgs::RegRm(
-                            x86::Register::Edx,
-                            x86::Rm::Memory(mm2),
-                        );
+                        let mm1 = x86::Memory { ptr_size: 4, ..m1 };
+                        let mm2 = x86::Memory { ptr_size: 4, ..m2 };
+                        let args = x86::TwoArgs::RegRm(x86::Register::Edx, x86::Rm::Memory(mm2));
                         self.emitter.emit(x86::Instruction::Mov(args));
-                        let args = x86::TwoArgs::RmReg(
-                            x86::Rm::Memory(mm1),
-                            x86::Register::Edx,
-                        );
+                        let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mm1), x86::Register::Edx);
                         self.emitter.emit(x86::Instruction::Mov(args));
                         m1.ptr_size -= 4;
                         m2.ptr_size -= 4;
@@ -856,20 +831,16 @@ impl<'a> FnCompiler<'a> {
                 debug_assert_eq!(size, 4);
                 x86::Rm::Register(x86::Register::Esi)
             }
-            Location::Stack(offset) => {
-                x86::Rm::Memory(x86::Memory {
-                    register: x86::Register::Esp,
-                    offset: self.stack_size as i32 - self.backup_space as i32 - offset as i32,
-                    ptr_size: size,
-                })
-            }
-            Location::Param(offset) => {
-                x86::Rm::Memory(x86::Memory {
-                    register: x86::Register::Esp,
-                    offset: (offset + self.stack_size) as i32,
-                    ptr_size: size,
-                })
-            }
+            Location::Stack(offset) => x86::Rm::Memory(x86::Memory {
+                register: x86::Register::Esp,
+                offset: self.stack_size as i32 - self.backup_space as i32 - offset as i32,
+                ptr_size: size,
+            }),
+            Location::Param(offset) => x86::Rm::Memory(x86::Memory {
+                register: x86::Register::Esp,
+                offset: (offset + self.stack_size) as i32,
+                ptr_size: size,
+            }),
             Location::Flags(_) => panic!("cannot convert flag location to r/m"),
         }
     }
@@ -891,10 +862,10 @@ impl<'a> FnCompiler<'a> {
                     self.emit_block_end(&BlockEnd::Jump(b));
                 }
             }
-            BlockEnd::Branch(Value::Int(_, _), a, _) |
-            BlockEnd::Branch(Value::Bytes(_), a, _) |
-            BlockEnd::Branch(Value::Symbol(_), a, _) |
-            BlockEnd::Jump(a) => {
+            BlockEnd::Branch(Value::Int(_, _), a, _)
+            | BlockEnd::Branch(Value::Bytes(_), a, _)
+            | BlockEnd::Branch(Value::Symbol(_), a, _)
+            | BlockEnd::Jump(a) => {
                 let end = self.go_to_block(a);
                 if let BlockEnd::Jump(a) = end {
                     self.referenced_blocks.insert(a);
@@ -911,32 +882,22 @@ impl<'a> FnCompiler<'a> {
                     if self.next_block == Some(a) {
                         self.referenced_blocks.insert(a);
                         let label = self.get_block_label(b);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            cond.opposite(),
-                            label,
-                        ));
+                        self.emitter
+                            .emit(x86::Instruction::Jcc(cond.opposite(), label));
                     } else if self.next_block == Some(b) {
                         self.referenced_blocks.insert(b);
                         let label = self.get_block_label(a);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            cond,
-                            label,
-                        ));
+                        self.emitter.emit(x86::Instruction::Jcc(cond, label));
                     } else {
                         let label = self.get_block_label(b);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            cond.opposite(),
-                            label,
-                        ));
+                        self.emitter
+                            .emit(x86::Instruction::Jcc(cond.opposite(), label));
                         self.emit_block_end(&BlockEnd::Jump(a));
                     }
                 } else {
                     match self.to_rm(r) {
                         x86::Rm::Register(reg) => {
-                            let args = x86::TwoArgs::RegRm(
-                                reg,
-                                x86::Rm::Register(reg),
-                            );
+                            let args = x86::TwoArgs::RegRm(reg, x86::Rm::Register(reg));
                             self.emitter.emit(x86::Instruction::Test(args));
                         }
                         x86::Rm::Memory(mem) => {
@@ -950,23 +911,17 @@ impl<'a> FnCompiler<'a> {
                     if self.next_block == Some(a) {
                         self.referenced_blocks.insert(a);
                         let label = self.get_block_label(b);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            x86::Condition::Equal,
-                            label,
-                        ));
+                        self.emitter
+                            .emit(x86::Instruction::Jcc(x86::Condition::Equal, label));
                     } else if self.next_block == Some(b) {
                         self.referenced_blocks.insert(b);
                         let label = self.get_block_label(a);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            x86::Condition::NotEqual,
-                            label,
-                        ));
+                        self.emitter
+                            .emit(x86::Instruction::Jcc(x86::Condition::NotEqual, label));
                     } else {
                         let label = self.get_block_label(b);
-                        self.emitter.emit(x86::Instruction::Jcc(
-                            x86::Condition::Equal,
-                            label,
-                        ));
+                        self.emitter
+                            .emit(x86::Instruction::Jcc(x86::Condition::Equal, label));
                         self.emit_block_end(&BlockEnd::Jump(a));
                     }
                 }
@@ -976,8 +931,7 @@ impl<'a> FnCompiler<'a> {
             }
             BlockEnd::Return(ref val) => {
                 match *val {
-                    Value::Bytes(_) |
-                    Value::Symbol(_) => {
+                    Value::Bytes(_) | Value::Symbol(_) => {
                         self.emit_assign(x86::Rm::Register(x86::Register::Eax), val, 4);
                     }
                     Value::Undef => panic!("got undef value"),
@@ -1034,16 +988,20 @@ impl<'a> FnCompiler<'a> {
 
     fn emit_register_restores(&mut self) {
         if self.is_location_used(Location::Edi) {
-            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
+            self.emitter
+                .emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Edi)));
         }
         if self.is_location_used(Location::Esi) {
-            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
+            self.emitter
+                .emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Esi)));
         }
         if self.is_location_used(Location::Ecx) {
-            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
+            self.emitter
+                .emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ecx)));
         }
         if self.is_location_used(Location::Ebx) {
-            self.emitter.emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
+            self.emitter
+                .emit(x86::Instruction::Pop(x86::Rm::Register(x86::Register::Ebx)));
         }
     }
 
@@ -1056,20 +1014,12 @@ impl<'a> FnCompiler<'a> {
         address.ptr_size = 4;
         match self.to_rm(to) {
             x86::Rm::Register(reg) => {
-                self.emitter.emit(x86::Instruction::Lea(
-                    reg,
-                    address,
-                ));
+                self.emitter.emit(x86::Instruction::Lea(reg, address));
             }
             x86::Rm::Memory(mem) => {
-                self.emitter.emit(x86::Instruction::Lea(
-                    x86::Register::Edx,
-                    address,
-                ));
-                let args = x86::TwoArgs::RmReg(
-                    x86::Rm::Memory(mem),
-                    x86::Register::Edx,
-                );
+                self.emitter
+                    .emit(x86::Instruction::Lea(x86::Register::Edx, address));
+                let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mem), x86::Register::Edx);
                 self.emitter.emit(x86::Instruction::Mov(args));
             }
         }
@@ -1091,21 +1041,15 @@ impl<'a> FnCompiler<'a> {
                 let dest = self.locations[&to];
                 let to = self.to_rm(to);
                 let (a, b) = match (a, b) {
-                    (_, &Value::Reg(r)) if self.locations[&r].is_same(dest) => {
-                        (b, a)
-                    }
+                    (_, &Value::Reg(r)) if self.locations[&r].is_same(dest) => (b, a),
                     (a, b) => (a, b),
                 };
                 self.emit_assign(to, a, 4);
                 let args = if let Value::Reg(r) = *b {
                     let r = self.to_rm(r);
                     match (to, r) {
-                        (x86::Rm::Register(to), _) => {
-                            x86::TwoArgs::RegRm(to, r)
-                        }
-                        (_, x86::Rm::Register(r)) => {
-                            x86::TwoArgs::RmReg(to, r)
-                        }
+                        (x86::Rm::Register(to), _) => x86::TwoArgs::RegRm(to, r),
+                        (_, x86::Rm::Register(r)) => x86::TwoArgs::RmReg(to, r),
                         (x86::Rm::Memory(to), x86::Rm::Memory(r)) => {
                             let temp = match r.ptr_size {
                                 1 => x86::Register::Dl,
@@ -1113,15 +1057,9 @@ impl<'a> FnCompiler<'a> {
                                 4 => x86::Register::Edx,
                                 _ => panic!("bad param size"),
                             };
-                            let args = x86::TwoArgs::RegRm(
-                                temp,
-                                x86::Rm::Memory(r),
-                            );
+                            let args = x86::TwoArgs::RegRm(temp, x86::Rm::Memory(r));
                             self.emitter.emit(x86::Instruction::Mov(args));
-                            x86::TwoArgs::RmReg(
-                                x86::Rm::Memory(to),
-                                temp,
-                            )
+                            x86::TwoArgs::RmReg(x86::Rm::Memory(to), temp)
                         }
                     }
                 } else {
@@ -1133,25 +1071,35 @@ impl<'a> FnCompiler<'a> {
                     BitOp::Xor => self.emitter.emit(x86::Instruction::Xor(args)),
                 }
             }
-            BinaryOp::IntOp(IntOp::Greater, _, size) |
-            BinaryOp::IntOp(IntOp::GreaterEq, _, size) |
-            BinaryOp::IntOp(IntOp::Less, _, size) |
-            BinaryOp::IntOp(IntOp::LessEq, _, size) => {
+            BinaryOp::IntOp(IntOp::Greater, _, size)
+            | BinaryOp::IntOp(IntOp::GreaterEq, _, size)
+            | BinaryOp::IntOp(IntOp::Less, _, size)
+            | BinaryOp::IntOp(IntOp::LessEq, _, size) => {
                 let mut cond = match op {
-                    BinaryOp::IntOp(IntOp::Greater, Signedness::Signed, _) => x86::Condition::Greater,
-                    BinaryOp::IntOp(IntOp::Greater, Signedness::Unsigned, _) => x86::Condition::Above,
-                    BinaryOp::IntOp(IntOp::GreaterEq, Signedness::Signed, _) => x86::Condition::GreaterEqual,
-                    BinaryOp::IntOp(IntOp::GreaterEq, Signedness::Unsigned, _) => x86::Condition::AboveEqual,
+                    BinaryOp::IntOp(IntOp::Greater, Signedness::Signed, _) => {
+                        x86::Condition::Greater
+                    }
+                    BinaryOp::IntOp(IntOp::Greater, Signedness::Unsigned, _) => {
+                        x86::Condition::Above
+                    }
+                    BinaryOp::IntOp(IntOp::GreaterEq, Signedness::Signed, _) => {
+                        x86::Condition::GreaterEqual
+                    }
+                    BinaryOp::IntOp(IntOp::GreaterEq, Signedness::Unsigned, _) => {
+                        x86::Condition::AboveEqual
+                    }
                     BinaryOp::IntOp(IntOp::Less, Signedness::Signed, _) => x86::Condition::Less,
                     BinaryOp::IntOp(IntOp::Less, Signedness::Unsigned, _) => x86::Condition::Below,
-                    BinaryOp::IntOp(IntOp::LessEq, Signedness::Signed, _) => x86::Condition::LessEqual,
-                    BinaryOp::IntOp(IntOp::LessEq, Signedness::Unsigned, _) => x86::Condition::BelowEqual,
+                    BinaryOp::IntOp(IntOp::LessEq, Signedness::Signed, _) => {
+                        x86::Condition::LessEqual
+                    }
+                    BinaryOp::IntOp(IntOp::LessEq, Signedness::Unsigned, _) => {
+                        x86::Condition::BelowEqual
+                    }
                     _ => panic!("shit, got {:?}", op),
                 };
                 let (a, b) = match (a, b) {
-                    (&Value::Reg(_), _) => {
-                        (a, b)
-                    }
+                    (&Value::Reg(_), _) => (a, b),
                     (a, b) => {
                         cond = cond.order_opposite();
                         (b, a)
@@ -1173,40 +1121,24 @@ impl<'a> FnCompiler<'a> {
                         let a = self.to_rm(a);
                         let b = self.to_rm(b);
                         let args = match (a, b) {
-                            (x86::Rm::Register(a), _) => {
-                                x86::TwoArgs::RegRm(a, b)
-                            }
-                            (_, x86::Rm::Register(b)) => {
-                                x86::TwoArgs::RmReg(a, b)
-                            }
+                            (x86::Rm::Register(a), _) => x86::TwoArgs::RegRm(a, b),
+                            (_, x86::Rm::Register(b)) => x86::TwoArgs::RmReg(a, b),
                             (x86::Rm::Memory(a), x86::Rm::Memory(b)) => {
-                                
-                                let args = x86::TwoArgs::RegRm(
-                                    temp,
-                                    x86::Rm::Memory(b),
-                                );
+                                let args = x86::TwoArgs::RegRm(temp, x86::Rm::Memory(b));
                                 self.emitter.emit(x86::Instruction::Mov(args));
-                                x86::TwoArgs::RmReg(
-                                    x86::Rm::Memory(a),
-                                    temp,
-                                )
+                                x86::TwoArgs::RmReg(x86::Rm::Memory(a), temp)
                             }
                         };
                         self.emitter.emit(x86::Instruction::Cmp(args));
                     }
                     (&Value::Reg(a), imm) => {
-                        let args = x86::TwoArgs::RmImm(
-                            self.to_rm(a),
-                            self.to_immediate(imm),
-                        );
+                        let args = x86::TwoArgs::RmImm(self.to_rm(a), self.to_immediate(imm));
                         self.emitter.emit(x86::Instruction::Cmp(args));
                     }
                     (imma, immb) => {
                         self.emit_assign(x86::Rm::Register(temp), imma, 4);
-                        let args = x86::TwoArgs::RmImm(
-                            x86::Rm::Register(temp),
-                            self.to_immediate(immb),
-                        );
+                        let args =
+                            x86::TwoArgs::RmImm(x86::Rm::Register(temp), self.to_immediate(immb));
                         self.emitter.emit(x86::Instruction::Cmp(args));
                     }
                 }
@@ -1216,41 +1148,27 @@ impl<'a> FnCompiler<'a> {
                     self.emitter.emit(x86::Instruction::Setcc(cond, to));
                 }
             }
-            BinaryOp::IntOp(IntOp::Add, _, size) |
-            BinaryOp::IntOp(IntOp::Sub, _, size) => {
+            BinaryOp::IntOp(IntOp::Add, _, size) | BinaryOp::IntOp(IntOp::Sub, _, size) => {
                 let to = self.to_rm(to);
                 self.emit_assign(to, a, 4);
                 let args = if let Value::Reg(r) = *b {
                     let r = self.to_rm(r);
                     match (to, r) {
-                        (x86::Rm::Register(to), _) => {
-                            x86::TwoArgs::RegRm(to, r)
-                        }
-                        (_, x86::Rm::Register(r)) => {
-                            x86::TwoArgs::RmReg(to, r)
-                        }
+                        (x86::Rm::Register(to), _) => x86::TwoArgs::RegRm(to, r),
+                        (_, x86::Rm::Register(r)) => x86::TwoArgs::RmReg(to, r),
                         (x86::Rm::Memory(to), x86::Rm::Memory(r)) => {
                             let temp = match size {
                                 Size::Bit8 => x86::Register::Dl,
                                 Size::Bit16 => x86::Register::Dx,
                                 Size::Bit32 => x86::Register::Edx,
                             };
-                            let args = x86::TwoArgs::RegRm(
-                                temp,
-                                x86::Rm::Memory(r),
-                            );
+                            let args = x86::TwoArgs::RegRm(temp, x86::Rm::Memory(r));
                             self.emitter.emit(x86::Instruction::Mov(args));
-                            x86::TwoArgs::RmReg(
-                                x86::Rm::Memory(to),
-                                temp,
-                            )
+                            x86::TwoArgs::RmReg(x86::Rm::Memory(to), temp)
                         }
                     }
                 } else {
-                    x86::TwoArgs::RmImm(
-                        to,
-                        self.to_immediate(b),
-                    )
+                    x86::TwoArgs::RmImm(to, self.to_immediate(b))
                 };
                 match op {
                     BinaryOp::IntOp(IntOp::Add, _, _) => {
@@ -1297,10 +1215,10 @@ impl<'a> FnCompiler<'a> {
                 let args = x86::TwoArgs::RmReg(self.to_rm(to), areg);
                 self.emitter.emit(x86::Instruction::Mov(args));
             }
-            BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, Size::Bit8) |
-            BinaryOp::IntOp(IntOp::Div, Signedness::Signed, Size::Bit8) |
-            BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, Size::Bit8) |
-            BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, Size::Bit8) => {
+            BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, Size::Bit8)
+            | BinaryOp::IntOp(IntOp::Div, Signedness::Signed, Size::Bit8)
+            | BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, Size::Bit8)
+            | BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, Size::Bit8) => {
                 let signed = match op {
                     BinaryOp::IntOp(_, Signedness::Unsigned, _) => false,
                     BinaryOp::IntOp(_, Signedness::Signed, _) => true,
@@ -1308,15 +1226,9 @@ impl<'a> FnCompiler<'a> {
                 };
                 if let Value::Reg(r) = *a {
                     let op = if signed {
-                        x86::Instruction::MovSX(
-                            x86::Register::Ax,
-                            self.to_rm(r),
-                        )
+                        x86::Instruction::MovSX(x86::Register::Ax, self.to_rm(r))
                     } else {
-                        x86::Instruction::MovZX(
-                            x86::Register::Ax,
-                            self.to_rm(r),
-                        )
+                        x86::Instruction::MovZX(x86::Register::Ax, self.to_rm(r))
                     };
                     self.emitter.emit(op);
                 } else {
@@ -1334,14 +1246,18 @@ impl<'a> FnCompiler<'a> {
                     )));
                 }
                 let (op, from_ah) = match op {
-                    BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) =>
-                        (x86::Instruction::Div as fn(_) -> x86::Instruction, false),
-                    BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) =>
-                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, false),
-                    BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _) =>
-                        (x86::Instruction::Div as fn(_) -> x86::Instruction, true),
-                    BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) =>
-                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, true),
+                    BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) => {
+                        (x86::Instruction::Div as fn(_) -> x86::Instruction, false)
+                    }
+                    BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) => {
+                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, false)
+                    }
+                    BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _) => {
+                        (x86::Instruction::Div as fn(_) -> x86::Instruction, true)
+                    }
+                    BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) => {
+                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, true)
+                    }
                     _ => panic!("shit, got {:?}", op),
                 };
                 if let Value::Reg(r) = *b {
@@ -1353,18 +1269,20 @@ impl<'a> FnCompiler<'a> {
                     self.emitter.emit(op(dl));
                 }
                 let to = self.to_rm(to);
-                let from = if from_ah { x86::Register::Ah } else { x86::Register::Al };
+                let from = if from_ah {
+                    x86::Register::Ah
+                } else {
+                    x86::Register::Al
+                };
                 self.emit_move(x86::Rm::Register(from), to, 4);
             }
-            BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) |
-            BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) |
-            BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _) |
-            BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) => {
+            BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _)
+            | BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _)
+            | BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _)
+            | BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) => {
                 let (areg, dreg) = match op {
-                    BinaryOp::IntOp(_, _, Size::Bit16) =>
-                        (x86::Register::Ax, x86::Register::Dx),
-                    BinaryOp::IntOp(_, _, Size::Bit32) =>
-                        (x86::Register::Eax, x86::Register::Edx),
+                    BinaryOp::IntOp(_, _, Size::Bit16) => (x86::Register::Ax, x86::Register::Dx),
+                    BinaryOp::IntOp(_, _, Size::Bit32) => (x86::Register::Eax, x86::Register::Edx),
                     _ => panic!("shit, got {:?}", op),
                 };
                 let signed = match op {
@@ -1374,12 +1292,10 @@ impl<'a> FnCompiler<'a> {
                 };
                 if let Value::Reg(r) = *a {
                     let a = self.to_rm(r);
-                    self.emitter.emit(x86::Instruction::Mov(x86::TwoArgs::RegRm(
-                        areg,
-                        a,
-                    )));
+                    self.emitter
+                        .emit(x86::Instruction::Mov(x86::TwoArgs::RegRm(areg, a)));
                 } else {
-                    let mut imm = self.to_immediate(a);
+                    let imm = self.to_immediate(a);
                     self.emitter.emit(x86::Instruction::Mov(x86::TwoArgs::RmImm(
                         x86::Rm::Register(areg),
                         imm,
@@ -1398,14 +1314,18 @@ impl<'a> FnCompiler<'a> {
                     )));
                 }
                 let (op, from_dx) = match op {
-                    BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) =>
-                        (x86::Instruction::Div as fn(_) -> x86::Instruction, false),
-                    BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) =>
-                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, false),
-                    BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _) =>
-                        (x86::Instruction::Div as fn(_) -> x86::Instruction, true),
-                    BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) =>
-                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, true),
+                    BinaryOp::IntOp(IntOp::Div, Signedness::Unsigned, _) => {
+                        (x86::Instruction::Div as fn(_) -> x86::Instruction, false)
+                    }
+                    BinaryOp::IntOp(IntOp::Div, Signedness::Signed, _) => {
+                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, false)
+                    }
+                    BinaryOp::IntOp(IntOp::Mod, Signedness::Unsigned, _) => {
+                        (x86::Instruction::Div as fn(_) -> x86::Instruction, true)
+                    }
+                    BinaryOp::IntOp(IntOp::Mod, Signedness::Signed, _) => {
+                        (x86::Instruction::Idiv as fn(_) -> x86::Instruction, true)
+                    }
                     _ => panic!("shit, got {:?}", op),
                 };
                 if let Value::Reg(r) = *b {
@@ -1425,8 +1345,7 @@ impl<'a> FnCompiler<'a> {
                 let from = if from_dx { dreg } else { areg };
                 self.emit_move(x86::Rm::Register(from), to, 4);
             }
-            BinaryOp::Eq |
-            BinaryOp::Neq => {
+            BinaryOp::Eq | BinaryOp::Neq => {
                 let eq = if let BinaryOp::Eq = op { true } else { false };
                 let (a, b) = if let Value::Reg(_) = *a {
                     (a, b)
@@ -1440,10 +1359,8 @@ impl<'a> FnCompiler<'a> {
                         self.emit_compare(ar, br, eq);
                     } else {
                         let imm = self.to_immediate(b);
-                        self.emitter.emit(x86::Instruction::Cmp(x86::TwoArgs::RmImm(
-                            ar,
-                            imm,
-                        )));
+                        self.emitter
+                            .emit(x86::Instruction::Cmp(x86::TwoArgs::RmImm(ar, imm)));
                     }
                 } else {
                     let temp = match *a {
@@ -1483,39 +1400,24 @@ impl<'a> FnCompiler<'a> {
     fn emit_compare(&mut self, a: x86::Rm, b: x86::Rm, eq: bool) {
         match (a, b) {
             (x86::Rm::Memory(mem), x86::Rm::Register(reg)) => {
-                let args = x86::TwoArgs::RmReg(
-                    x86::Rm::Memory(mem),
-                    reg,
-                );
+                let args = x86::TwoArgs::RmReg(x86::Rm::Memory(mem), reg);
                 self.emitter.emit(x86::Instruction::Cmp(args));
             }
             (x86::Rm::Register(r1), x86::Rm::Register(r2)) => {
-                let args = x86::TwoArgs::RmReg(
-                    x86::Rm::Register(r1),
-                    r2,
-                );
+                let args = x86::TwoArgs::RmReg(x86::Rm::Register(r1), r2);
                 self.emitter.emit(x86::Instruction::Cmp(args));
             }
             (x86::Rm::Register(reg), x86::Rm::Memory(mem)) => {
-                let args = x86::TwoArgs::RegRm(
-                    reg,
-                    x86::Rm::Memory(mem),
-                );
+                let args = x86::TwoArgs::RegRm(reg, x86::Rm::Memory(mem));
                 self.emitter.emit(x86::Instruction::Cmp(args));
             }
             (x86::Rm::Memory(mut m1), x86::Rm::Memory(mut m2)) => {
                 debug_assert_eq!(m1.ptr_size, m2.ptr_size);
                 let end_label = self.emitter.make_label();
                 while m1.ptr_size > 0 {
-                    let args = x86::TwoArgs::RegRm(
-                        x86::Register::Edx,
-                        x86::Rm::Memory(m2),
-                    );
+                    let args = x86::TwoArgs::RegRm(x86::Register::Edx, x86::Rm::Memory(m2));
                     self.emitter.emit(x86::Instruction::Mov(args));
-                    let args = x86::TwoArgs::RmReg(
-                        x86::Rm::Memory(m1),
-                        x86::Register::Edx,
-                    );
+                    let args = x86::TwoArgs::RmReg(x86::Rm::Memory(m1), x86::Register::Edx);
                     self.emitter.emit(x86::Instruction::Cmp(args));
                     m1.ptr_size -= 4;
                     m2.ptr_size -= 4;
@@ -1539,9 +1441,7 @@ impl<'a> FnCompiler<'a> {
         let mut total_size = 0u32;
         for arg in args {
             match *arg {
-                Value::Bytes(_) |
-                Value::Int(_, _) |
-                Value::Symbol(_) => total_size += 4,
+                Value::Bytes(_) | Value::Int(_, _) | Value::Symbol(_) => total_size += 4,
                 Value::Reg(r) => total_size += (self.f.registers[&r].size + 3) / 4 * 4,
                 Value::Undef => panic!("got undef"),
             }
@@ -1549,9 +1449,7 @@ impl<'a> FnCompiler<'a> {
         let mut offset = 0;
         for arg in args {
             let to = match *arg {
-                Value::Bytes(_) |
-                Value::Int(_, Size::Bit32) |
-                Value::Symbol(_) => {
+                Value::Bytes(_) | Value::Int(_, Size::Bit32) | Value::Symbol(_) => {
                     offset += 4;
                     x86::Memory {
                         register: x86::Register::Esp,
@@ -1594,8 +1492,7 @@ impl<'a> FnCompiler<'a> {
 
     fn value_size(&self, val: &Value) -> u32 {
         match *val {
-            Value::Bytes(_) |
-            Value::Symbol(_) => 4,
+            Value::Bytes(_) | Value::Symbol(_) => 4,
             Value::Int(_, size) => size.in_bytes(),
             Value::Reg(r) => self.f.registers[&r].size,
             Value::Undef => panic!("got undef"),
@@ -1613,7 +1510,9 @@ fn compile_function(f: &Function, emitter: &mut Emitter) {
         }
         compiler.current_block = id;
         compiler.next_block = blocks.get(index + 1).cloned();
-        compiler.emitter.emit(x86::Instruction::Label(compiler.block_labels[&id].clone()));
+        compiler
+            .emitter
+            .emit(x86::Instruction::Label(compiler.block_labels[&id].clone()));
         compiler.emit_block(&f.blocks[&id]);
     }
 }

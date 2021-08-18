@@ -1,7 +1,6 @@
-use std::rc::Rc;
-use ast::typed::{Mutability, Signedness, Size, Type, TypeVar};
 use super::rollback_map::Map;
-
+use ast::typed::{Mutability, Signedness, Size, Type, TypeVar};
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 enum VarTarget {
@@ -54,15 +53,17 @@ impl UnifyTable {
         let a = self.shallow_normalize(a);
         let b = self.shallow_normalize(b);
         match (a, b) {
-            (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => if a == b {
-                assert_eq!(ap.len(), bp.len());
-                for (a, b) in ap.iter().zip(bp.iter()) {
-                    self.unify_raw(a, b, false)?;
+            (Type::Concrete(a, ref ap), Type::Concrete(b, ref bp)) => {
+                if a == b {
+                    assert_eq!(ap.len(), bp.len());
+                    for (a, b) in ap.iter().zip(bp.iter()) {
+                        self.unify_raw(a, b, false)?;
+                    }
+                    Ok(())
+                } else {
+                    Err(())
                 }
-                Ok(())
-            } else {
-                Err(())
-            },
+            }
             (Type::Function(ref ap, ref a), Type::Function(ref bp, ref b)) => {
                 if ap.len() == bp.len() {
                     for (a, b) in ap.iter().zip(bp.iter()) {
@@ -87,13 +88,15 @@ impl UnifyTable {
                 self.unify_raw(a, b, false)
             }
             (Type::Pointer(Mutability::Mut, ref a), Type::Pointer(Mutability::Const, ref b))
-            if allow_coerce => {
+                if allow_coerce =>
+            {
                 self.unify_raw(a, b, false)
             }
             (Type::Var(a), ty) | (ty, Type::Var(a)) => self.unify_var_type(a, ty),
-            (Type::Bool, Type::Bool) |
-            (Type::Unit, Type::Unit) |
-            (Type::Error, _) | (_, Type::Error) => Ok(()),
+            (Type::Bool, Type::Bool)
+            | (Type::Unit, Type::Unit)
+            | (Type::Error, _)
+            | (_, Type::Error) => Ok(()),
             (_, _) => Err(()),
         }
     }

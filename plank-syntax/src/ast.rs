@@ -1,6 +1,5 @@
 use position::{Span, Spanned};
 
-
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone)]
 pub struct Ident(pub String);
 
@@ -114,7 +113,12 @@ pub enum Statement {
     Break,
     Continue,
     Return(Spanned<Expr>),
-    Let(Mutability, Spanned<Ident>, Option<Spanned<Type>>, Option<Spanned<Expr>>),
+    Let(
+        Mutability,
+        Spanned<Ident>,
+        Option<Spanned<Type>>,
+        Option<Spanned<Expr>>,
+    ),
     Block(Vec<Spanned<Statement>>),
     Expr(Spanned<Expr>),
     Error,

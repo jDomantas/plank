@@ -1,8 +1,7 @@
-use std::collections::{HashSet, VecDeque};
-use plank_syntax::position::Spanned;
 use ast::cfg::{Block, BlockEnd, BlockId, BlockLink, Function, Instruction, Program};
+use plank_syntax::position::Spanned;
+use std::collections::{HashSet, VecDeque};
 use CompileCtx;
-
 
 fn function_block_chain(f: &Function) -> VecDeque<BlockId> {
     let mut blocks = VecDeque::new();

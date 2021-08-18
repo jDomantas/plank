@@ -1,7 +1,8 @@
-use std::collections::HashMap;
-pub use plank_syntax::ast::{BinaryOp, FunctionType, Literal, Number, Signedness, Size, UnaryOp, Mutability};
+pub use plank_syntax::ast::{
+    BinaryOp, FunctionType, Literal, Mutability, Number, Signedness, Size, UnaryOp,
+};
 use plank_syntax::position::{Span, Spanned};
-
+use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
 pub struct Symbol(pub u32);
@@ -30,7 +31,12 @@ pub enum Statement {
     Break,
     Continue,
     Return(Spanned<Expr>),
-    Let(Mutability, Spanned<Symbol>, Spanned<Type>, Option<Spanned<Expr>>),
+    Let(
+        Mutability,
+        Spanned<Symbol>,
+        Spanned<Type>,
+        Option<Spanned<Expr>>,
+    ),
     Block(Vec<Spanned<Statement>>),
     Expr(Spanned<Expr>),
     Error,

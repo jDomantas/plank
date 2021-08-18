@@ -1,8 +1,8 @@
+pub mod analysis;
 pub mod ir;
 pub mod optimization;
-pub mod analysis;
-pub mod validation;
 mod printer;
+pub mod validation;
 
 pub use ir::Program;
 pub use printer::emit_program;

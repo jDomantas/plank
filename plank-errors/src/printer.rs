@@ -1,8 +1,7 @@
 //! Functions to pretty-print diagnostics.
 
-use std::collections::{BTreeMap, HashSet};
 use reporter::{Diagnostic, Note, Severity};
-
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 enum MarkerStyle {
@@ -23,16 +22,20 @@ impl MarkerStyle {
 
     fn to_marker_part(self, is_arrow: bool) -> MarkerPart {
         match self {
-            MarkerStyle::Primary => if is_arrow {
-                MarkerPart::ArrowPrimary
-            } else {
-                MarkerPart::PrimaryMarker
-            },
-            MarkerStyle::Secondary => if is_arrow {
-                MarkerPart::ArrowSecondary
-            } else {
-                MarkerPart::SecondaryMarker
-            },
+            MarkerStyle::Primary => {
+                if is_arrow {
+                    MarkerPart::ArrowPrimary
+                } else {
+                    MarkerPart::PrimaryMarker
+                }
+            }
+            MarkerStyle::Secondary => {
+                if is_arrow {
+                    MarkerPart::ArrowSecondary
+                } else {
+                    MarkerPart::SecondaryMarker
+                }
+            }
         }
     }
 }
@@ -114,7 +117,7 @@ struct Printer<'a> {
 impl<'a> Printer<'a> {
     fn new(source: &'a str) -> Self {
         Printer {
-            lines: source.lines().map(str::trim_right).collect(),
+            lines: source.lines().map(str::trim_end).collect(),
             line_markers: BTreeMap::new(),
             next_connect_col: 0,
             full_connection_cols: HashSet::new(),
@@ -198,7 +201,7 @@ impl<'a> Printer<'a> {
     }
 
     fn print_annotations(&mut self) {
-        let line_markers = ::std::mem::replace(&mut self.line_markers, BTreeMap::new());
+        let line_markers = std::mem::take(&mut self.line_markers);
         let mut last_printed = None;
         for (line, markers) in line_markers {
             if let Some(prev) = last_printed {
@@ -251,8 +254,7 @@ impl<'a> Printer<'a> {
             }
             Some(LineMarker::FromStart {
                 arrow_col, message, ..
-            }) if message.is_some() =>
-            {
+            }) if message.is_some() => {
                 self.print_markers(&markers, arrow_col + 1);
                 println!();
             }
@@ -348,9 +350,11 @@ impl<'a> Printer<'a> {
                 match *marker {
                     LineMarker::FromStart {
                         arrow_col, style, ..
-                    } => if arrow_col == col {
-                        part = part.or(style.to_marker_part(true));
-                    },
+                    } => {
+                        if arrow_col == col {
+                            part = part.or(style.to_marker_part(true));
+                        }
+                    }
                     LineMarker::FromTo {
                         start_col,
                         end_col,
@@ -394,14 +398,18 @@ impl<'a> Printer<'a> {
             };
             for marker in markers.iter().rev() {
                 match *marker {
-                    LineMarker::FromStart { arrow_col, .. } => if arrow_col == col {
-                        part = MarkerPart::SingleColumn;
-                    },
+                    LineMarker::FromStart { arrow_col, .. } => {
+                        if arrow_col == col {
+                            part = MarkerPart::SingleColumn;
+                        }
+                    }
                     LineMarker::FromTo {
                         end_col, message, ..
-                    } => if end_col == col + 1 && message.is_some() {
-                        part = MarkerPart::SingleColumn;
-                    },
+                    } => {
+                        if end_col == col + 1 && message.is_some() {
+                            part = MarkerPart::SingleColumn;
+                        }
+                    }
                 }
             }
             print!("{}", part.to_char());
@@ -430,6 +438,6 @@ pub fn print_diagnostics(source: &str, diagnostics: &[Diagnostic]) {
     let mut printer = Printer::new(source);
     for diagnostic in diagnostics {
         printer.pretty_print(diagnostic);
-        println!("");
+        println!();
     }
 }
